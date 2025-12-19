@@ -163,6 +163,13 @@
       <div id="notion-content" class="notion-content"></div>
     </div>
   </div>
+  <script>
+    // Log inmediato para verificar que el HTML se carga
+    console.log('📄 HTML cargado');
+    console.log('🔍 Buscando elementos...');
+    console.log('page-list:', document.getElementById('page-list') ? '✅ encontrado' : '❌ no encontrado');
+    console.log('notion-container:', document.getElementById('notion-container') ? '✅ encontrado' : '❌ no encontrado');
+  </script>
   <script type="module" src="index.js"></script>
 </body>
 </html>

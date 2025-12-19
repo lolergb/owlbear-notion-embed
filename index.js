@@ -1,4 +1,8 @@
+console.log('🚀 Iniciando carga de index.js...');
+
 import OBR from "https://esm.sh/@owlbear-rodeo/sdk@3.1.0";
+
+console.log('✅ OBR SDK importado');
 
 // Importar configuración
 // Si config.js no existe, copia config.example.js a config.js y completa los datos
@@ -10,8 +14,13 @@ import {
 
 // Verificar que las páginas se cargaron correctamente
 console.log('✅ Config.js cargado');
-console.log('Páginas importadas:', NOTION_PAGES?.length || 0);
-console.log('Nombres de páginas:', NOTION_PAGES?.map(p => p.name) || []);
+console.log('📄 Páginas importadas:', NOTION_PAGES?.length || 0);
+if (NOTION_PAGES && NOTION_PAGES.length > 0) {
+  console.log('📝 Nombres de páginas:', NOTION_PAGES.map(p => p.name));
+  console.log('🔗 URLs:', NOTION_PAGES.map(p => p.url));
+} else {
+  console.warn('⚠️ No se encontraron páginas en config.js');
+}
 
 // Manejo de errores global para capturar problemas de carga
 window.addEventListener('error', (event) => {
@@ -325,11 +334,13 @@ function showNotionBlockedMessage(container, url) {
 }
 
 // Intentar inicializar Owlbear con manejo de errores
+console.log('🔄 Intentando inicializar Owlbear SDK...');
+
 try {
   OBR.onReady(() => {
-    console.log('Owlbear SDK listo');
-    console.log('URL actual:', window.location.href);
-    console.log('Origen:', window.location.origin);
+    console.log('✅ Owlbear SDK listo');
+    console.log('🌐 URL actual:', window.location.href);
+    console.log('🔗 Origen:', window.location.origin);
     
     const pageList = document.getElementById("page-list");
 
@@ -422,7 +433,8 @@ try {
     console.log('Total de botones creados:', pageList.children.length);
   });
 } catch (error) {
-  console.error('Error al cargar el SDK de Owlbear:', error);
+  console.error('❌ Error crítico al cargar el SDK de Owlbear:', error);
+  console.error('Stack:', error.stack);
   const pageList = document.getElementById("page-list");
   if (pageList) {
     pageList.innerHTML = `
@@ -434,4 +446,7 @@ try {
     `;
   }
 }
+
+// Log adicional para verificar que el script se ejecutó completamente
+console.log('✅ index.js cargado completamente');
 

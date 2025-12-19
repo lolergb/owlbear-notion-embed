@@ -37,7 +37,7 @@ export const NOTION_PAGES = [
   },
   {
     name: "Espíritu de las Sombras",
-    url: "https://solid-jingle-6ee.notion.site/Esp-ritu-de-las-Sombras-2b3d4856c90e81a9aef1df8eba748244?source=copy_link"
+    url: "https://solid-jingle-6ee.notion.site/Esp-ritu-de-las-Sombras-2b3d4856c90e81a9aef1df8eba748244"
   }
 ];
 `;
