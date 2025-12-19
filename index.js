@@ -1,5 +1,4 @@
-// OBR se carga desde el CDN en index.html
-const OBR = window.OBR;
+import OBR from "https://cdn.jsdelivr.net/npm/@owlbear-rodeo/sdk@1/dist/index.esm.js";
 
 // Configuración de páginas de Notion
 // Agrega aquí tus páginas públicas de Notion
@@ -39,12 +38,12 @@ OBR.onReady(() => {
     
     button.addEventListener("click", async () => {
       try {
+        console.log("Abriendo modal con URL:", page.url);
         await OBR.modal.open({
           id: `notion-modal-${index}`,
           url: page.url,
           width: Math.min(window.innerWidth * 0.9, 1200),
-          height: Math.min(window.innerHeight * 0.9, 800),
-          fullscreen: false
+          height: Math.min(window.innerHeight * 0.9, 800)
         });
       } catch (error) {
         console.error("Error al abrir modal:", error);
