@@ -134,9 +134,33 @@ owlbear-notion-embed/
 ├── config.js              # ⚠️ Configuración con token (NO subir a GitHub)
 ├── config.example.js      # Plantilla de configuración
 ├── notion-markdown.css    # Estilos para renderizar contenido
+├── test-notion-api.js     # Script de prueba de la API
+├── build-config.js        # Script de build para Netlify
 ├── icon.svg               # Icono de la extensión (opcional)
 └── README.md              # Esta documentación
 ```
+
+## 🧪 Probar que funciona
+
+Antes de usar la extensión, verifica que la API de Notion esté configurada correctamente:
+
+```bash
+# Ejecuta el script de prueba
+npm test
+# o directamente:
+node test-notion-api.js
+```
+
+El script verificará:
+- ✅ Que `config.js` existe y tiene el token configurado
+- ✅ Que el token es válido
+- ✅ Que puede acceder a las páginas configuradas
+- ✅ Que obtiene los bloques correctamente
+
+**Si hay errores:**
+- **Token no válido:** Verifica que el token sea correcto en `config.js`
+- **Sin permisos:** Asegúrate de que la integración de Notion tenga acceso a las páginas
+- **Página no encontrada:** Verifica que las URLs en `config.js` sean correctas
 
 ## 🎮 Uso
 
