@@ -635,106 +635,177 @@ async function loadPageContent(url, name) {
 
 // Función para mostrar el editor de JSON
 function showJSONEditor(pagesConfig) {
-  // Crear modal
-  const modal = document.createElement('div');
-  modal.id = 'json-editor-modal';
-  modal.style.cssText = `
+  // Ocultar el contenedor principal y mostrar el editor
+  const mainContainer = document.querySelector('.container');
+  const pageList = document.getElementById("page-list");
+  const notionContainer = document.getElementById("notion-container");
+  
+  if (mainContainer) mainContainer.classList.add('hidden');
+  if (pageList) pageList.classList.add('hidden');
+  if (notionContainer) notionContainer.classList.add('hidden');
+  
+  // Crear contenedor del editor (estilo Notion)
+  const editorContainer = document.createElement('div');
+  editorContainer.id = 'json-editor-container';
+  editorContainer.style.cssText = `
     position: fixed;
     top: 0;
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(0, 0, 0, 0.9);
+    background: #1a1a1a;
     z-index: 1000;
     display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 20px;
-  `;
-  
-  const modalContent = document.createElement('div');
-  modalContent.style.cssText = `
-    background: #1a1a1a;
-    border-radius: 12px;
-    padding: 24px;
-    max-width: 800px;
-    width: 100%;
-    max-height: 90vh;
-    display: flex;
     flex-direction: column;
-    color: #e0e0e0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
   `;
   
-  modalContent.innerHTML = `
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-      <h2 style="color: #fff; margin: 0;">📝 Editar JSON</h2>
-      <button id="close-json-editor" style="
-        background: transparent;
-        border: none;
-        color: #999;
-        font-size: 24px;
-        cursor: pointer;
-        padding: 0;
-        width: 32px;
-        height: 32px;
-      ">×</button>
-    </div>
-    <div style="flex: 1; display: flex; flex-direction: column; gap: 12px;">
-      <textarea id="json-textarea" style="
-        background: #0d1117;
+  // Header estilo Notion
+  const header = document.createElement('div');
+  header.style.cssText = `
+    background: #1a1a1a;
+    border-bottom: 1px solid #404040;
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  `;
+  
+  header.innerHTML = `
+    <div style="display: flex; align-items: center; gap: 12px;">
+      <button id="back-from-editor" style="
+        background: #2d2d2d;
         border: 1px solid #404040;
         border-radius: 6px;
-        padding: 16px;
-        color: #c9d1d9;
-        font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+        padding: 6px 12px;
+        color: #e0e0e0;
+        cursor: pointer;
+        font-size: 14px;
+        transition: all 0.2s;
+      ">← Volver</button>
+      <h1 style="color: #fff; font-size: 18px; font-weight: 600; margin: 0;">📝 Editar Configuración</h1>
+    </div>
+  `;
+  
+  // Área de contenido
+  const contentArea = document.createElement('div');
+  contentArea.style.cssText = `
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 24px;
+    max-width: 900px;
+    margin: 0 auto;
+    width: 100%;
+    overflow: hidden;
+  `;
+  
+  contentArea.innerHTML = `
+    <div style="margin-bottom: 16px;">
+      <p style="color: #999; font-size: 14px; margin-bottom: 12px;">
+        Edita el JSON para gestionar tus categorías y páginas. La estructura debe tener un array "categories" con objetos que contengan "name" y "pages".
+      </p>
+    </div>
+    <div style="flex: 1; display: flex; flex-direction: column; gap: 12px; min-height: 0;">
+      <textarea id="json-textarea" style="
+        background: #2d2d2d;
+        border: 1px solid #404040;
+        border-radius: 8px;
+        padding: 20px;
+        color: #e0e0e0;
+        font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', monospace;
         font-size: 13px;
-        line-height: 1.5;
+        line-height: 1.6;
         flex: 1;
         resize: none;
         white-space: pre;
         overflow-wrap: normal;
         overflow-x: auto;
+        overflow-y: auto;
+        transition: border-color 0.2s;
       ">${JSON.stringify(pagesConfig, null, 2)}</textarea>
-      <div style="display: flex; gap: 8px; justify-content: flex-end;">
+      <div id="json-error" style="
+        color: #ff6b6b;
+        font-size: 13px;
+        display: none;
+        padding: 12px 16px;
+        background: rgba(255, 107, 107, 0.1);
+        border: 1px solid rgba(255, 107, 107, 0.3);
+        border-radius: 6px;
+      "></div>
+      <div style="display: flex; gap: 8px; justify-content: flex-end; padding-top: 12px; border-top: 1px solid #404040;">
         <button id="reset-json" style="
-          background: #dc3545;
-          border: none;
+          background: #2d2d2d;
+          border: 1px solid #404040;
           border-radius: 6px;
           padding: 10px 20px;
-          color: #fff;
+          color: #e0e0e0;
           cursor: pointer;
           font-size: 14px;
+          font-weight: 500;
+          transition: all 0.2s;
         ">Resetear</button>
         <button id="save-json" style="
-          background: #28a745;
+          background: #4a9eff;
           border: none;
           border-radius: 6px;
-          padding: 10px 20px;
+          padding: 10px 24px;
           color: #fff;
           cursor: pointer;
           font-size: 14px;
           font-weight: 600;
+          transition: all 0.2s;
         ">Guardar</button>
       </div>
-      <div id="json-error" style="
-        color: #dc3545;
-        font-size: 12px;
-        display: none;
-        padding: 8px;
-        background: rgba(220, 53, 69, 0.1);
-        border-radius: 4px;
-      "></div>
     </div>
   `;
   
-  modal.appendChild(modalContent);
-  document.body.appendChild(modal);
+  editorContainer.appendChild(header);
+  editorContainer.appendChild(contentArea);
+  document.body.appendChild(editorContainer);
   
-  const textarea = modalContent.querySelector('#json-textarea');
-  const errorDiv = modalContent.querySelector('#json-error');
+  const textarea = contentArea.querySelector('#json-textarea');
+  const errorDiv = contentArea.querySelector('#json-error');
+  
+  // Estilos hover para botones
+  const resetBtn = contentArea.querySelector('#reset-json');
+  const saveBtn = contentArea.querySelector('#save-json');
+  const backBtn = header.querySelector('#back-from-editor');
+  
+  resetBtn.addEventListener('mouseenter', () => {
+    resetBtn.style.background = '#3d3d3d';
+    resetBtn.style.borderColor = '#555';
+  });
+  resetBtn.addEventListener('mouseleave', () => {
+    resetBtn.style.background = '#2d2d2d';
+    resetBtn.style.borderColor = '#404040';
+  });
+  
+  saveBtn.addEventListener('mouseenter', () => {
+    saveBtn.style.background = '#5aaeff';
+  });
+  saveBtn.addEventListener('mouseleave', () => {
+    saveBtn.style.background = '#4a9eff';
+  });
+  
+  backBtn.addEventListener('mouseenter', () => {
+    backBtn.style.background = '#3d3d3d';
+    backBtn.style.borderColor = '#555';
+  });
+  backBtn.addEventListener('mouseleave', () => {
+    backBtn.style.background = '#2d2d2d';
+    backBtn.style.borderColor = '#404040';
+  });
+  
+  // Función para cerrar el editor
+  const closeEditor = () => {
+    document.body.removeChild(editorContainer);
+    if (mainContainer) mainContainer.classList.remove('hidden');
+    if (pageList) pageList.classList.remove('hidden');
+  };
   
   // Guardar JSON
-  modalContent.querySelector('#save-json').addEventListener('click', () => {
+  saveBtn.addEventListener('click', () => {
     try {
       const jsonText = textarea.value.trim();
       const parsed = JSON.parse(jsonText);
@@ -747,26 +818,29 @@ function showJSONEditor(pagesConfig) {
       // Guardar
       savePagesJSON(parsed);
       errorDiv.style.display = 'none';
+      textarea.style.borderColor = '#404040';
       
       // Cerrar y recargar
-      document.body.removeChild(modal);
+      closeEditor();
       const newConfig = getPagesJSON() || getDefaultJSON();
-      const pageList = document.getElementById("page-list");
-      if (pageList) {
-        renderPagesByCategories(newConfig, pageList);
+      const pageListEl = document.getElementById("page-list");
+      if (pageListEl) {
+        renderPagesByCategories(newConfig, pageListEl);
       }
     } catch (e) {
       errorDiv.textContent = `Error: ${e.message}`;
       errorDiv.style.display = 'block';
+      textarea.style.borderColor = '#ff6b6b';
     }
   });
   
   // Resetear JSON
-  modalContent.querySelector('#reset-json').addEventListener('click', () => {
+  resetBtn.addEventListener('click', () => {
     if (confirm('¿Resetear al JSON por defecto? Se perderán todos los cambios.')) {
       const defaultConfig = getDefaultJSON();
       textarea.value = JSON.stringify(defaultConfig, null, 2);
       errorDiv.style.display = 'none';
+      textarea.style.borderColor = '#404040';
     }
   });
   
@@ -777,24 +851,17 @@ function showJSONEditor(pagesConfig) {
       errorDiv.style.display = 'none';
       textarea.style.borderColor = '#404040';
     } catch (e) {
-      textarea.style.borderColor = '#dc3545';
+      textarea.style.borderColor = '#ff6b6b';
     }
   });
   
-  // Cerrar modal
-  modalContent.querySelector('#close-json-editor').addEventListener('click', () => {
-    document.body.removeChild(modal);
-  });
+  // Volver
+  backBtn.addEventListener('click', closeEditor);
   
-  modal.addEventListener('click', (e) => {
-    if (e.target === modal) {
-      document.body.removeChild(modal);
-    }
-  });
-  
-  // Auto-focus y seleccionar todo
+  // Auto-focus
   textarea.focus();
-  textarea.select();
+  // Scroll al inicio
+  textarea.scrollTop = 0;
 }
 
 // Log adicional para verificar que el script se ejecutó completamente
