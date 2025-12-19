@@ -128,16 +128,21 @@ GitHub Pages solo sirve archivos estáticos, por lo que no puedes usar variables
 
 ```
 owlbear-notion-embed/
-├── manifest.json          # Configuración de la extensión
-├── index.html             # Interfaz de usuario
-├── index.js               # Lógica principal
-├── config.js              # ⚠️ Configuración con token (NO subir a GitHub)
-├── config.example.js      # Plantilla de configuración
-├── notion-markdown.css    # Estilos para renderizar contenido
-├── test-notion-api.js     # Script de prueba de la API
-├── build-config.js        # Script de build para Netlify
-├── icon.svg               # Icono de la extensión (opcional)
-└── README.md              # Esta documentación
+├── manifest.json              # Configuración de la extensión
+├── index.html                 # Interfaz de usuario
+├── index.js                   # Lógica principal
+├── notion-markdown.css        # Estilos para renderizar contenido
+├── icon.svg                   # Icono de la extensión
+├── config.example.js          # Plantilla de configuración
+├── build-config.js            # Script de build para Netlify
+├── test-notion-api.js         # Script de prueba (desarrollo)
+├── netlify/
+│   └── functions/
+│       └── notion-api.js      # Netlify Function (proxy seguro)
+├── netlify.toml               # Configuración de Netlify
+├── package.json               # Configuración de Node.js
+├── .gitignore                 # Archivos ignorados por Git
+└── README.md                  # Esta documentación
 ```
 
 ## 🧪 Probar que funciona

@@ -11,6 +11,13 @@ import {
   NOTION_PAGES 
 } from "./config.js";
 
+// Importar sistema de gestión de páginas
+import {
+  getPagesConfig,
+  initializeDefaultPages,
+  getAllPagesFlat
+} from "./pages-manager.js";
+
 // El token ya no se importa directamente - se usa Netlify Function como proxy en producción
 // En desarrollo local, config.js puede tener el token, pero en producción no es necesario
 // porque el token está seguro en el servidor (Netlify Function)
@@ -427,123 +434,60 @@ try {
       console.log('🌐 URL actual:', window.location.href);
       console.log('🔗 Origen:', window.location.origin);
       
-      // Verificar que las variables se cargaron
-      console.log('🔍 Verificando variables...');
-      console.log('NOTION_PAGES existe:', !!NOTION_PAGES);
-      console.log('NOTION_PAGES es array:', Array.isArray(NOTION_PAGES));
-      console.log('NOTION_PAGES.length:', NOTION_PAGES?.length || 0);
-    
-    if (NOTION_PAGES && NOTION_PAGES.length > 0) {
-      console.log('📋 Todas las páginas:', NOTION_PAGES);
-      NOTION_PAGES.forEach((page, i) => {
-        console.log(`  ${i + 1}. ${page.name}: ${page.url}`);
-      });
-    } else {
-      console.error('❌ NOTION_PAGES está vacío o no se cargó correctamente');
-    }
-    
-    const pageList = document.getElementById("page-list");
-
-    if (!pageList) {
-      console.error('❌ No se encontró el elemento page-list');
-      return;
-    }
-
-    console.log('✅ page-list encontrado');
-
-    // Filtrar páginas válidas (que tengan URLs reales, no placeholders)
-    const validPages = NOTION_PAGES.filter(page => 
-      page.url && 
-      !page.url.includes('...') && 
-      page.url.startsWith('http')
-    );
-
-    console.log('📊 Total de páginas configuradas:', NOTION_PAGES?.length || 0);
-    console.log('✅ Páginas válidas encontradas:', validPages.length);
-    if (validPages.length > 0) {
-      console.log('📝 Páginas válidas:', validPages.map(p => `${p.name} (${p.url.substring(0, 50)}...)`));
-    } else {
-      console.warn('⚠️ No hay páginas válidas después del filtro');
-      if (NOTION_PAGES && NOTION_PAGES.length > 0) {
-        console.log('🔍 Páginas filtradas:');
-        NOTION_PAGES.forEach((page, i) => {
-          const isValid = page.url && !page.url.includes('...') && page.url.startsWith('http');
-          console.log(`  ${i + 1}. ${page.name}: ${isValid ? '✅ válida' : '❌ inválida'} - ${page.url}`);
-        });
-      }
-    }
-
-    if (validPages.length === 0) {
-      pageList.innerHTML = `
-        <div class="empty-state">
-          <p>No hay páginas configuradas</p>
-          <p>Edita <code>config.js</code> para agregar tus páginas de Notion</p>
-          <p style="font-size: 12px; margin-top: 8px; color: #888;">
-            Asegúrate de que las URLs sean completas (sin "...")
-          </p>
-        </div>
-      `;
-      return;
-    }
-
-    // Crear botones para cada página válida
-    console.log('Creando botones para', validPages.length, 'páginas');
-    validPages.forEach((page, index) => {
-      console.log(`Creando botón ${index + 1}:`, page.name);
-      const button = document.createElement("button");
-      button.className = "page-button";
-      button.innerHTML = `
-        <div class="page-name">${page.name}</div>
-        <div class="page-url">${page.url}</div>
-      `;
+      // Inicializar sistema de gestión de páginas
+      const pagesConfig = initializeDefaultPages(NOTION_PAGES);
       
-      button.addEventListener("click", async () => {
-        console.log("Cargando Notion en el popover:", page.url);
-        
-        // Obtener elementos
-        const pageList = document.getElementById("page-list");
-        const notionContainer = document.getElementById("notion-container");
-        const backButton = document.getElementById("back-button");
-        const pageTitle = document.getElementById("page-title");
-        const notionContent = document.getElementById("notion-content");
-        
-        if (pageList && notionContainer && backButton && pageTitle && notionContent) {
-          // Ocultar lista y mostrar contenedor de Notion
-          pageList.classList.add("hidden");
-          notionContainer.classList.remove("hidden");
-          backButton.classList.remove("hidden");
-          pageTitle.textContent = page.name;
-          
-          // Cargar contenido desde la API
-          await loadNotionContent(page.url, notionContainer);
-          
-          // Configurar el botón de volver (solo una vez)
-          if (!backButton.dataset.listenerAdded) {
-            backButton.addEventListener("click", () => {
-              // Volver a mostrar la lista
-              pageList.classList.remove("hidden");
-              notionContainer.classList.add("hidden");
-              backButton.classList.add("hidden");
-              pageTitle.textContent = "📚 Páginas de Notion";
-              notionContainer.classList.remove("show-content");
-              if (notionContent) {
-                notionContent.innerHTML = "";
-              }
-            });
-            backButton.dataset.listenerAdded = "true";
-          }
-        } else {
-          console.error("No se encontraron los elementos necesarios");
-          // Fallback: abrir en nueva ventana
-          window.open(page.url, '_blank', 'noopener,noreferrer');
-        }
-      });
+      // Obtener todas las páginas (desde localStorage o por defecto)
+      const allPages = getAllPagesFlat();
+      
+      // Filtrar páginas válidas
+      const validPages = allPages.filter(page => 
+        page.url && 
+        !page.url.includes('...') && 
+        page.url.startsWith('http')
+      );
 
-      pageList.appendChild(button);
-      console.log(`Botón agregado: ${page.name}`);
-    });
-    
-      console.log('Total de botones creados:', pageList.children.length);
+      console.log('📊 Total de páginas:', validPages.length);
+      console.log('📁 Categorías:', pagesConfig.categories.length);
+      
+      const pageList = document.getElementById("page-list");
+      const header = document.getElementById("header");
+
+      if (!pageList || !header) {
+        console.error('❌ No se encontraron los elementos necesarios');
+        return;
+      }
+
+      // Agregar botón de administración
+      const adminButton = document.createElement("button");
+      adminButton.className = "admin-button";
+      adminButton.innerHTML = "⚙️";
+      adminButton.title = "Gestionar páginas";
+      adminButton.style.cssText = `
+        background: #2d2d2d;
+        border: 1px solid #404040;
+        border-radius: 6px;
+        padding: 6px 12px;
+        color: #e0e0e0;
+        cursor: pointer;
+        font-size: 16px;
+        margin-left: auto;
+      `;
+      adminButton.addEventListener("click", () => showAdminPanel(pagesConfig));
+      header.appendChild(adminButton);
+
+      if (validPages.length === 0) {
+        pageList.innerHTML = `
+          <div class="empty-state">
+            <p>No hay páginas configuradas</p>
+            <p>Clic en ⚙️ para agregar páginas</p>
+          </div>
+        `;
+        return;
+      }
+
+      // Renderizar páginas agrupadas por categorías
+      renderPagesByCategories(pagesConfig, pageList, validPages);
     } catch (error) {
       console.error('❌ Error dentro de OBR.onReady:', error);
       console.error('Stack:', error.stack);
@@ -572,6 +516,364 @@ try {
       </div>
     `;
   }
+}
+
+// Función para renderizar páginas agrupadas por categorías
+function renderPagesByCategories(pagesConfig, pageList, validPages) {
+  pageList.innerHTML = '';
+  
+  pagesConfig.categories.forEach(category => {
+    // Filtrar páginas válidas de esta categoría
+    const categoryPages = category.pages.filter(page => 
+      validPages.some(vp => vp.id === page.id)
+    );
+    
+    if (categoryPages.length === 0) return;
+    
+    // Crear contenedor de categoría
+    const categoryDiv = document.createElement('div');
+    categoryDiv.className = 'category-group';
+    categoryDiv.style.cssText = 'margin-bottom: 24px;';
+    
+    // Título de categoría
+    const categoryTitle = document.createElement('h2');
+    categoryTitle.className = 'category-title';
+    categoryTitle.textContent = category.name;
+    categoryTitle.style.cssText = `
+      font-size: 14px;
+      font-weight: 600;
+      color: #999;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    `;
+    categoryDiv.appendChild(categoryTitle);
+    
+    // Contenedor de páginas de la categoría
+    const pagesContainer = document.createElement('div');
+    pagesContainer.className = 'category-pages';
+    pagesContainer.style.cssText = 'display: flex; flex-direction: column; gap: 8px;';
+    
+    // Crear botones para cada página
+    categoryPages.forEach(page => {
+      const button = document.createElement("button");
+      button.className = "page-button";
+      button.innerHTML = `
+        <div class="page-name">${page.name}</div>
+        <div class="page-url">${page.url}</div>
+      `;
+      
+      button.addEventListener("click", async () => {
+        await loadPageContent(page.url, page.name);
+      });
+      
+      pagesContainer.appendChild(button);
+    });
+    
+    categoryDiv.appendChild(pagesContainer);
+    pageList.appendChild(categoryDiv);
+  });
+}
+
+// Función para cargar contenido de una página
+async function loadPageContent(url, name) {
+  const pageList = document.getElementById("page-list");
+  const notionContainer = document.getElementById("notion-container");
+  const backButton = document.getElementById("back-button");
+  const pageTitle = document.getElementById("page-title");
+  const notionContent = document.getElementById("notion-content");
+  
+  if (pageList && notionContainer && backButton && pageTitle && notionContent) {
+    pageList.classList.add("hidden");
+    notionContainer.classList.remove("hidden");
+    backButton.classList.remove("hidden");
+    pageTitle.textContent = name;
+    
+    await loadNotionContent(url, notionContainer);
+    
+    if (!backButton.dataset.listenerAdded) {
+      backButton.addEventListener("click", () => {
+        pageList.classList.remove("hidden");
+        notionContainer.classList.add("hidden");
+        backButton.classList.add("hidden");
+        pageTitle.textContent = "📚 Páginas de Notion";
+        notionContainer.classList.remove("show-content");
+        if (notionContent) {
+          notionContent.innerHTML = "";
+        }
+      });
+      backButton.dataset.listenerAdded = "true";
+    }
+  }
+}
+
+// Función para mostrar el panel de administración
+function showAdminPanel(pagesConfig) {
+  // Importar funciones de gestión dinámicamente
+  import('./pages-manager.js').then(module => {
+    const {
+      addCategory,
+      deleteCategory,
+      addPageToCategory,
+      deletePage,
+      updatePage,
+      updateCategoryName,
+      savePagesConfig,
+      getPagesConfig,
+      getAllPagesFlat
+    } = module;
+    
+    // Crear modal de administración
+    const modal = document.createElement('div');
+    modal.id = 'admin-modal';
+    modal.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.8);
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    `;
+    
+    const modalContent = document.createElement('div');
+    modalContent.style.cssText = `
+      background: #2d2d2d;
+      border-radius: 12px;
+      padding: 24px;
+      max-width: 600px;
+      width: 100%;
+      max-height: 80vh;
+      overflow-y: auto;
+      color: #e0e0e0;
+    `;
+    
+    modalContent.innerHTML = `
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h2 style="color: #fff; margin: 0;">⚙️ Gestionar Páginas</h2>
+        <button id="close-admin" style="
+          background: transparent;
+          border: none;
+          color: #999;
+          font-size: 24px;
+          cursor: pointer;
+          padding: 0;
+          width: 32px;
+          height: 32px;
+        ">×</button>
+      </div>
+      <div id="admin-content"></div>
+    `;
+    
+    modal.appendChild(modalContent);
+    document.body.appendChild(modal);
+    
+    // Función para recargar contenido
+    const reloadAdmin = () => {
+      const config = getPagesConfig();
+      renderAdminContent(modalContent.querySelector('#admin-content'), config, module);
+    };
+    
+    // Renderizar contenido de administración
+    renderAdminContent(modalContent.querySelector('#admin-content'), pagesConfig, module, reloadAdmin);
+    
+    // Cerrar modal
+    modal.querySelector('#close-admin').addEventListener('click', () => {
+      document.body.removeChild(modal);
+      // Recargar la lista de páginas
+      const config = getPagesConfig();
+      const allPages = getAllPagesFlat();
+      const validPages = allPages.filter(page => 
+        page.url && !page.url.includes('...') && page.url.startsWith('http')
+      );
+      const pageList = document.getElementById("page-list");
+      if (pageList) {
+        renderPagesByCategories(config, pageList, validPages);
+      }
+    });
+    
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) {
+        document.body.removeChild(modal);
+      }
+    });
+  });
+}
+
+// Función para renderizar el contenido del panel de administración
+function renderAdminContent(container, pagesConfig, managerModule, reloadCallback) {
+  container.innerHTML = '';
+  
+  // Botón para agregar categoría
+  const addCategoryBtn = document.createElement('button');
+  addCategoryBtn.textContent = '+ Agregar Categoría';
+  addCategoryBtn.style.cssText = `
+    background: #4a9eff;
+    border: none;
+    border-radius: 6px;
+    padding: 10px 16px;
+    color: #fff;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 20px;
+    width: 100%;
+  `;
+  addCategoryBtn.addEventListener('click', () => {
+    const name = prompt('Nombre de la categoría:');
+    if (name && name.trim()) {
+      managerModule.addCategory(name.trim());
+      reloadCallback();
+    }
+  });
+  container.appendChild(addCategoryBtn);
+  
+  // Renderizar cada categoría
+  pagesConfig.categories.forEach(category => {
+    const categoryDiv = document.createElement('div');
+    categoryDiv.style.cssText = `
+      background: #1a1a1a;
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 16px;
+    `;
+    
+    categoryDiv.innerHTML = `
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+        <input type="text" value="${category.name}" id="cat-name-${category.id}" style="
+          background: #2d2d2d;
+          border: 1px solid #404040;
+          border-radius: 4px;
+          padding: 6px 12px;
+          color: #fff;
+          font-size: 14px;
+          flex: 1;
+          margin-right: 8px;
+        ">
+        <button class="delete-category" data-id="${category.id}" style="
+          background: #dc3545;
+          border: none;
+          border-radius: 4px;
+          padding: 6px 12px;
+          color: #fff;
+          cursor: pointer;
+          font-size: 12px;
+        ">Eliminar</button>
+      </div>
+      <div class="category-pages-list" style="margin-bottom: 12px;"></div>
+      <button class="add-page" data-category="${category.id}" style="
+        background: #28a745;
+        border: none;
+        border-radius: 4px;
+        padding: 6px 12px;
+        color: #fff;
+        cursor: pointer;
+        font-size: 12px;
+        width: 100%;
+      ">+ Agregar Página</button>
+    `;
+    
+    // Actualizar nombre de categoría
+    const nameInput = categoryDiv.querySelector(`#cat-name-${category.id}`);
+    nameInput.addEventListener('blur', () => {
+      if (nameInput.value !== category.name) {
+        managerModule.updateCategoryName(category.id, nameInput.value);
+      }
+    });
+    
+    // Eliminar categoría
+    categoryDiv.querySelector('.delete-category').addEventListener('click', () => {
+      if (confirm(`¿Eliminar categoría "${category.name}" y todas sus páginas?`)) {
+        managerModule.deleteCategory(category.id);
+        reloadCallback();
+      }
+    });
+    
+    // Renderizar páginas de la categoría
+    const pagesList = categoryDiv.querySelector('.category-pages-list');
+    category.pages.forEach(page => {
+      const pageDiv = document.createElement('div');
+      pageDiv.style.cssText = `
+        background: #2d2d2d;
+        border-radius: 6px;
+        padding: 12px;
+        margin-bottom: 8px;
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      `;
+      
+      pageDiv.innerHTML = `
+        <div style="flex: 1;">
+          <input type="text" value="${page.name}" class="page-name-input" data-page="${page.id}" style="
+            background: #1a1a1a;
+            border: 1px solid #404040;
+            border-radius: 4px;
+            padding: 4px 8px;
+            color: #fff;
+            font-size: 13px;
+            width: 100%;
+            margin-bottom: 4px;
+          ">
+          <input type="text" value="${page.url}" class="page-url-input" data-page="${page.id}" style="
+            background: #1a1a1a;
+            border: 1px solid #404040;
+            border-radius: 4px;
+            padding: 4px 8px;
+            color: #999;
+            font-size: 11px;
+            width: 100%;
+          ">
+        </div>
+        <button class="delete-page" data-category="${category.id}" data-page="${page.id}" style="
+          background: #dc3545;
+          border: none;
+          border-radius: 4px;
+          padding: 4px 8px;
+          color: #fff;
+          cursor: pointer;
+          font-size: 11px;
+        ">×</button>
+      `;
+      
+      // Actualizar página
+      const nameInput = pageDiv.querySelector('.page-name-input');
+      const urlInput = pageDiv.querySelector('.page-url-input');
+      const updatePage = () => {
+        managerModule.updatePage(category.id, page.id, nameInput.value, urlInput.value);
+      };
+      nameInput.addEventListener('blur', updatePage);
+      urlInput.addEventListener('blur', updatePage);
+      
+      // Eliminar página
+      pageDiv.querySelector('.delete-page').addEventListener('click', () => {
+        if (confirm(`¿Eliminar página "${page.name}"?`)) {
+          managerModule.deletePage(category.id, page.id);
+          reloadCallback();
+        }
+      });
+      
+      pagesList.appendChild(pageDiv);
+    });
+    
+    // Agregar página
+    categoryDiv.querySelector('.add-page').addEventListener('click', () => {
+      const name = prompt('Nombre de la página:');
+      if (!name || !name.trim()) return;
+      
+      const url = prompt('URL de la página de Notion:');
+      if (!url || !url.trim()) return;
+      
+      managerModule.addPageToCategory(category.id, name.trim(), url.trim());
+      reloadCallback();
+    });
+    
+    container.appendChild(categoryDiv);
+  });
 }
 
 // Log adicional para verificar que el script se ejecutó completamente

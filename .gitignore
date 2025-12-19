@@ -1,6 +1,18 @@
+# Dependencias
 node_modules/
+
+# Archivos del sistema
 .DS_Store
 *.log
+
+# Variables de entorno
 .env
+.env.local
+
+# Configuración local (se genera en build)
 config.js
+
+# Archivos temporales
+*.tmp
+*.temp
 
