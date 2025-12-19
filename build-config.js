@@ -30,11 +30,10 @@ export const NOTION_API_TOKEN = "${NOTION_API_TOKEN}";
 export const NOTION_API_BASE = "${NOTION_API_BASE}";
 
 // Configuración de páginas de Notion
-// Edita esto según tus necesidades o usa variables de entorno adicionales
 export const NOTION_PAGES = [
   {
     name: "Ganar Tiempo",
-    url: "https://solid-jingle-6ee.notion.site/ebd//2ccd4856c90e80febdfcd5fdfc08d0fd"
+    url: "https://solid-jingle-6ee.notion.site/Ganar-Tiempo-2ccd4856c90e80febdfcd5fdfc08d0fd"
   },
   {
     name: "Espíritu de las Sombras",
