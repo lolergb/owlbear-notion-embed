@@ -48,6 +48,11 @@ function extractNotionPageId(url) {
 
 // Función para obtener bloques de una página de Notion
 async function fetchNotionBlocks(pageId) {
+  // Verificar que el token esté configurado
+  if (!NOTION_API_TOKEN || NOTION_API_TOKEN === 'tu_token_de_notion_aqui') {
+    throw new Error('El token de la API de Notion no está configurado. Edita config.js y agrega tu token.');
+  }
+
   try {
     const response = await fetch(`${NOTION_API_BASE}/blocks/${pageId}/children`, {
       method: 'GET',
@@ -60,7 +65,14 @@ async function fetchNotionBlocks(pageId) {
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      throw new Error(`Error de API: ${response.status} - ${errorData.message || response.statusText}`);
+      
+      if (response.status === 401) {
+        throw new Error('Token inválido o sin permisos. Verifica que el token en config.js sea correcto y que la integración tenga acceso a esta página.');
+      } else if (response.status === 404) {
+        throw new Error('Página no encontrada. Verifica que la URL sea correcta y que la integración tenga acceso.');
+      } else {
+        throw new Error(`Error de API: ${response.status} - ${errorData.message || response.statusText}`);
+      }
     }
 
     const data = await response.json();
@@ -321,18 +333,28 @@ try {
       return;
     }
 
-    if (NOTION_PAGES.length === 0) {
+    // Filtrar páginas válidas (que tengan URLs reales, no placeholders)
+    const validPages = NOTION_PAGES.filter(page => 
+      page.url && 
+      !page.url.includes('...') && 
+      page.url.startsWith('http')
+    );
+
+    if (validPages.length === 0) {
       pageList.innerHTML = `
         <div class="empty-state">
           <p>No hay páginas configuradas</p>
-          <p>Edita <code>index.js</code> para agregar tus páginas de Notion</p>
+          <p>Edita <code>config.js</code> para agregar tus páginas de Notion</p>
+          <p style="font-size: 12px; margin-top: 8px; color: #888;">
+            Asegúrate de que las URLs sean completas (sin "...")
+          </p>
         </div>
       `;
       return;
     }
 
-    // Crear botones para cada página
-    NOTION_PAGES.forEach((page, index) => {
+    // Crear botones para cada página válida
+    validPages.forEach((page, index) => {
       const button = document.createElement("button");
       button.className = "page-button";
       button.innerHTML = `
