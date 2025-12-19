@@ -8,6 +8,11 @@ import {
   NOTION_PAGES 
 } from "./config.js";
 
+// Verificar que las páginas se cargaron correctamente
+console.log('✅ Config.js cargado');
+console.log('Páginas importadas:', NOTION_PAGES?.length || 0);
+console.log('Nombres de páginas:', NOTION_PAGES?.map(p => p.name) || []);
+
 // Manejo de errores global para capturar problemas de carga
 window.addEventListener('error', (event) => {
   console.error('Error global:', event.error);
@@ -340,6 +345,10 @@ try {
       page.url.startsWith('http')
     );
 
+    console.log('Total de páginas configuradas:', NOTION_PAGES.length);
+    console.log('Páginas válidas encontradas:', validPages.length);
+    console.log('Páginas válidas:', validPages.map(p => p.name));
+
     if (validPages.length === 0) {
       pageList.innerHTML = `
         <div class="empty-state">
@@ -354,7 +363,9 @@ try {
     }
 
     // Crear botones para cada página válida
+    console.log('Creando botones para', validPages.length, 'páginas');
     validPages.forEach((page, index) => {
+      console.log(`Creando botón ${index + 1}:`, page.name);
       const button = document.createElement("button");
       button.className = "page-button";
       button.innerHTML = `
@@ -405,7 +416,10 @@ try {
       });
 
       pageList.appendChild(button);
+      console.log(`Botón agregado: ${page.name}`);
     });
+    
+    console.log('Total de botones creados:', pageList.children.length);
   });
 } catch (error) {
   console.error('Error al cargar el SDK de Owlbear:', error);
