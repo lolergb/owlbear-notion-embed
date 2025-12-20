@@ -35,13 +35,25 @@ Extensión simple para embebber páginas de Notion directamente en Owlbear Rodeo
 
 ### 🔑 Obtener tu Token de Notion
 
+**Paso 1: Crear la integración**
 1. Ve a https://www.notion.so/my-integrations
-2. Clic en **"Nueva integración"** o usa una existente
-3. Copia el **"Internal Integration Token"** (empieza con `secret_`)
-4. En la extensión: **🔑** → Pega el token → **Guardar**
-5. **Importante:** Comparte tus páginas con la integración:
-   - En Notion: **Compartir** → **Invitar** → Busca el nombre de tu integración
-   - Dale acceso de lectura
+2. Clic en **"+ Nueva integración"**
+3. Dale un nombre (ej: "Owlbear Notion")
+4. Selecciona tu workspace
+5. Clic en **"Enviar"**
+
+**Paso 2: Copiar el token**
+1. En la página de la integración, busca **"Internal Integration Token"**
+2. Clic en **"Mostrar"** y copia el token (empieza con `secret_`)
+
+**Paso 3: Compartir tus páginas**
+1. En Notion, abre cada página que quieres usar
+2. Clic en **"Compartir"** (arriba a la derecha)
+3. Busca el nombre de tu integración y dale acceso
+
+**Paso 4: Configurar en la extensión**
+1. En la extensión: **🔑** → Pega el token → **Guardar**
+2. ¡Listo! Ya puedes usar tus páginas
 
 ### 📖 Uso Diario
 

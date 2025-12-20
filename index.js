@@ -1355,10 +1355,28 @@ function showTokenConfig(roomId = null) {
         <h3 style="color: #fff; font-size: 14px; font-weight: 600; margin-bottom: 12px;">📝 Cómo obtener tu token:</h3>
         <ol style="color: #ccc; font-size: 13px; line-height: 1.8; margin-left: 20px; padding-left: 0;">
           <li>Ve a <a href="https://www.notion.so/my-integrations" target="_blank" style="color: #4a9eff; text-decoration: none;">notion.so/my-integrations</a></li>
-          <li>Crea una nueva integración o usa una existente</li>
-          <li>Copia el "Internal Integration Token"</li>
-          <li>Pégalo en el campo de abajo</li>
-          <li>Asegúrate de darle acceso a las páginas que quieres usar</li>
+          <li><strong>Crea una nueva integración:</strong>
+            <ul style="margin-top: 8px; margin-left: 20px; padding-left: 0;">
+              <li>Clic en <strong>"+ Nueva integración"</strong></li>
+              <li>Dale un nombre (ej: "Owlbear Notion")</li>
+              <li>Selecciona el workspace donde están tus páginas</li>
+              <li>Clic en <strong>"Enviar"</strong></li>
+            </ul>
+          </li>
+          <li><strong>Copia el token:</strong>
+            <ul style="margin-top: 8px; margin-left: 20px; padding-left: 0;">
+              <li>En la página de la integración, busca <strong>"Internal Integration Token"</strong></li>
+              <li>Clic en <strong>"Mostrar"</strong> y copia el token (empieza con <code style="background: #1a1a1a; padding: 2px 4px; border-radius: 3px;">secret_</code>)</li>
+            </ul>
+          </li>
+          <li><strong>Comparte tus páginas:</strong>
+            <ul style="margin-top: 8px; margin-left: 20px; padding-left: 0;">
+              <li>En Notion, abre cada página que quieres usar</li>
+              <li>Clic en <strong>"Compartir"</strong> (arriba a la derecha)</li>
+              <li>Busca el nombre de tu integración y dale acceso</li>
+            </ul>
+          </li>
+          <li>Pega el token en el campo de abajo y guarda</li>
         </ol>
       </div>
       
