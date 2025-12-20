@@ -1197,10 +1197,10 @@ async function loadPageContent(url, name) {
     refreshButton.innerHTML = "🔄";
     refreshButton.title = "Recargar contenido";
     refreshButton.style.cssText = `
-      background: #2d2d2d;
-      border: 1px solid #404040;
-      border-radius: 6px;
-      padding: 6px 12px;
+      background: #ffffff1a;
+      border: 1px solid #f3e8ff66;
+      border-radius: 8px;
+      padding: 8px 12px;
       color: #e0e0e0;
       cursor: pointer;
       font-size: 16px;
@@ -1216,12 +1216,12 @@ async function loadPageContent(url, name) {
     refreshButton.dataset.pageUrl = url;
     
       refreshButton.addEventListener('mouseenter', () => {
-        refreshButton.style.background = '#3d3d3d';
-        refreshButton.style.borderColor = '#555';
+        refreshButton.style.background = '#ffffff1a';
+        refreshButton.style.borderColor = '#f3e8ff66';
       });
       refreshButton.addEventListener('mouseleave', () => {
-        refreshButton.style.background = '#2d2d2d';
-        refreshButton.style.borderColor = '#404040';
+        refreshButton.style.background = '#ffffff1a';
+        refreshButton.style.borderColor = '#f3e8ff66';
       });
     
     refreshButton.addEventListener('click', async () => {
@@ -1299,7 +1299,7 @@ function showTokenConfig(roomId = null) {
     left: 0;
     right: 0;
     bottom: 0;
-    background: #1a1a1a;
+    background: #ffffff1a;
     z-index: 1000;
     display: flex;
     flex-direction: column;
@@ -1308,7 +1308,7 @@ function showTokenConfig(roomId = null) {
   
   const header = document.createElement('div');
   header.style.cssText = `
-    background: #1a1a1a;
+    background: #ffffff1a;
     border-bottom: 1px solid #404040;
     padding: 12px 16px;
     display: flex;
