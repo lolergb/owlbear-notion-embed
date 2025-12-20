@@ -772,15 +772,10 @@ async function loadNotionContent(url, container, forceRefresh = false) {
   container.classList.add('show-content');
   
   try {
-    // Verificar primero si es una URL de Notion
-    if (!isNotionUrl(url)) {
-      throw new Error('Esta función solo funciona con URLs de Notion. Use loadIframeContent() para URLs genéricas.');
-    }
-    
     // Extraer ID de la página
     const pageId = extractNotionPageId(url);
     if (!pageId) {
-      throw new Error('No se pudo extraer el ID de la página desde la URL de Notion');
+      throw new Error('No se pudo extraer el ID de la página desde la URL');
     }
     
     console.log('Obteniendo bloques para página:', pageId, forceRefresh ? '(recarga forzada - sin caché)' : '(con caché)');
@@ -806,15 +801,6 @@ async function loadNotionContent(url, container, forceRefresh = false) {
     
   } catch (error) {
     console.error('Error al cargar contenido de Notion:', error);
-    
-    // Si el error es porque no se pudo extraer el ID y la URL no es de Notion,
-    // intentar cargar en iframe como fallback
-    if (error.message.includes('No se pudo extraer el ID') && !isNotionUrl(url)) {
-      console.log('⚠️ No es una URL de Notion, intentando cargar en iframe como fallback');
-      loadIframeContent(url, container);
-      return;
-    }
-    
     contentDiv.innerHTML = `
       <div class="notion-error">
         <strong>Error al cargar el contenido:</strong><br>
@@ -1309,11 +1295,9 @@ function isNotionUrl(url) {
     const urlObj = new URL(url);
     // Verificar si es una URL de Notion
     const isNotion = urlObj.hostname.includes('notion.so') || urlObj.hostname.includes('notion.site');
-    console.log('🔍 Verificando URL:', url, '→ Es Notion:', isNotion);
     return isNotion;
   } catch (e) {
     // Si no es una URL válida, no es Notion
-    console.log('⚠️ URL inválida o no parseable:', url);
     return false;
   }
 }
