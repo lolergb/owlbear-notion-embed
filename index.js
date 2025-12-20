@@ -11,12 +11,17 @@ import {
   NOTION_PAGES 
 } from "./config.js";
 
-// Sistema simple de gestión con JSON
-const STORAGE_KEY = 'notion-pages-json';
+// Sistema simple de gestión con JSON (por room)
+const STORAGE_KEY_PREFIX = 'notion-pages-json-';
 
-function getPagesJSON() {
+function getStorageKey(roomId) {
+  return STORAGE_KEY_PREFIX + (roomId || 'default');
+}
+
+function getPagesJSON(roomId) {
   try {
-    const stored = localStorage.getItem(STORAGE_KEY);
+    const storageKey = getStorageKey(roomId);
+    const stored = localStorage.getItem(storageKey);
     if (stored) {
       return JSON.parse(stored);
     }
@@ -26,9 +31,11 @@ function getPagesJSON() {
   return null;
 }
 
-function savePagesJSON(json) {
+function savePagesJSON(json, roomId) {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(json, null, 2));
+    const storageKey = getStorageKey(roomId);
+    localStorage.setItem(storageKey, JSON.stringify(json, null, 2));
+    console.log('💾 Configuración guardada para room:', roomId);
     return true;
   } catch (e) {
     console.error('Error al guardar JSON:', e);
@@ -45,6 +52,27 @@ function getDefaultJSON() {
       }
     ]
   };
+}
+
+// Función para obtener todas las configuraciones de rooms (para debugging)
+function getAllRoomConfigs() {
+  const configs = {};
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith(STORAGE_KEY_PREFIX)) {
+        const roomId = key.replace(STORAGE_KEY_PREFIX, '');
+        try {
+          configs[roomId] = JSON.parse(localStorage.getItem(key));
+        } catch (e) {
+          console.error('Error al parsear configuración de room:', roomId, e);
+        }
+      }
+    }
+  } catch (e) {
+    console.error('Error al obtener configuraciones:', e);
+  }
+  return configs;
 }
 
 // El token ya no se importa directamente - se usa Netlify Function como proxy en producción
@@ -626,20 +654,31 @@ function showNotionBlockedMessage(container, url) {
 console.log('🔄 Intentando inicializar Owlbear SDK...');
 
 try {
-  OBR.onReady(() => {
+  OBR.onReady(async () => {
     try {
       console.log('✅ Owlbear SDK listo');
       console.log('🌐 URL actual:', window.location.href);
       console.log('🔗 Origen:', window.location.origin);
       
-      // Cargar configuración desde JSON
-      let pagesConfig = getPagesJSON();
+      // Obtener ID de la room actual
+      let roomId = null;
+      try {
+        roomId = await OBR.room.getId();
+        console.log('🏠 Room ID:', roomId);
+      } catch (e) {
+        console.warn('⚠️ No se pudo obtener el ID de la room, usando "default":', e);
+        roomId = 'default';
+      }
+      
+      // Cargar configuración desde JSON (específica para esta room)
+      let pagesConfig = getPagesJSON(roomId);
       if (!pagesConfig) {
         pagesConfig = getDefaultJSON();
-        savePagesJSON(pagesConfig);
+        savePagesJSON(pagesConfig, roomId);
+        console.log('📝 Configuración por defecto creada para room:', roomId);
       }
 
-      console.log('📊 Configuración cargada:', pagesConfig);
+      console.log('📊 Configuración cargada para room:', roomId, pagesConfig);
       
       const pageList = document.getElementById("page-list");
       const header = document.getElementById("header");
@@ -697,7 +736,7 @@ try {
         font-size: 16px;
         transition: all 0.2s;
       `;
-      adminButton.addEventListener("click", () => showJSONEditor(pagesConfig));
+      adminButton.addEventListener("click", () => showJSONEditor(pagesConfig, roomId));
       adminButton.addEventListener('mouseenter', () => {
         adminButton.style.background = '#3d3d3d';
         adminButton.style.borderColor = '#555';
@@ -744,7 +783,7 @@ try {
 }
 
 // Función para renderizar páginas agrupadas por categorías
-function renderPagesByCategories(pagesConfig, pageList) {
+function renderPagesByCategories(pagesConfig, pageList, roomId = null) {
   pageList.innerHTML = '';
   
   if (!pagesConfig || !pagesConfig.categories || pagesConfig.categories.length === 0) {
@@ -847,7 +886,7 @@ async function loadPageContent(url, name) {
 }
 
 // Función para mostrar el editor de JSON
-function showJSONEditor(pagesConfig) {
+function showJSONEditor(pagesConfig, roomId = null) {
   // Ocultar el contenedor principal y mostrar el editor
   const mainContainer = document.querySelector('.container');
   const pageList = document.getElementById("page-list");
@@ -896,7 +935,10 @@ function showJSONEditor(pagesConfig) {
         font-size: 14px;
         transition: all 0.2s;
       ">← Volver</button>
-      <h1 style="color: #fff; font-size: 18px; font-weight: 600; margin: 0;">📝 Editar Configuración</h1>
+      <div>
+        <h1 style="color: #fff; font-size: 18px; font-weight: 600; margin: 0;">📝 Editar Configuración</h1>
+        ${roomId ? `<p style="color: #999; font-size: 11px; margin: 2px 0 0 0;">Room: ${roomId}</p>` : ''}
+      </div>
     </div>
   `;
   
@@ -1030,17 +1072,17 @@ function showJSONEditor(pagesConfig) {
         throw new Error('El JSON debe tener un array "categories"');
       }
       
-      // Guardar
-      savePagesJSON(parsed);
+      // Guardar (con roomId)
+      savePagesJSON(parsed, roomId);
       errorDiv.style.display = 'none';
       textarea.style.borderColor = '#404040';
       
       // Cerrar y recargar
       closeEditor();
-      const newConfig = getPagesJSON() || getDefaultJSON();
+      const newConfig = getPagesJSON(roomId) || getDefaultJSON();
       const pageListEl = document.getElementById("page-list");
       if (pageListEl) {
-        renderPagesByCategories(newConfig, pageListEl);
+        renderPagesByCategories(newConfig, pageListEl, roomId);
       }
     } catch (e) {
       errorDiv.textContent = `Error: ${e.message}`;
@@ -1051,7 +1093,7 @@ function showJSONEditor(pagesConfig) {
   
   // Resetear JSON
   resetBtn.addEventListener('click', () => {
-    if (confirm('¿Resetear al JSON por defecto? Se perderán todos los cambios.')) {
+    if (confirm('¿Resetear al JSON por defecto? Se perderán todos los cambios para esta room.')) {
       const defaultConfig = getDefaultJSON();
       textarea.value = JSON.stringify(defaultConfig, null, 2);
       errorDiv.style.display = 'none';
