@@ -151,10 +151,7 @@ function getCachedBlocks(pageId) {
       // Verificar si el caché no ha expirado
       if (data.timestamp && (now - data.timestamp) < CACHE_EXPIRY) {
         console.log('✅ Bloques obtenidos del caché para:', pageId);
-        return {
-          blocks: data.blocks,
-          lastEditedTime: data.lastEditedTime || null
-        };
+        return data.blocks;
       } else {
         // Caché expirado, eliminarlo
         localStorage.removeItem(cacheKey);
@@ -170,16 +167,15 @@ function getCachedBlocks(pageId) {
 /**
  * Guardar bloques en el caché
  */
-function setCachedBlocks(pageId, blocks, lastEditedTime = null) {
+function setCachedBlocks(pageId, blocks) {
   try {
     const cacheKey = CACHE_PREFIX + pageId;
     const data = {
       timestamp: Date.now(),
-      blocks: blocks,
-      lastEditedTime: lastEditedTime
+      blocks: blocks
     };
     localStorage.setItem(cacheKey, JSON.stringify(data));
-    console.log('💾 Bloques guardados en caché para:', pageId, 'con lastEditedTime:', lastEditedTime);
+    console.log('💾 Bloques guardados en caché para:', pageId);
   } catch (e) {
     console.error('Error al guardar en caché:', e);
     // Si el localStorage está lleno, limpiar cachés antiguos
@@ -371,37 +367,13 @@ function renderPageIcon(icon, pageName, pageId) {
   ">${initial}</div>`;
 }
 
-// Función para obtener bloques de una página de Notion (con caché inteligente)
+// Función para obtener bloques de una página de Notion (con caché simple)
 async function fetchNotionBlocks(pageId, useCache = true) {
-  // Si hay caché, verificar si el contenido ha cambiado
+  // Intentar obtener del caché primero
   if (useCache) {
-    const cachedData = getCachedBlocks(pageId);
-    if (cachedData && cachedData.blocks) {
-      // Intentar verificar si el contenido ha cambiado comparando last_edited_time
-      try {
-        // Obtener el last_edited_time más reciente de los bloques actuales
-        const currentLastEdited = await fetchPageLastEditedTime(pageId);
-        if (currentLastEdited && cachedData.lastEditedTime) {
-          if (currentLastEdited === cachedData.lastEditedTime) {
-            console.log('✅ Contenido sin cambios, usando caché');
-            return cachedData.blocks;
-          } else {
-            console.log('🔄 Contenido modificado detectado, invalidando caché');
-            console.log('   Caché:', cachedData.lastEditedTime);
-            console.log('   Actual:', currentLastEdited);
-            // Invalidar caché
-            const cacheKey = CACHE_PREFIX + pageId;
-            localStorage.removeItem(cacheKey);
-          }
-        } else {
-          // Si no podemos verificar, usar el caché si no ha expirado
-          console.log('⚠️ No se pudo verificar cambios, usando caché si no ha expirado');
-          return cachedData.blocks;
-        }
-      } catch (e) {
-        console.warn('Error al verificar cambios, usando caché:', e);
-        return cachedData.blocks;
-      }
+    const cachedBlocks = getCachedBlocks(pageId);
+    if (cachedBlocks) {
+      return cachedBlocks;
     }
   }
   
@@ -457,29 +429,9 @@ async function fetchNotionBlocks(pageId, useCache = true) {
     const data = await response.json();
     const blocks = data.results || [];
     
-    // Obtener last_edited_time del primer bloque o de la página
-    let lastEditedTime = null;
-    if (blocks.length > 0) {
-      // Buscar el last_edited_time más reciente entre los bloques
-      const editedTimes = blocks
-        .map(b => b.last_edited_time)
-        .filter(t => t)
-        .sort()
-        .reverse();
-      if (editedTimes.length > 0) {
-        lastEditedTime = editedTimes[0];
-      }
-    }
-    
-    // Si no encontramos en los bloques, intentar obtener de la página
-    if (!lastEditedTime) {
-      const pageInfo = await fetchPageInfo(pageId);
-      lastEditedTime = pageInfo.lastEditedTime;
-    }
-    
     // Guardar en caché después de obtener exitosamente
     if (blocks.length > 0) {
-      setCachedBlocks(pageId, blocks, lastEditedTime);
+      setCachedBlocks(pageId, blocks);
     }
     
     return blocks;
@@ -1103,6 +1055,18 @@ function renderPagesByCategories(pagesConfig, pageList, roomId = null) {
   });
 }
 
+// Función para limpiar el caché de una página específica
+function clearPageCache(url) {
+  const pageId = extractNotionPageId(url);
+  if (pageId) {
+    const cacheKey = CACHE_PREFIX + pageId;
+    localStorage.removeItem(cacheKey);
+    console.log('🗑️ Caché limpiado para página:', pageId);
+    return true;
+  }
+  return false;
+}
+
 // Función para cargar contenido de una página
 async function loadPageContent(url, name) {
   const pageList = document.getElementById("page-list");
@@ -1110,12 +1074,52 @@ async function loadPageContent(url, name) {
   const backButton = document.getElementById("back-button");
   const pageTitle = document.getElementById("page-title");
   const notionContent = document.getElementById("notion-content");
+  const header = document.getElementById("header");
   
-  if (pageList && notionContainer && backButton && pageTitle && notionContent) {
+  if (pageList && notionContainer && backButton && pageTitle && notionContent && header) {
     pageList.classList.add("hidden");
     notionContainer.classList.remove("hidden");
     backButton.classList.remove("hidden");
     pageTitle.textContent = name;
+    
+    // Agregar botón de recargar si no existe
+    let refreshButton = document.getElementById("refresh-page-button");
+    if (!refreshButton) {
+      refreshButton = document.createElement("button");
+      refreshButton.id = "refresh-page-button";
+      refreshButton.innerHTML = "🔄";
+      refreshButton.title = "Recargar contenido";
+      refreshButton.style.cssText = `
+        background: #2d2d2d;
+        border: 1px solid #404040;
+        border-radius: 6px;
+        padding: 6px 12px;
+        color: #e0e0e0;
+        cursor: pointer;
+        font-size: 16px;
+        transition: all 0.2s;
+        margin-left: 8px;
+      `;
+      refreshButton.addEventListener('mouseenter', () => {
+        refreshButton.style.background = '#3d3d3d';
+        refreshButton.style.borderColor = '#555';
+      });
+      refreshButton.addEventListener('mouseleave', () => {
+        refreshButton.style.background = '#2d2d2d';
+        refreshButton.style.borderColor = '#404040';
+      });
+      refreshButton.addEventListener('click', async () => {
+        // Limpiar caché de esta página y recargar
+        clearPageCache(url);
+        refreshButton.disabled = true;
+        refreshButton.innerHTML = "⏳";
+        await loadNotionContent(url, notionContainer, true);
+        refreshButton.disabled = false;
+        refreshButton.innerHTML = "🔄";
+      });
+      header.appendChild(refreshButton);
+    }
+    refreshButton.classList.remove("hidden");
     
     await loadNotionContent(url, notionContainer);
     
@@ -1128,6 +1132,10 @@ async function loadPageContent(url, name) {
         notionContainer.classList.remove("show-content");
         if (notionContent) {
           notionContent.innerHTML = "";
+        }
+        // Ocultar botón de recargar
+        if (refreshButton) {
+          refreshButton.classList.add("hidden");
         }
       });
       backButton.dataset.listenerAdded = "true";
