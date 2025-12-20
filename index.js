@@ -678,13 +678,38 @@ try {
       // Obtener ID de la room actual
       let roomId = null;
       try {
-        roomId = await OBR.room.getId();
-        console.log('🏠 Room ID obtenido:', roomId);
+        // Intentar obtener el ID de la room usando la propiedad directa
+        roomId = OBR.room.id;
+        console.log('🏠 Room ID obtenido (OBR.room.id):', roomId);
         console.log('🏠 Tipo de roomId:', typeof roomId);
         console.log('🏠 Longitud de roomId:', roomId ? roomId.length : 0);
+        
+        // Si no funciona, intentar con el método async
+        if (!roomId) {
+          console.log('🔄 Intentando con OBR.room.getId()...');
+          roomId = await OBR.room.getId();
+          console.log('🏠 Room ID obtenido (OBR.room.getId()):', roomId);
+        }
       } catch (e) {
-        console.warn('⚠️ No se pudo obtener el ID de la room, usando "default":', e);
-        roomId = 'default';
+        console.warn('⚠️ No se pudo obtener el ID de la room:', e);
+        // Intentar obtener desde el contexto o la URL
+        try {
+          const context = await OBR.context.getId();
+          console.log('🏠 Context ID obtenido:', context);
+          roomId = context;
+        } catch (e2) {
+          console.warn('⚠️ No se pudo obtener Context ID:', e2);
+          // Intentar extraer de la URL
+          const urlParams = new URLSearchParams(window.location.search);
+          const obrref = urlParams.get('obrref');
+          if (obrref) {
+            console.log('🏠 Usando obrref de URL:', obrref);
+            roomId = obrref;
+          } else {
+            console.warn('⚠️ No se encontró obrref en URL, usando "default"');
+            roomId = 'default';
+          }
+        }
       }
       
       // Verificar que roomId no sea null o undefined
@@ -692,6 +717,8 @@ try {
         console.warn('⚠️ roomId es null/undefined, usando "default"');
         roomId = 'default';
       }
+      
+      console.log('✅ Room ID final que se usará:', roomId);
       
       // Cargar configuración desde JSON (específica para esta room)
       console.log('🔍 Intentando cargar configuración para room:', roomId);
