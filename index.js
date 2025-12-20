@@ -1286,6 +1286,38 @@ function clearPageCache(url) {
   return false;
 }
 
+// Función para detectar si una URL es de Notion
+function isNotionUrl(url) {
+  try {
+    const urlObj = new URL(url);
+    // Verificar si es una URL de Notion
+    return urlObj.hostname.includes('notion.so') || urlObj.hostname.includes('notion.site');
+  } catch (e) {
+    return false;
+  }
+}
+
+// Función para cargar contenido en iframe (para URLs no-Notion)
+function loadIframeContent(url, container) {
+  const iframe = container.querySelector('#notion-iframe');
+  const contentDiv = container.querySelector('#notion-content');
+  
+  if (!iframe) {
+    console.error('No se encontró el iframe');
+    return;
+  }
+  
+  // Ocultar el contenido de Notion y mostrar el iframe
+  if (contentDiv) {
+    contentDiv.style.display = 'none';
+  }
+  container.classList.remove('show-content');
+  iframe.style.display = 'block';
+  iframe.src = url;
+  
+  console.log('📄 Cargando URL en iframe:', url);
+}
+
 // Función para cargar contenido de una página
 async function loadPageContent(url, name) {
   const pageList = document.getElementById("page-list");
@@ -1301,8 +1333,13 @@ async function loadPageContent(url, name) {
     backButton.classList.remove("hidden");
     pageTitle.textContent = name;
     
-    // Agregar o actualizar botón de recargar
-    let refreshButton = document.getElementById("refresh-page-button");
+    // Detectar si es una URL de Notion o una URL genérica
+    if (isNotionUrl(url)) {
+      // Es una URL de Notion → usar la API
+      console.log('📝 URL de Notion detectada, usando API');
+      
+      // Agregar o actualizar botón de recargar (solo para Notion)
+      let refreshButton = document.getElementById("refresh-page-button");
     if (!refreshButton) {
       refreshButton = document.createElement("button");
       refreshButton.id = "refresh-page-button";
@@ -1406,9 +1443,22 @@ async function loadPageContent(url, name) {
       }
     });
     
-    refreshButton.classList.remove("hidden");
-    
-    await loadNotionContent(url, notionContainer);
+      refreshButton.classList.remove("hidden");
+      
+      await loadNotionContent(url, notionContainer);
+    } else {
+      // No es una URL de Notion → cargar en iframe
+      console.log('🌐 URL genérica detectada, usando iframe');
+      
+      // Ocultar botón de recargar si existe (solo para Notion)
+      let refreshButton = document.getElementById("refresh-page-button");
+      if (refreshButton) {
+        refreshButton.classList.add("hidden");
+      }
+      
+      // Cargar en iframe
+      loadIframeContent(url, notionContainer);
+    }
     
     if (!backButton.dataset.listenerAdded) {
       backButton.addEventListener("click", () => {
@@ -1420,7 +1470,14 @@ async function loadPageContent(url, name) {
         if (notionContent) {
           notionContent.innerHTML = "";
         }
+        // Limpiar iframe
+        const iframe = notionContainer.querySelector('#notion-iframe');
+        if (iframe) {
+          iframe.src = '';
+          iframe.style.display = 'none';
+        }
         // Ocultar botón de recargar
+        const refreshButton = document.getElementById("refresh-page-button");
         if (refreshButton) {
           refreshButton.classList.add("hidden");
         }
