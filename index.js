@@ -1269,13 +1269,6 @@ async function loadPageContent(url, name) {
     refreshButton.id = "refresh-page-button";
     refreshButton.dataset.pageUrl = url;
     
-    // Re-agregar el icono después del clone
-    const reloadIconNew = document.createElement("img");
-    reloadIconNew.src = "img/icon-reload.svg";
-    reloadIconNew.alt = "Recargar contenido";
-    reloadIconNew.style.cssText = "width: 20px; height: 20px; display: block;";
-    refreshButton.appendChild(reloadIconNew);
-    
       refreshButton.addEventListener('mouseenter', () => {
         refreshButton.style.background = CSS_VARS.bgHover;
         refreshButton.style.borderRadius = '50%';
