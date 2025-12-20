@@ -946,7 +946,7 @@ function showJSONEditor(pagesConfig) {
         border: 1px solid rgba(255, 107, 107, 0.3);
         border-radius: 6px;
       "></div>
-      <div style="display: flex; gap: 8px; justify-content: flex-end; padding-top: 12px; border-top: 1px solid #404040;">
+      <div style="display: flex; gap: 16px; justify-content: flex-end; padding-top: 16px;">
         <button id="reset-json" style="
           background: #2d2d2d;
           border: 1px solid #404040;
@@ -957,6 +957,7 @@ function showJSONEditor(pagesConfig) {
           font-size: 14px;
           font-weight: 500;
           transition: all 0.2s;
+          flex:1;
         ">Resetear</button>
         <button id="save-json" style="
           background: #4a9eff;
@@ -968,6 +969,7 @@ function showJSONEditor(pagesConfig) {
           font-size: 14px;
           font-weight: 600;
           transition: all 0.2s;
+          flex:1;
         ">Guardar</button>
       </div>
     </div>
