@@ -2433,10 +2433,26 @@ function showJSONEditor(pagesConfig, roomId = null) {
       errorDiv.style.display = 'none';
       textarea.style.borderColor = CSS_VARS.borderPrimary;
       
-      // Actualizar el textarea con el JSON guardado (formateado) - NO cerrar el editor
-      const formattedJSON = JSON.stringify(parsed, null, 2);
-      textarea.value = formattedJSON;
-      console.log('✅ Textarea actualizado con el JSON guardado');
+      // Obtener el JSON guardado desde localStorage para asegurar que coincida exactamente
+      console.log('📖 Obteniendo JSON guardado desde localStorage...');
+      // Pequeño delay para asegurar que localStorage se haya actualizado
+      setTimeout(() => {
+        const savedConfig = getPagesJSON(roomId);
+        if (savedConfig) {
+          // Actualizar el textarea con el JSON guardado (formateado) desde localStorage
+          const formattedJSON = JSON.stringify(savedConfig, null, 2);
+          textarea.value = formattedJSON;
+          // Forzar actualización del textarea
+          textarea.dispatchEvent(new Event('input', { bubbles: true }));
+          console.log('✅ Textarea actualizado con el JSON guardado desde localStorage');
+        } else {
+          // Fallback: usar el parsed si no se puede obtener de localStorage
+          const formattedJSON = JSON.stringify(parsed, null, 2);
+          textarea.value = formattedJSON;
+          textarea.dispatchEvent(new Event('input', { bubbles: true }));
+          console.log('⚠️ Usando JSON parsed como fallback');
+        }
+      }, 10);
       
       // Recargar la lista de páginas sin cerrar el editor
       console.log('🔄 Recargando configuración para roomId:', roomId);
