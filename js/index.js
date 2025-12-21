@@ -1146,10 +1146,15 @@ async function renderBlocks(blocks, blockTypes = null, headingLevelOffset = 0) {
         // solo mostrar el contenido de los hijos (sin el callout)
         if (blockTypes) {
           const typesArray = Array.isArray(blockTypes) ? blockTypes : [blockTypes];
-          if (!typesArray.includes('callout') && childrenContent.trim()) {
-            // El callout no coincide con el filtro, pero tiene contenido filtrado
-            html += childrenContent;
-            console.log(`    ✅ Callout filtrado, solo mostrando hijos`);
+          if (!typesArray.includes('callout')) {
+            if (childrenContent.trim()) {
+              // El callout no coincide con el filtro, pero tiene contenido filtrado
+              html += childrenContent;
+              console.log(`    ✅ Callout filtrado, solo mostrando hijos`);
+            } else {
+              // El callout no coincide con el filtro y no tiene contenido filtrado
+              console.log(`    ⏭️ Callout filtrado, sin contenido que mostrar`);
+            }
             continue;
           }
         }
@@ -1253,6 +1258,14 @@ async function renderBlocks(blocks, blockTypes = null, headingLevelOffset = 0) {
       
       // Manejar tablas de forma especial
       if (block.type === 'table') {
+        // Verificar si la tabla coincide con el filtro
+        if (blockTypes) {
+          const typesArray = Array.isArray(blockTypes) ? blockTypes : [blockTypes];
+          if (!typesArray.includes('table')) {
+            console.log(`    ⏭️ Tabla filtrada, no se muestra`);
+            continue;
+          }
+        }
         try {
           const tableHtml = await renderTable(block);
           html += tableHtml;
@@ -1262,6 +1275,14 @@ async function renderBlocks(blocks, blockTypes = null, headingLevelOffset = 0) {
           html += '<div class="notion-table-placeholder">[Error al cargar tabla]</div>';
         }
       } else {
+        // Verificar si el bloque coincide con el filtro antes de renderizar
+        if (blockTypes) {
+          const typesArray = Array.isArray(blockTypes) ? blockTypes : [blockTypes];
+          if (!typesArray.includes(type)) {
+            console.log(`    ⏭️ Bloque [${index}] de tipo ${type} filtrado, no se muestra`);
+            continue;
+          }
+        }
         try {
           const rendered = renderBlock(block);
           if (rendered) {
