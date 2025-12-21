@@ -322,6 +322,18 @@ function clearAllCache() {
 // Función para extraer el ID de página desde una URL de Notion
 function extractNotionPageId(url) {
   try {
+    // Verificar si la URL es de Notion antes de procesarla
+    if (!url || typeof url !== 'string') {
+      return null;
+    }
+    
+    // Verificar si es una URL de Notion
+    const isNotionUrl = url.includes('notion.so') || url.includes('notion.site');
+    if (!isNotionUrl) {
+      // No es una URL de Notion, no generar warning
+      return null;
+    }
+    
     // Formatos soportados:
     // 1. https://workspace.notion.site/Title-{32-char-id}?params
     // 2. https://www.notion.so/Title-{32-char-id}?params
@@ -350,16 +362,24 @@ function extractNotionPageId(url) {
       }
     }
     
-    console.warn('⚠️ No se pudo extraer el ID de Notion de la URL:', url);
+    // Solo loggear en modo debug si es una URL de Notion pero no se pudo extraer el ID
+    log('⚠️ No se pudo extraer el ID de Notion de la URL:', url);
     return null;
   } catch (e) {
-    console.error('Error al extraer ID de Notion:', e);
+    // Solo loggear errores en modo debug
+    log('Error al extraer ID de Notion:', e);
     return null;
   }
 }
 
 // Función para obtener la información de la página (last_edited_time e icono)
 async function fetchPageInfo(pageId) {
+  // Verificar que pageId sea válido antes de hacer la llamada
+  if (!pageId || pageId === 'null' || pageId === 'undefined') {
+    log('⚠️ fetchPageInfo: pageId inválido, saltando llamada a la API');
+    return { lastEditedTime: null, icon: null };
+  }
+  
   try {
     // Obtener el roomId actual para usar el token del usuario
     let currentRoomId = null;
@@ -1872,6 +1892,10 @@ function renderCategory(category, parentElement, level = 0, roomId = null) {
     // Cargar iconos en paralelo después de renderizar todos los botones
     if (buttonsData.length > 0) {
       Promise.all(buttonsData.map(async ({ button, pageId, pageName, linkIconHtml }) => {
+        // Solo intentar cargar el icono si tenemos un pageId válido
+        if (!pageId || pageId === 'null') {
+          return; // Saltar si no hay pageId válido
+        }
         try {
           const icon = await fetchPageIcon(pageId);
           const iconHtml = renderPageIcon(icon, pageName, pageId);
