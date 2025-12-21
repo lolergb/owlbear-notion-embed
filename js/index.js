@@ -797,7 +797,7 @@ async function fetchBlockChildren(blockId, useCache = true) {
 }
 
 // Función para renderizar un toggle con su contenido
-async function renderToggle(toggleBlock) {
+async function renderToggle(toggleBlock, blockTypes = null, headingLevelOffset = 0) {
   const toggle = toggleBlock.toggle;
   const toggleText = renderRichText(toggle?.rich_text);
   
@@ -812,7 +812,7 @@ async function renderToggle(toggleBlock) {
     const children = await fetchBlockChildren(toggleBlock.id);
     console.log(`  📦 Hijos obtenidos: ${children.length}`);
     if (children.length > 0) {
-      toggleContent = await renderBlocks(children);
+      toggleContent = await renderBlocks(children, blockTypes, headingLevelOffset);
       console.log(`  ✅ Contenido del toggle renderizado: ${toggleContent.length} caracteres`);
     } else {
       console.log(`  ⚠️ Toggle sin contenido`);
@@ -830,7 +830,7 @@ async function renderToggle(toggleBlock) {
 }
 
 // Función para renderizar un toggle heading con su contenido
-async function renderToggleHeading(toggleHeadingBlock, headingLevel) {
+async function renderToggleHeading(toggleHeadingBlock, headingLevel, blockTypes = null, headingLevelOffset = 0) {
   const toggleHeading = toggleHeadingBlock[`heading_${headingLevel}`] || toggleHeadingBlock.toggle;
   const headingText = renderRichText(toggleHeading?.rich_text);
   
@@ -845,7 +845,8 @@ async function renderToggleHeading(toggleHeadingBlock, headingLevel) {
     const children = await fetchBlockChildren(toggleHeadingBlock.id);
     console.log(`  📦 Hijos obtenidos: ${children.length}`);
     if (children.length > 0) {
-      toggleContent = await renderBlocks(children);
+      // Los hijos de un toggle heading deben tener un offset de nivel +1
+      toggleContent = await renderBlocks(children, blockTypes, headingLevelOffset + 1);
       console.log(`  ✅ Contenido del toggle_heading_${headingLevel} renderizado: ${toggleContent.length} caracteres`);
     } else {
       console.log(`  ⚠️ Toggle heading sin contenido`);
@@ -854,8 +855,9 @@ async function renderToggleHeading(toggleHeadingBlock, headingLevel) {
     console.log(`  ℹ️ Toggle heading sin hijos`);
   }
   
-  // Renderizar el heading dentro del summary
-  const headingTag = `h${headingLevel}`;
+  // Renderizar el heading dentro del summary (ajustar nivel con offset)
+  const adjustedLevel = Math.min(headingLevel + headingLevelOffset, 6);
+  const headingTag = `h${adjustedLevel}`;
   return `
     <details class="notion-toggle notion-toggle-heading">
       <summary class="notion-toggle-summary">
@@ -867,7 +869,7 @@ async function renderToggleHeading(toggleHeadingBlock, headingLevel) {
 }
 
 // Función para renderizar todas las columnas de una column_list
-async function renderColumnList(columnListBlock, allBlocks, currentIndex) {
+async function renderColumnList(columnListBlock, allBlocks, currentIndex, blockTypes = null, headingLevelOffset = 0) {
   console.log('📐 Renderizando column_list:', columnListBlock.id, {
     hasChildren: columnListBlock.has_children,
     currentIndex: currentIndex,
@@ -923,7 +925,7 @@ async function renderColumnList(columnListBlock, allBlocks, currentIndex) {
       const children = await fetchBlockChildren(columnBlock.id);
       console.log(`    🔽 Hijos obtenidos: ${children.length}`);
       if (children.length > 0) {
-        columnContent = await renderBlocks(children);
+        columnContent = await renderBlocks(children, blockTypes, headingLevelOffset);
         console.log(`    ✅ Contenido de columna renderizado: ${columnContent.length} caracteres`);
       } else {
         console.log(`    ⚠️ Columna sin contenido`);
@@ -939,16 +941,26 @@ async function renderColumnList(columnListBlock, allBlocks, currentIndex) {
 }
 
 // Función para renderizar todos los bloques
-async function renderBlocks(blocks) {
+async function renderBlocks(blocks, blockTypes = null, headingLevelOffset = 0) {
   let html = '';
   let inList = false;
   let listType = null;
   let listItems = [];
   
-  console.log('🎨 Iniciando renderizado de', blocks.length, 'bloques');
+  console.log('🎨 Iniciando renderizado de', blocks.length, 'bloques', blockTypes ? `(filtro: ${Array.isArray(blockTypes) ? blockTypes.join(', ') : blockTypes})` : '');
   
-  for (let index = 0; index < blocks.length; index++) {
-    const block = blocks[index];
+  // Filtrar bloques por tipo si se especifica
+  let filteredBlocks = blocks;
+  if (blockTypes) {
+    const typesArray = Array.isArray(blockTypes) ? blockTypes : [blockTypes];
+    filteredBlocks = blocks.filter(block => typesArray.includes(block.type));
+    if (filteredBlocks.length !== blocks.length) {
+      console.log(`  🔍 Filtrados: ${filteredBlocks.length} de ${blocks.length} bloques`);
+    }
+  }
+  
+  for (let index = 0; index < filteredBlocks.length; index++) {
+    const block = filteredBlocks[index];
     const type = block.type;
     
     console.log(`  [${index}] Renderizando bloque:`, {
@@ -960,12 +972,12 @@ async function renderBlocks(blocks) {
     // Manejar column_list de forma especial (debe procesarse antes que otros bloques)
     if (type === 'column_list') {
       try {
-        const columnListHtml = await renderColumnList(block, blocks, index);
+        const columnListHtml = await renderColumnList(block, filteredBlocks, index, blockTypes, headingLevelOffset);
         html += columnListHtml;
         // Saltar las columnas que ya procesamos
         let skipCount = 0;
-        for (let j = index + 1; j < blocks.length; j++) {
-          if (blocks[j].type === 'column') {
+        for (let j = index + 1; j < filteredBlocks.length; j++) {
+          if (filteredBlocks[j].type === 'column') {
             skipCount++;
           } else {
             break;
@@ -990,7 +1002,7 @@ async function renderBlocks(blocks) {
     // Manejar toggles de forma especial (tienen hijos que se cargan dinámicamente)
     if (type === 'toggle') {
       try {
-        const toggleHtml = await renderToggle(block);
+        const toggleHtml = await renderToggle(block, blockTypes, headingLevelOffset);
         html += toggleHtml;
         console.log(`    ✅ Toggle renderizado`);
         continue;
@@ -1008,7 +1020,7 @@ async function renderBlocks(blocks) {
     if (type === 'toggle_heading_1' || type === 'toggle_heading_2' || type === 'toggle_heading_3') {
       try {
         const headingLevel = type === 'toggle_heading_1' ? 1 : type === 'toggle_heading_2' ? 2 : 3;
-        const toggleHeadingHtml = await renderToggleHeading(block, headingLevel);
+        const toggleHeadingHtml = await renderToggleHeading(block, headingLevel, blockTypes, headingLevelOffset);
         html += toggleHeadingHtml;
         console.log(`    ✅ Toggle heading ${headingLevel} renderizado`);
         continue;
@@ -1016,7 +1028,8 @@ async function renderBlocks(blocks) {
         console.error(`Error al renderizar toggle_heading:`, error);
         // Fallback: renderizar sin contenido
         const headingLevel = type === 'toggle_heading_1' ? 1 : type === 'toggle_heading_2' ? 2 : 3;
-        const headingTag = `h${headingLevel}`;
+        const adjustedLevel = Math.min(headingLevel + headingLevelOffset, 6);
+        const headingTag = `h${adjustedLevel}`;
         const headingText = renderRichText(block[`heading_${headingLevel}`]?.rich_text || block.toggle?.rich_text);
         html += `<details class="notion-toggle"><summary class="notion-toggle-summary"><${headingTag} style="display: inline; margin: 0;">${headingText}</${headingTag}></summary><div class="notion-toggle-content">[Error al cargar contenido]</div></details>`;
         continue;
@@ -1026,22 +1039,24 @@ async function renderBlocks(blocks) {
     // Manejar headings normales que tienen hijos (contenido anidado)
     if ((type === 'heading_1' || type === 'heading_2' || type === 'heading_3') && block.has_children) {
       try {
-        const headingLevel = type === 'heading_1' ? 1 : type === 'heading_2' ? 2 : 3;
+        const baseHeadingLevel = type === 'heading_1' ? 1 : type === 'heading_2' ? 2 : 3;
+        const headingLevel = Math.min(baseHeadingLevel + headingLevelOffset, 6); // Máximo h6
         const headingTag = `h${headingLevel}`;
-        const headingText = renderRichText(block[`heading_${headingLevel}`]?.rich_text);
+        const headingText = renderRichText(block[`heading_${baseHeadingLevel}`]?.rich_text);
         
-        console.log(`  📦 Obteniendo hijos del heading_${headingLevel}...`);
+        console.log(`  📦 Obteniendo hijos del heading_${baseHeadingLevel} (renderizado como ${headingTag})...`);
         const children = await fetchBlockChildren(block.id);
         console.log(`  📦 Hijos obtenidos: ${children.length}`);
         
         let childrenContent = '';
         if (children.length > 0) {
-          childrenContent = await renderBlocks(children);
+          // Los hijos de un heading deben tener un offset de nivel +1
+          childrenContent = await renderBlocks(children, blockTypes, headingLevelOffset + 1);
           console.log(`  ✅ Contenido del heading renderizado: ${childrenContent.length} caracteres`);
         }
         
         html += `<${headingTag}>${headingText}</${headingTag}>${childrenContent}`;
-        console.log(`    ✅ Heading ${headingLevel} con hijos renderizado`);
+        console.log(`    ✅ Heading ${baseHeadingLevel} (${headingTag}) con hijos renderizado`);
         continue;
       } catch (error) {
         console.error(`Error al renderizar heading con hijos:`, error);
@@ -1067,7 +1082,7 @@ async function renderBlocks(blocks) {
         
         let childrenContent = '';
         if (children.length > 0) {
-          childrenContent = await renderBlocks(children);
+          childrenContent = await renderBlocks(children, blockTypes, headingLevelOffset);
           console.log(`  ✅ Contenido del callout renderizado: ${childrenContent.length} caracteres`);
         }
         
@@ -1303,7 +1318,7 @@ async function loadNotionContent(url, container, forceRefresh = false, blockType
     }
     
     // Renderizar bloques (ahora es async)
-    const html = await renderBlocks(filteredBlocks);
+    const html = await renderBlocks(filteredBlocks, blockTypes, 0);
     contentDiv.innerHTML = html;
     
     // Agregar event listeners a las imágenes para abrirlas en modal
