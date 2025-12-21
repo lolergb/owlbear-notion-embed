@@ -1765,8 +1765,9 @@ function renderCategory(category, parentElement, level = 0, roomId = null) {
   collapseIcon.alt = isCollapsed ? 'Expandir' : 'Colapsar';
   collapseButton.appendChild(collapseIcon);
   
-  // Título de categoría
-  const categoryTitle = document.createElement('h2');
+  // Título de categoría (anidamiento de heading según el nivel)
+  const headingLevel = Math.min(level + 2, 6); // nivel 0 = h2, nivel 1 = h3, ..., máximo h6
+  const categoryTitle = document.createElement(`h${headingLevel}`);
   categoryTitle.className = 'category-title';
   categoryTitle.textContent = category.name;
   categoryTitle.style.cssText = `
