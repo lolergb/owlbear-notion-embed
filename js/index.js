@@ -1614,28 +1614,17 @@ function renderPagesByCategories(pagesConfig, pageList, roomId = null) {
       return;
     }
   
-  // Ordenar categorías alfabéticamente
-  const sortedCategories = [...pagesConfig.categories].sort((a, b) => {
-    const nameA = (a.name || '').toLowerCase();
-    const nameB = (b.name || '').toLowerCase();
-    return nameA.localeCompare(nameB);
-  });
-  
-  sortedCategories.forEach(category => {
-    if (!category.pages || category.pages.length === 0) return;
-    
-    // Filtrar y ordenar páginas válidas alfabéticamente
-    const categoryPages = category.pages
-      .filter(page => 
-        page.url && 
-        !page.url.includes('...') && 
-        page.url.startsWith('http')
-      )
-      .sort((a, b) => {
-        const nameA = (a.name || '').toLowerCase();
-        const nameB = (b.name || '').toLowerCase();
-        return nameA.localeCompare(nameB);
-      });
+    // Mantener el orden original del JSON (sin ordenar)
+    pagesConfig.categories.forEach(category => {
+      if (!category.pages || category.pages.length === 0) return;
+      
+      // Filtrar páginas válidas (mantener el orden original)
+      const categoryPages = category.pages
+        .filter(page => 
+          page.url && 
+          !page.url.includes('...') && 
+          page.url.startsWith('http')
+        );
     
     if (categoryPages.length === 0) return;
     
