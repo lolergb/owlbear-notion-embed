@@ -1838,11 +1838,14 @@ function renderCategory(category, parentElement, level = 0, roomId = null) {
     categoryPages.forEach((page, index) => {
       const pageId = extractNotionPageId(page.url);
       const isNotion = isNotionUrl(page.url);
+      const isDndbeyondUrl = isDndbeyond(page.url);
       
       // Determinar icono de tipo de link
       let linkIconHtml = '';
       if (isNotion) {
         linkIconHtml = '<img src="img/icon-notion.svg" alt="Notion" class="page-link-icon">';
+      } else if (isDndbeyondUrl) {
+        linkIconHtml = '<img src="img/icon-dnd.svg" alt="D&D Beyond" class="page-link-icon">';
       } else {
         linkIconHtml = '<img src="img/icon-link.svg" alt="Link" class="page-link-icon">';
       }
@@ -1984,6 +1987,22 @@ function isNotionUrl(url) {
   }
 }
 
+// Función para detectar si una URL es de D&D Beyond
+function isDndbeyond(url) {
+  if (!url || typeof url !== 'string') {
+    return false;
+  }
+  try {
+    const urlObj = new URL(url);
+    // Verificar si es una URL de D&D Beyond
+    const isDndbeyond = urlObj.hostname.includes('dndbeyond.com');
+    return isDndbeyond;
+  } catch (e) {
+    // Si no es una URL válida, no es D&D Beyond
+    return false;
+  }
+}
+
 // Función para obtener el tipo de link y su icono correspondiente
 // Preparado para añadir más tipos en el futuro
 function getLinkType(url) {
@@ -2000,10 +2019,9 @@ function getLinkType(url) {
       return { type: 'notion', icon: 'icon-notion.svg' };
     }
     
-    // Aquí se pueden añadir más tipos en el futuro:
-    // if (hostname.includes('dndbeyond.com')) {
-    //   return { type: 'dndbeyond', icon: 'icon-dndbeyond.svg' };
-    // }
+    if (hostname.includes('dndbeyond.com')) {
+      return { type: 'dndbeyond', icon: 'icon-dnd.svg' };
+    }
     // if (hostname.includes('roll20.net')) {
     //   return { type: 'roll20', icon: 'icon-roll20.svg' };
     // }
