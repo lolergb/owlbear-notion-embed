@@ -2381,7 +2381,7 @@ function showTokenConfig() {
           <li><strong>Copia el token:</strong>
             <ul style="margin-top: 8px; margin-left: 20px; padding-left: 0;">
               <li>En la página de la integración, busca <strong>"Internal Integration Token"</strong></li>
-              <li>Clic en <strong>"Mostrar"</strong> y copia el token (empieza con <code style="background: ${CSS_VARS.bgPrimary}; padding: 2px 4px; border-radius: 3px;">secret_</code>)</li>
+              <li>Clic en <strong>"Mostrar"</strong> y copia el token completo</li>
             </ul>
           </li>
           <li><strong>Comparte tus páginas:</strong>
@@ -2402,7 +2402,7 @@ function showTokenConfig() {
         <input 
           type="password" 
           id="token-input" 
-          placeholder="secret_..." 
+          placeholder="ntn_... o secret_..." 
           value="${currentToken}"
           style="
             width: 100%;
@@ -2519,12 +2519,6 @@ function showTokenConfig() {
     
     if (!token) {
       errorDiv.textContent = 'Por favor, ingresa un token de Notion';
-      errorDiv.style.display = 'block';
-      return;
-    }
-    
-    if (!token.startsWith('secret_')) {
-      errorDiv.textContent = 'El token de Notion debe comenzar con "secret_"';
       errorDiv.style.display = 'block';
       return;
     }
