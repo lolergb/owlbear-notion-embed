@@ -790,38 +790,68 @@ async function fetchBlockChildren(blockId, useCache = true) {
 
 // Función para renderizar todas las columnas de una column_list
 async function renderColumnList(columnListBlock, allBlocks, currentIndex) {
-  console.log('📐 Renderizando column_list:', columnListBlock.id);
+  console.log('📐 Renderizando column_list:', columnListBlock.id, {
+    hasChildren: columnListBlock.has_children,
+    currentIndex: currentIndex,
+    totalBlocks: allBlocks.length
+  });
   
-  // Buscar todas las columnas que siguen a este column_list
-  const columns = [];
-  let index = currentIndex + 1;
+  let columns = [];
   
-  while (index < allBlocks.length) {
-    const block = allBlocks[index];
-    if (block.type === 'column') {
-      columns.push(block);
-      index++;
-    } else {
-      break;
+  // Opción 1: Las columnas son hijos del column_list (más común)
+  if (columnListBlock.has_children) {
+    console.log('  📦 Obteniendo columnas como hijos del column_list...');
+    const children = await fetchBlockChildren(columnListBlock.id);
+    console.log(`  📦 Hijos obtenidos: ${children.length}`, children.map(c => c.type));
+    columns = children.filter(block => block.type === 'column');
+    console.log(`  📐 Columnas encontradas como hijos: ${columns.length}`);
+  }
+  
+  // Opción 2: Las columnas son bloques hermanos que siguen al column_list
+  if (columns.length === 0) {
+    console.log('  🔍 Buscando columnas como bloques hermanos...');
+    let index = currentIndex + 1;
+    
+    while (index < allBlocks.length) {
+      const block = allBlocks[index];
+      if (block.type === 'column') {
+        columns.push(block);
+        index++;
+      } else {
+        break;
+      }
     }
+    console.log(`  📐 Columnas encontradas como hermanos: ${columns.length}`);
   }
   
   if (columns.length === 0) {
+    console.warn('  ⚠️ No se encontraron columnas para el column_list');
     return '<div class="notion-column-list">[Sin columnas]</div>';
   }
   
-  console.log(`  Encontradas ${columns.length} columnas`);
+  console.log(`  ✅ Total de columnas encontradas: ${columns.length}`);
   
   // Renderizar cada columna con sus bloques hijos
-  const columnHtmls = await Promise.all(columns.map(async (columnBlock) => {
+  const columnHtmls = await Promise.all(columns.map(async (columnBlock, colIndex) => {
     let columnContent = '';
     
+    console.log(`  📄 Procesando columna ${colIndex + 1}/${columns.length}:`, {
+      id: columnBlock.id,
+      hasChildren: columnBlock.has_children
+    });
+    
     if (columnBlock.has_children) {
-      console.log(`  Obteniendo hijos de columna: ${columnBlock.id}`);
+      console.log(`    🔽 Obteniendo hijos de columna: ${columnBlock.id}`);
       const children = await fetchBlockChildren(columnBlock.id);
+      console.log(`    🔽 Hijos obtenidos: ${children.length}`);
       if (children.length > 0) {
         columnContent = await renderBlocks(children);
+        console.log(`    ✅ Contenido de columna renderizado: ${columnContent.length} caracteres`);
+      } else {
+        console.log(`    ⚠️ Columna sin contenido`);
       }
+    } else {
+      console.log(`    ℹ️ Columna sin hijos`);
     }
     
     return `<div class="notion-column">${columnContent}</div>`;
