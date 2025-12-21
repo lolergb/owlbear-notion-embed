@@ -700,9 +700,11 @@ function renderBlock(block) {
       return `<div class="notion-todo"><input type="checkbox" ${checked} disabled> ${todoText}</div>`;
     
     case 'toggle':
+      // Los toggles se renderizan de forma especial en renderBlocks (tienen hijos)
+      // Este caso no debería ejecutarse nunca, pero lo dejamos por seguridad
       const toggle = block.toggle;
       const toggleText = renderRichText(toggle?.rich_text);
-      return `<details class="notion-toggle"><summary>${toggleText}</summary></details>`;
+      return `<details class="notion-toggle"><summary>${toggleText}</summary><div class="notion-toggle-content" data-toggle-id="${block.id}">Cargando contenido...</div></details>`;
     
     default:
       console.warn('⚠️ Tipo de bloque no soportado:', type, {
@@ -786,6 +788,39 @@ async function fetchBlockChildren(blockId, useCache = true) {
     console.error('Error al obtener bloques hijos:', error);
     return [];
   }
+}
+
+// Función para renderizar un toggle con su contenido
+async function renderToggle(toggleBlock) {
+  const toggle = toggleBlock.toggle;
+  const toggleText = renderRichText(toggle?.rich_text);
+  
+  console.log('🔽 Renderizando toggle:', toggleBlock.id, {
+    hasChildren: toggleBlock.has_children
+  });
+  
+  let toggleContent = '';
+  
+  if (toggleBlock.has_children) {
+    console.log('  📦 Obteniendo hijos del toggle...');
+    const children = await fetchBlockChildren(toggleBlock.id);
+    console.log(`  📦 Hijos obtenidos: ${children.length}`);
+    if (children.length > 0) {
+      toggleContent = await renderBlocks(children);
+      console.log(`  ✅ Contenido del toggle renderizado: ${toggleContent.length} caracteres`);
+    } else {
+      console.log(`  ⚠️ Toggle sin contenido`);
+    }
+  } else {
+    console.log(`  ℹ️ Toggle sin hijos`);
+  }
+  
+  return `
+    <details class="notion-toggle">
+      <summary class="notion-toggle-summary">${toggleText}</summary>
+      <div class="notion-toggle-content">${toggleContent}</div>
+    </details>
+  `;
 }
 
 // Función para renderizar todas las columnas de una column_list
@@ -907,6 +942,23 @@ async function renderBlocks(blocks) {
     if (type === 'column') {
       console.log(`    ⏭️ Columna individual ignorada (ya procesada en column_list)`);
       continue;
+    }
+    
+    // Manejar toggles de forma especial (tienen hijos que se cargan dinámicamente)
+    if (type === 'toggle') {
+      try {
+        const toggleHtml = await renderToggle(block);
+        html += toggleHtml;
+        console.log(`    ✅ Toggle renderizado`);
+        continue;
+      } catch (error) {
+        console.error('Error al renderizar toggle:', error);
+        // Fallback: renderizar sin contenido
+        const toggle = block.toggle;
+        const toggleText = renderRichText(toggle?.rich_text);
+        html += `<details class="notion-toggle"><summary class="notion-toggle-summary">${toggleText}</summary><div class="notion-toggle-content">[Error al cargar contenido]</div></details>`;
+        continue;
+      }
     }
     
     // Manejar listas agrupadas
