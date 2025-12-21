@@ -1,13 +1,13 @@
 {
-  "name": "Notion Embed",
+  "name": "Context panel",
   "version": "2.0.0",
   "manifest_version": 1,
   "author": "Lole",
-  "description": "Embeber páginas públicas de Notion en Owlbear Rodeo",
+  "description": "Panel de contexto para organizar tu homebrew en Owlbear Rodeo",
   "homepage_url": "https://github.com/lolergb/owlbear-notion-embed",
   "icon": "/icon.svg",
   "action": {
-    "title": "Notion Embed",
+    "title": "Context panel",
     "icon": "/icon.svg",
     "popover": "/index.html",
     "height": 800,

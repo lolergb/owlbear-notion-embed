@@ -43,7 +43,7 @@ export const NOTION_PAGES = [
 ];
 `;
 
-const configPath = join(__dirname, 'config.js');
+const configPath = join(__dirname, '..', 'config', 'config.js');
 writeFileSync(configPath, configContent, 'utf8');
 
 console.log('✅ config.js generado exitosamente desde variables de entorno');

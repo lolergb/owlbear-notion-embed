@@ -9,7 +9,7 @@ console.log('✅ OBR SDK importado');
 import { 
   NOTION_API_BASE, 
   NOTION_PAGES 
-} from "./config.js";
+} from "../config/config.js";
 
 // Variables de color CSS (deben coincidir con las del index.html)
 const CSS_VARS = {
@@ -259,18 +259,35 @@ function clearAllCache() {
 // Función para extraer el ID de página desde una URL de Notion
 function extractNotionPageId(url) {
   try {
-    // Formato: https://workspace.notion.site/Title-{32-char-id}?params
+    // Formatos soportados:
+    // 1. https://workspace.notion.site/Title-{32-char-id}?params
+    // 2. https://www.notion.so/Title-{32-char-id}?params
     const urlObj = new URL(url);
-    const pathParts = urlObj.pathname.split('-');
+    const pathname = urlObj.pathname;
+    
+    // Buscar un ID de 32 caracteres hexadecimales en el pathname
+    // Puede estar al final después de un guion, o ser el único elemento
+    const idMatch = pathname.match(/-([a-f0-9]{32})(?:[^a-f0-9]|$)/i);
+    
+    if (idMatch && idMatch[1]) {
+      const pageId = idMatch[1];
+      // Convertir a formato UUID con guiones: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+      return `${pageId.substring(0, 8)}-${pageId.substring(8, 12)}-${pageId.substring(12, 16)}-${pageId.substring(16, 20)}-${pageId.substring(20, 32)}`;
+    }
+    
+    // Fallback: intentar extraer del último segmento después de dividir por guiones
+    const pathParts = pathname.split('-');
     if (pathParts.length > 0) {
       const lastPart = pathParts[pathParts.length - 1];
       // El ID tiene 32 caracteres hexadecimales
-      if (lastPart && lastPart.length >= 32) {
+      if (lastPart && /^[a-f0-9]{32}$/i.test(lastPart)) {
         const pageId = lastPart.substring(0, 32);
         // Convertir a formato UUID con guiones
         return `${pageId.substring(0, 8)}-${pageId.substring(8, 12)}-${pageId.substring(12, 16)}-${pageId.substring(16, 20)}-${pageId.substring(20, 32)}`;
       }
     }
+    
+    console.warn('⚠️ No se pudo extraer el ID de Notion de la URL:', url);
     return null;
   } catch (e) {
     console.error('Error al extraer ID de Notion:', e);
@@ -309,7 +326,7 @@ async function fetchPageInfo(pageId) {
       
       if (!apiUrl.includes('/.netlify/functions/')) {
         try {
-          const config = await import("./config.js");
+          const config = await import("../config/config.js");
           const localToken = config.NOTION_API_TOKEN;
           if (localToken && localToken !== 'tu_token_de_notion_aqui') {
             headers['Authorization'] = `Bearer ${localToken}`;
@@ -455,7 +472,7 @@ async function fetchNotionBlocks(pageId, useCache = true) {
       // Solo agregar Authorization si no estamos usando el proxy (desarrollo local)
       if (!apiUrl.includes('/.netlify/functions/')) {
         try {
-          const config = await import("./config.js");
+          const config = await import("../config/config.js");
           const localToken = config.NOTION_API_TOKEN;
           if (localToken && localToken !== 'tu_token_de_notion_aqui') {
             headers['Authorization'] = `Bearer ${localToken}`;
@@ -557,20 +574,62 @@ function renderBlock(block) {
     
     case 'image':
       const image = block.image;
-      const imageUrl = image?.external?.url || image?.file?.url;
+      let imageUrl = null;
+      let imageType = null;
+      
+      // Prioridad: external.url (URLs externas) o file.url (archivos de Notion)
+      if (image?.external?.url) {
+        imageUrl = image.external.url;
+        imageType = 'external';
+      } else if (image?.file?.url) {
+        imageUrl = image.file.url;
+        imageType = 'file';
+        // Las URLs de file pueden tener expiry_time, pero normalmente son accesibles directamente
+        // Si la URL expira, Notion devuelve un error 403/404 y necesitamos refrescar
+      }
+      
       const caption = image?.caption ? renderRichText(image.caption) : '';
       
       if (imageUrl) {
         // Generar ID único para la imagen
         const imageId = `img-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        
+        // Log para debugging
+        console.log('🖼️ Renderizando imagen:', {
+          type: imageType,
+          url: imageUrl.substring(0, 80) + (imageUrl.length > 80 ? '...' : ''),
+          hasCaption: !!caption,
+          expiryTime: image?.file?.expiry_time || null
+        });
+        
+        // Las imágenes de Notion deberían ser accesibles directamente
+        // Si fallan, mostrar un mensaje de error
         return `
           <div class="notion-image">
-            <img src="${imageUrl}" alt="${caption || ''}" class="notion-image-clickable" data-image-id="${imageId}" data-image-url="${imageUrl}" data-image-caption="${caption.replace(/"/g, '&quot;')}" style="cursor: pointer;" />
+            <img 
+              src="${imageUrl}" 
+              alt="${caption || 'Imagen de Notion'}" 
+              class="notion-image-clickable" 
+              data-image-id="${imageId}" 
+              data-image-url="${imageUrl}" 
+              data-image-caption="${caption.replace(/"/g, '&quot;')}" 
+              style="cursor: pointer; max-width: 100%; height: auto; display: block; margin: 0 auto;" 
+              loading="lazy"
+              onerror="console.error('❌ Error al cargar imagen de Notion:', this.src); const errorDiv = document.createElement('div'); errorDiv.style.cssText = 'padding: 20px; text-align: center; color: #999; background: #f5f5f5; border-radius: 4px;'; errorDiv.innerHTML = '⚠️ No se pudo cargar la imagen<br><small>La URL puede haber expirado</small>'; this.parentElement.replaceChild(errorDiv, this);"
+              onload="console.log('✅ Imagen cargada correctamente:', this.src.substring(0, 80));"
+            />
             ${caption ? `<div class="notion-image-caption">${caption}</div>` : ''}
           </div>
         `;
+      } else {
+        console.warn('⚠️ Bloque de imagen sin URL válida:', {
+          blockId: block.id,
+          hasExternal: !!image?.external,
+          hasFile: !!image?.file,
+          image: image
+        });
+        return '<div style="padding: 10px; color: #999; font-style: italic;">[Imagen no disponible]</div>';
       }
-      return '';
     
     case 'divider':
       return '<div class="notion-divider"></div>';
@@ -717,7 +776,7 @@ async function renderTable(tableBlock) {
 async function showImageModal(imageUrl, caption) {
   try {
     // Construir URL con parámetros
-    const viewerUrl = new URL('image-viewer.html', window.location.origin);
+    const viewerUrl = new URL('html/image-viewer.html', window.location.origin);
     viewerUrl.searchParams.set('url', encodeURIComponent(imageUrl));
     if (caption) {
       viewerUrl.searchParams.set('caption', encodeURIComponent(caption));
@@ -1149,7 +1208,7 @@ function renderPagesByCategories(pagesConfig, pageList, roomId = null) {
     const categoryDiv = document.createElement('div');
     categoryDiv.className = 'category-group';
     categoryDiv.dataset.categoryName = category.name;
-    categoryDiv.style.cssText = 'margin-bottom: 24px;';
+    categoryDiv.style.cssText = 'margin-bottom: 0px;';
     
     // Contenedor del título con botón de colapsar
     const titleContainer = document.createElement('div');
@@ -1172,14 +1231,14 @@ function renderPagesByCategories(pagesConfig, pageList, roomId = null) {
       display: flex;
       align-items: center;
       justify-content: center;
-      width: 20px;
-      height: 20px;
+      width: 24px;
+      height: 24px;
       transition: transform 0.2s;
     `;
     
     // Icono de colapsar (inicialmente cerrado/expandido)
     const collapseIcon = document.createElement('img');
-    collapseIcon.style.cssText = 'width: 16px; height: 16px; display: block;';
+    collapseIcon.style.cssText = 'width: 24px; height: 24px; display: block;';
     
     // Verificar estado guardado en localStorage
     const collapseStateKey = `category-collapsed-${category.name}`;
@@ -1194,8 +1253,10 @@ function renderPagesByCategories(pagesConfig, pageList, roomId = null) {
     categoryTitle.className = 'category-title';
     categoryTitle.textContent = category.name;
     categoryTitle.style.cssText = `
-      font-size: 14px;
-      font-weight: 600;
+      font-family: Roboto, Helvetica, Arial, sans-serif;
+      font-size: 16px;
+      line-height: 24px;
+      font-weight: 700;
       color: #999;
       text-transform: uppercase;
       letter-spacing: 0.5px;
@@ -1363,7 +1424,8 @@ function getLinkType(url) {
 }
 
 // Función para cargar contenido en iframe (para URLs no-Notion)
-function loadIframeContent(url, container) {
+// Si se proporciona un selector, carga solo ese elemento
+async function loadIframeContent(url, container, selector = null) {
   const iframe = container.querySelector('#notion-iframe');
   const contentDiv = container.querySelector('#notion-content');
   
@@ -1372,22 +1434,112 @@ function loadIframeContent(url, container) {
     return;
   }
   
-  // Ocultar el contenido de Notion y mostrar el iframe
+  // Ocultar el contenido de Notion
   if (contentDiv) {
     contentDiv.style.display = 'none';
   }
-  // Quitar la clase que oculta el iframe
   container.classList.remove('show-content');
-  // Asegurarse de que el iframe se muestre
-  iframe.style.display = 'block';
-  iframe.style.visibility = 'visible';
-  iframe.src = url;
   
-  console.log('📄 Cargando URL en iframe:', url);
+  // Si hay un selector, intentar cargar solo ese elemento
+  if (selector) {
+    try {
+      console.log('📄 Cargando elemento específico:', selector, 'de:', url);
+      
+      // Obtener el HTML de la página (puede fallar por CORS)
+      const response = await fetch(url, { 
+        mode: 'cors',
+        credentials: 'omit'
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Error al cargar: ${response.status}`);
+      }
+      
+      const html = await response.text();
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(html, 'text/html');
+      
+      // Buscar el elemento por selector (id o clase)
+      const element = doc.querySelector(selector);
+      
+      if (!element) {
+        throw new Error(`No se encontró el elemento con selector: ${selector}`);
+      }
+      
+      // Obtener todos los estilos de la página original
+      const styles = Array.from(doc.querySelectorAll('style')).map(s => s.textContent).join('\n');
+      const styleLinks = Array.from(doc.querySelectorAll('link[rel="stylesheet"]'))
+        .map(link => {
+          const href = link.href;
+          // Convertir URLs relativas a absolutas
+          try {
+            return new URL(href, url).href;
+          } catch {
+            return href;
+          }
+        })
+        .map(href => `<link rel="stylesheet" href="${href}">`)
+        .join('\n');
+      
+      // Crear un HTML completo con solo ese elemento y sus estilos
+      const isolatedHtml = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <style>
+            * {
+              margin: 0;
+              padding: 0;
+              box-sizing: border-box;
+            }
+            body {
+              padding: 16px;
+              background: transparent;
+            }
+            ${styles}
+          </style>
+          ${styleLinks}
+        </head>
+        <body>
+          ${element.outerHTML}
+        </body>
+        </html>
+      `;
+      
+      // Crear un blob URL para el contenido aislado
+      const blob = new Blob([isolatedHtml], { type: 'text/html' });
+      const blobUrl = URL.createObjectURL(blob);
+      
+      iframe.src = blobUrl;
+      iframe.style.display = 'block';
+      iframe.style.visibility = 'visible';
+      
+      // Limpiar el blob URL cuando el iframe se descargue
+      iframe.addEventListener('load', () => {
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+      }, { once: true });
+      
+    } catch (error) {
+      console.warn('⚠️ No se pudo cargar elemento específico (posible CORS):', error.message);
+      console.log('📄 Cargando URL completa como fallback:', url);
+      // Fallback: cargar la URL completa
+      iframe.src = url;
+      iframe.style.display = 'block';
+      iframe.style.visibility = 'visible';
+    }
+  } else {
+    // Sin selector: cargar la URL completa
+    console.log('📄 Cargando URL completa en iframe:', url);
+    iframe.src = url;
+    iframe.style.display = 'block';
+    iframe.style.visibility = 'visible';
+  }
 }
 
 // Función para cargar contenido de una página
-async function loadPageContent(url, name) {
+async function loadPageContent(url, name, selector = null) {
   const pageList = document.getElementById("page-list");
   const notionContainer = document.getElementById("notion-container");
   const backButton = document.getElementById("back-button");
@@ -1524,8 +1676,8 @@ async function loadPageContent(url, name) {
         refreshButton.classList.add("hidden");
       }
       
-      // Cargar en iframe
-      loadIframeContent(url, notionContainer);
+      // Cargar en iframe (con selector opcional)
+      await loadIframeContent(url, notionContainer, selector);
     }
     
     if (!backButton.dataset.listenerAdded) {
@@ -1580,7 +1732,7 @@ function showTokenConfig(roomId = null) {
     z-index: 1000;
     display: flex;
     flex-direction: column;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    font-family: Roboto, Helvetica, Arial, sans-serif;
   `;
   
   const header = document.createElement('div');
@@ -1606,7 +1758,7 @@ function showTokenConfig(roomId = null) {
         transition: all 0.2s;
       ">← Volver</button>
       <div>
-        <h1 style="color: #fff; font-size: 18px; font-weight: 600; margin: 0;">🔑 Configurar Token de Notion</h1>
+        <h1 style="font-family: Roboto, Helvetica, Arial, sans-serif; color: #fff; font-size: 18px; line-height: 24px; font-weight: 700; margin: 0;">🔑 Configurar Token de Notion</h1>
         ${roomId ? `<p style="color: #999; font-size: 11px; margin: 2px 0 0 0;">Room: ${getFriendlyRoomId(roomId)}</p>` : ''}
       </div>
     </div>
@@ -1846,7 +1998,7 @@ function showJSONEditor(pagesConfig, roomId = null) {
     z-index: 1000;
     display: flex;
     flex-direction: column;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    font-family: Roboto, Helvetica, Arial, sans-serif;
   `;
   
   // Header estilo Notion
@@ -1873,7 +2025,7 @@ function showJSONEditor(pagesConfig, roomId = null) {
         transition: all 0.2s;
       ">← Volver</button>
       <div>
-        <h1 style="color: #fff; font-size: 18px; font-weight: 600; margin: 0;">📝 Editar Configuración</h1>
+        <h1 style="font-family: Roboto, Helvetica, Arial, sans-serif; color: #fff; font-size: 18px; line-height: 24px; font-weight: 700; margin: 0;">📝 Editar Configuración</h1>
         ${roomId ? `<p style="color: #999; font-size: 11px; margin: 2px 0 0 0;">Room: ${getFriendlyRoomId(roomId)}</p>` : ''}
       </div>
     </div>
@@ -2037,6 +2189,9 @@ function showJSONEditor(pagesConfig, roomId = null) {
       savePagesJSON(parsed, roomId);
       errorDiv.style.display = 'none';
       textarea.style.borderColor = CSS_VARS.borderPrimary;
+      
+      // Actualizar el textarea con el JSON guardado (formateado)
+      textarea.value = JSON.stringify(parsed, null, 2);
       
       // Cerrar y recargar
       closeEditor();
