@@ -1771,12 +1771,7 @@ function renderCategory(category, parentElement, level = 0, roomId = null) {
         await loadPageContent(page.url, page.name, page.selector || '', blockTypes);
       });
       
-      const buttonWrapper = document.createElement('div');
-      buttonWrapper.style.cssText = 'display: flex; align-items: center; gap: 0;';
-      buttonWrapper.appendChild(button);
-      buttonWrapper.appendChild(refreshButton);
-      
-      pagesContainer.appendChild(buttonWrapper);
+      pagesContainer.appendChild(button);
       
       buttonsData.push({ button, pageId, pageName: page.name, linkIconHtml });
     });
