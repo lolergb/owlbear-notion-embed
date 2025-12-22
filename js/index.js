@@ -1723,7 +1723,7 @@ try {
       jsonIcon.className = "icon-button-icon";
       adminButton.appendChild(jsonIcon);
       adminButton.title = "Editar JSON";
-      adminButton.addEventListener("click", async () => await showJSONEditor(pagesConfig, roomId));
+      adminButton.addEventListener("click", async () => await showVisualEditor(pagesConfig, roomId));
       
       // Botón para configurar token de Notion
       const tokenButton = document.createElement("button");
@@ -2609,6 +2609,255 @@ function showTokenConfig() {
   backBtn.addEventListener('click', closeTokenConfig);
 }
 
+// ============================================
+// EDITOR VISUAL TIPO NOTION
+// ============================================
+
+// Función para crear menú contextual estilo Owlbear
+function createContextMenu(items, position, onClose) {
+  // Remover menú existente si hay uno
+  const existingMenu = document.getElementById('context-menu');
+  if (existingMenu) {
+    existingMenu.remove();
+  }
+
+  const menu = document.createElement('div');
+  menu.id = 'context-menu';
+  menu.style.cssText = `
+    position: fixed;
+    left: ${position.x}px;
+    top: ${position.y}px;
+    background: rgba(30, 30, 30, 0.95);
+    backdrop-filter: blur(10px);
+    border-radius: 8px;
+    padding: 4px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    min-width: 180px;
+    z-index: 10000;
+    font-family: Roboto, Helvetica, Arial, sans-serif;
+    font-size: 14px;
+  `;
+
+  items.forEach((item, index) => {
+    if (item.separator) {
+      const separator = document.createElement('div');
+      separator.style.cssText = `
+        height: 1px;
+        background: rgba(255, 255, 255, 0.1);
+        margin: 4px 0;
+      `;
+      menu.appendChild(separator);
+      return;
+    }
+
+    const menuItem = document.createElement('div');
+    menuItem.className = 'context-menu-item';
+    menuItem.style.cssText = `
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 8px 12px;
+      border-radius: 4px;
+      cursor: pointer;
+      color: #e0e0e0;
+      transition: background 0.15s;
+    `;
+
+    menuItem.innerHTML = `
+      <span style="font-size: 16px; width: 20px; text-align: center;">${item.icon || ''}</span>
+      <span>${item.text}</span>
+    `;
+
+    menuItem.addEventListener('mouseenter', () => {
+      menuItem.style.background = 'rgba(255, 255, 255, 0.1)';
+    });
+
+    menuItem.addEventListener('mouseleave', () => {
+      menuItem.style.background = 'transparent';
+    });
+
+    menuItem.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (item.action) {
+        item.action();
+      }
+      if (onClose) onClose();
+      menu.remove();
+    });
+
+    menu.appendChild(menuItem);
+  });
+
+  // Cerrar al hacer click fuera
+  const closeMenu = (e) => {
+    if (!menu.contains(e.target)) {
+      menu.remove();
+      document.removeEventListener('click', closeMenu);
+      if (onClose) onClose();
+    }
+  };
+
+  // Usar setTimeout para evitar que el click que abrió el menú lo cierre inmediatamente
+  setTimeout(() => {
+    document.addEventListener('click', closeMenu);
+  }, 0);
+
+  document.body.appendChild(menu);
+
+  // Ajustar posición si se sale de la pantalla
+  const rect = menu.getBoundingClientRect();
+  if (rect.right > window.innerWidth) {
+    menu.style.left = `${position.x - rect.width}px`;
+  }
+  if (rect.bottom > window.innerHeight) {
+    menu.style.top = `${position.y - rect.height}px`;
+  }
+
+  return menu;
+}
+
+// Función para mostrar formulario modal
+function showModalForm(title, fields, onSubmit, onCancel) {
+  const overlay = document.createElement('div');
+  overlay.id = 'modal-overlay';
+  overlay.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(4px);
+    z-index: 10001;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: Roboto, Helvetica, Arial, sans-serif;
+  `;
+
+  const modal = document.createElement('div');
+  modal.style.cssText = `
+    background: rgba(30, 30, 30, 0.95);
+    backdrop-filter: blur(10px);
+    border-radius: 12px;
+    padding: 24px;
+    min-width: 400px;
+    max-width: 500px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  `;
+
+  modal.innerHTML = `
+    <h2 style="color: #fff; font-size: 20px; font-weight: 700; margin-bottom: 20px;">${title}</h2>
+    <form id="modal-form" style="display: flex; flex-direction: column; gap: 16px;">
+      ${fields.map(field => `
+        <div>
+          <label style="display: block; color: #999; font-size: 12px; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px;">
+            ${field.label}${field.required ? ' *' : ''}
+          </label>
+          ${field.type === 'textarea' ? `
+            <textarea 
+              id="field-${field.name}" 
+              name="${field.name}"
+              ${field.required ? 'required' : ''}
+              placeholder="${field.placeholder || ''}"
+              style="
+                width: 100%;
+                padding: 10px 12px;
+                background: rgba(255, 255, 255, 0.05);
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                border-radius: 6px;
+                color: #e0e0e0;
+                font-size: 14px;
+                font-family: Roboto, Helvetica, Arial, sans-serif;
+                resize: vertical;
+                min-height: 60px;
+              "
+            >${field.value || ''}</textarea>
+          ` : `
+            <input 
+              type="${field.type || 'text'}" 
+              id="field-${field.name}" 
+              name="${field.name}"
+              ${field.required ? 'required' : ''}
+              placeholder="${field.placeholder || ''}"
+              value="${field.value || ''}"
+              style="
+                width: 100%;
+                padding: 10px 12px;
+                background: rgba(255, 255, 255, 0.05);
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                border-radius: 6px;
+                color: #e0e0e0;
+                font-size: 14px;
+                font-family: Roboto, Helvetica, Arial, sans-serif;
+              "
+            />
+          `}
+          ${field.help ? `<div style="color: #666; font-size: 12px; margin-top: 4px;">${field.help}</div>` : ''}
+        </div>
+      `).join('')}
+      <div style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 8px;">
+        <button type="button" id="modal-cancel" style="
+          padding: 10px 20px;
+          background: transparent;
+          border: 1px solid rgba(255, 255, 255, 0.2);
+          border-radius: 6px;
+          color: #e0e0e0;
+          cursor: pointer;
+          font-size: 14px;
+          font-weight: 500;
+          transition: all 0.2s;
+        ">Cancelar</button>
+        <button type="submit" id="modal-submit" style="
+          padding: 10px 20px;
+          background: #4a9eff;
+          border: none;
+          border-radius: 6px;
+          color: #fff;
+          cursor: pointer;
+          font-size: 14px;
+          font-weight: 700;
+          transition: all 0.2s;
+        ">Guardar</button>
+      </div>
+    </form>
+  `;
+
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+
+  const form = modal.querySelector('#modal-form');
+  const cancelBtn = modal.querySelector('#modal-cancel');
+  const submitBtn = modal.querySelector('#modal-submit');
+
+  const close = () => {
+    overlay.remove();
+    if (onCancel) onCancel();
+  };
+
+  cancelBtn.addEventListener('click', close);
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) close();
+  });
+
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const formData = {};
+    fields.forEach(field => {
+      const input = modal.querySelector(`#field-${field.name}`);
+      formData[field.name] = input.value.trim();
+    });
+    if (onSubmit) onSubmit(formData);
+    close();
+  });
+
+  // Focus en el primer campo
+  const firstInput = modal.querySelector('input, textarea');
+  if (firstInput) {
+    setTimeout(() => firstInput.focus(), 100);
+  }
+}
+
 // Función para mostrar el editor de JSON
 async function showJSONEditor(pagesConfig, roomId = null) {
   // SIEMPRE leer desde localStorage para obtener la versión más actualizada
@@ -2895,6 +3144,479 @@ async function showJSONEditor(pagesConfig, roomId = null) {
   textarea.focus();
   // Scroll al inicio
   textarea.scrollTop = 0;
+}
+
+// Función para mostrar el editor visual tipo Notion
+async function showVisualEditor(pagesConfig, roomId = null) {
+  const currentConfig = getPagesJSON(roomId) || pagesConfig || await getDefaultJSON();
+  console.log('📖 Abriendo editor visual - Configuración cargada:', currentConfig);
+
+  // Ocultar el contenedor principal
+  const mainContainer = document.querySelector('.container');
+  const pageList = document.getElementById("page-list");
+  const notionContainer = document.getElementById("notion-container");
+
+  if (mainContainer) mainContainer.classList.add('hidden');
+  if (pageList) pageList.classList.add('hidden');
+  if (notionContainer) notionContainer.classList.add('hidden');
+
+  // Crear contenedor del editor
+  const editorContainer = document.createElement('div');
+  editorContainer.id = 'visual-editor-container';
+  editorContainer.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: ${CSS_VARS.bgPrimary};
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+    font-family: Roboto, Helvetica, Arial, sans-serif;
+  `;
+
+  // Header
+  const header = document.createElement('div');
+  header.style.cssText = `
+    background: ${CSS_VARS.bgPrimary};
+    border-bottom: 1px solid ${CSS_VARS.borderPrimary};
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  `;
+
+  header.innerHTML = `
+    <div style="display: flex; align-items: center; gap: 12px;">
+      <button id="back-from-visual-editor" style="
+        background: ${CSS_VARS.bgPrimary};
+        border: 1px solid ${CSS_VARS.borderPrimary};
+        border-radius: 6px;
+        padding: 6px 12px;
+        color: #e0e0e0;
+        cursor: pointer;
+        font-size: 14px;
+        transition: all 0.2s;
+      ">← Volver</button>
+      <h1 style="margin: 0; font-size: 18px; font-weight: 700; color: #fff;">Editor de Configuración</h1>
+    </div>
+  `;
+
+  // Área de contenido (sidebar tipo Notion)
+  const contentArea = document.createElement('div');
+  contentArea.id = 'visual-editor-content';
+  contentArea.style.cssText = `
+    flex: 1;
+    overflow-y: auto;
+    padding: 24px;
+    max-width: 800px;
+    margin: 0 auto;
+    width: 100%;
+  `;
+
+  // Función para renderizar items recursivamente
+  const renderEditorItem = (item, parentElement, level = 0, path = []) => {
+    const itemDiv = document.createElement('div');
+    itemDiv.className = 'editor-item';
+    itemDiv.dataset.level = level;
+    itemDiv.dataset.path = JSON.stringify(path);
+
+    const indent = level * 20;
+    const isCategory = item.pages !== undefined || item.categories !== undefined;
+    const hasChildren = (item.pages && item.pages.length > 0) || (item.categories && item.categories.length > 0);
+
+    itemDiv.style.cssText = `
+      margin-left: ${indent}px;
+      margin-bottom: 2px;
+      position: relative;
+    `;
+
+    const itemRow = document.createElement('div');
+    itemRow.className = 'editor-item-row';
+    itemRow.style.cssText = `
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 8px;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background 0.15s;
+      position: relative;
+    `;
+
+    // Toggle para categorías con hijos
+    if (isCategory && hasChildren) {
+      const toggle = document.createElement('button');
+      toggle.className = 'editor-toggle';
+      toggle.innerHTML = '▶';
+      toggle.style.cssText = `
+        background: transparent;
+        border: none;
+        color: #999;
+        cursor: pointer;
+        padding: 0;
+        width: 16px;
+        height: 16px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 10px;
+        transition: transform 0.2s;
+      `;
+      itemRow.appendChild(toggle);
+    } else {
+      const spacer = document.createElement('div');
+      spacer.style.width = '16px';
+      itemRow.appendChild(spacer);
+    }
+
+    // Icono
+    const icon = document.createElement('span');
+    icon.textContent = isCategory ? '📁' : '📄';
+    icon.style.fontSize = '16px';
+    itemRow.appendChild(icon);
+
+    // Nombre
+    const name = document.createElement('span');
+    name.textContent = item.name;
+    name.style.cssText = `
+      flex: 1;
+      color: #e0e0e0;
+      font-size: 14px;
+    `;
+    itemRow.appendChild(name);
+
+    // Botón de menú contextual (•••)
+    const menuBtn = document.createElement('button');
+    menuBtn.className = 'editor-menu-btn';
+    menuBtn.innerHTML = '⋯';
+    menuBtn.style.cssText = `
+      background: transparent;
+      border: none;
+      color: #666;
+      cursor: pointer;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 18px;
+      line-height: 1;
+      opacity: 0;
+      transition: all 0.15s;
+    `;
+
+    itemRow.addEventListener('mouseenter', () => {
+      itemRow.style.background = 'rgba(255, 255, 255, 0.05)';
+      menuBtn.style.opacity = '1';
+    });
+
+    itemRow.addEventListener('mouseleave', () => {
+      itemRow.style.background = 'transparent';
+      menuBtn.style.opacity = '0';
+    });
+
+    menuBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const rect = menuBtn.getBoundingClientRect();
+      const menuItems = [];
+
+      if (isCategory) {
+        menuItems.push(
+          { icon: '➕', text: 'Agregar categoría', action: () => addCategory(path) },
+          { icon: '➕', text: 'Agregar página', action: () => addPage(path) },
+          { separator: true },
+          { icon: '✏️', text: 'Editar', action: () => editCategory(item, path) },
+          { icon: '🗑️', text: 'Eliminar', action: () => deleteCategory(path) }
+        );
+      } else {
+        menuItems.push(
+          { icon: '✏️', text: 'Editar', action: () => editPage(item, path) },
+          { icon: '🗑️', text: 'Eliminar', action: () => deletePage(path) }
+        );
+      }
+
+      createContextMenu(menuItems, { x: rect.right, y: rect.top });
+    });
+
+    itemRow.appendChild(menuBtn);
+    itemDiv.appendChild(itemRow);
+
+    // Contenedor de hijos (colapsable)
+    const childrenContainer = document.createElement('div');
+    childrenContainer.className = 'editor-children';
+    childrenContainer.style.cssText = `
+      display: ${hasChildren ? 'block' : 'none'};
+      margin-left: 24px;
+    `;
+
+    if (isCategory && hasChildren) {
+      // Renderizar subcategorías primero
+      if (item.categories && item.categories.length > 0) {
+        item.categories.forEach((subcat, index) => {
+          const newPath = path.length > 0 ? [...path, 'categories', index] : ['categories', index];
+          renderEditorItem(subcat, childrenContainer, level + 1, newPath);
+        });
+      }
+
+      // Renderizar páginas después
+      if (item.pages && item.pages.length > 0) {
+        item.pages.forEach((page, index) => {
+          const newPath = path.length > 0 ? [...path, 'pages', index] : ['pages', index];
+          renderEditorItem(page, childrenContainer, level + 1, newPath);
+        });
+      }
+
+      // Toggle para colapsar/expandir
+      const toggle = itemRow.querySelector('.editor-toggle');
+      if (toggle) {
+        toggle.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const isExpanded = childrenContainer.style.display === 'block';
+          childrenContainer.style.display = isExpanded ? 'none' : 'block';
+          toggle.style.transform = isExpanded ? 'rotate(0deg)' : 'rotate(90deg)';
+        });
+      }
+    }
+
+    itemDiv.appendChild(childrenContainer);
+    parentElement.appendChild(itemDiv);
+  };
+
+  // Función auxiliar para navegar por el path
+  const navigatePath = (config, path) => {
+    let target = config;
+    for (let i = 0; i < path.length; i += 2) {
+      const key = path[i];
+      const index = path[i + 1];
+      if (target[key] && target[key][index]) {
+        target = target[key][index];
+      } else {
+        return null;
+      }
+    }
+    return target;
+  };
+
+  // Funciones CRUD
+  const addCategory = (parentPath = []) => {
+    showModalForm(
+      'Agregar Categoría',
+      [
+        { name: 'name', label: 'Nombre', type: 'text', required: true, placeholder: 'Nombre de la categoría' }
+      ],
+      (data) => {
+        const config = JSON.parse(JSON.stringify(getPagesJSON(roomId) || currentConfig));
+        const newCategory = { name: data.name, pages: [], categories: [] };
+        
+        if (parentPath.length === 0) {
+          // Agregar al nivel raíz
+          if (!config.categories) config.categories = [];
+          config.categories.push(newCategory);
+        } else {
+          // Agregar dentro de una categoría
+          const parent = navigatePath(config, parentPath);
+          if (parent) {
+            if (!parent.categories) parent.categories = [];
+            parent.categories.push(newCategory);
+          }
+        }
+        
+        savePagesJSON(config, roomId);
+        refreshEditor();
+      }
+    );
+  };
+
+  const addPage = (parentPath = []) => {
+    showModalForm(
+      'Agregar Página',
+      [
+        { name: 'name', label: 'Nombre', type: 'text', required: true, placeholder: 'Nombre de la página' },
+        { name: 'url', label: 'URL', type: 'url', required: true, placeholder: 'https://...' },
+        { name: 'selector', label: 'Selector (opcional)', type: 'text', placeholder: '#main-content', help: 'Solo para URLs externas' },
+        { name: 'blockTypes', label: 'Tipos de bloques (opcional)', type: 'text', placeholder: 'quote, callout', help: 'Solo para URLs de Notion. Ej: "quote" o "quote,callout"' }
+      ],
+      (data) => {
+        const config = JSON.parse(JSON.stringify(getPagesJSON(roomId) || currentConfig));
+        const newPage = {
+          name: data.name,
+          url: data.url
+        };
+        if (data.selector) newPage.selector = data.selector;
+        if (data.blockTypes) {
+          newPage.blockTypes = data.blockTypes.includes(',') 
+            ? data.blockTypes.split(',').map(s => s.trim())
+            : data.blockTypes.trim();
+        }
+        
+        if (parentPath.length === 0) {
+          // Si no hay categorías, crear una
+          if (!config.categories || config.categories.length === 0) {
+            config.categories = [{ name: 'General', pages: [], categories: [] }];
+          }
+          if (!config.categories[0].pages) config.categories[0].pages = [];
+          config.categories[0].pages.push(newPage);
+        } else {
+          // Agregar dentro de una categoría
+          const parent = navigatePath(config, parentPath);
+          if (parent) {
+            if (!parent.pages) parent.pages = [];
+            parent.pages.push(newPage);
+          }
+        }
+        
+        savePagesJSON(config, roomId);
+        refreshEditor();
+      }
+    );
+  };
+
+  const editCategory = (category, path) => {
+    showModalForm(
+      'Editar Categoría',
+      [
+        { name: 'name', label: 'Nombre', type: 'text', required: true, value: category.name }
+      ],
+      (data) => {
+        const config = JSON.parse(JSON.stringify(getPagesJSON(roomId) || currentConfig));
+        const target = navigatePath(config, path);
+        if (target) {
+          target.name = data.name;
+          savePagesJSON(config, roomId);
+          refreshEditor();
+        }
+      }
+    );
+  };
+
+  const editPage = (page, path) => {
+    showModalForm(
+      'Editar Página',
+      [
+        { name: 'name', label: 'Nombre', type: 'text', required: true, value: page.name },
+        { name: 'url', label: 'URL', type: 'url', required: true, value: page.url },
+        { name: 'selector', label: 'Selector (opcional)', type: 'text', value: page.selector || '', help: 'Solo para URLs externas' },
+        { name: 'blockTypes', label: 'Tipos de bloques (opcional)', type: 'text', value: Array.isArray(page.blockTypes) ? page.blockTypes.join(', ') : (page.blockTypes || ''), help: 'Solo para URLs de Notion' }
+      ],
+      (data) => {
+        const config = JSON.parse(JSON.stringify(getPagesJSON(roomId) || currentConfig));
+        const target = navigatePath(config, path);
+        if (target) {
+          target.name = data.name;
+          target.url = data.url;
+          if (data.selector) {
+            target.selector = data.selector;
+          } else {
+            delete target.selector;
+          }
+          if (data.blockTypes) {
+            target.blockTypes = data.blockTypes.includes(',') 
+              ? data.blockTypes.split(',').map(s => s.trim())
+              : data.blockTypes.trim();
+          } else {
+            delete target.blockTypes;
+          }
+          savePagesJSON(config, roomId);
+          refreshEditor();
+        }
+      }
+    );
+  };
+
+  const deleteCategory = (path) => {
+    if (!confirm('¿Eliminar esta categoría y todo su contenido?')) return;
+    const config = JSON.parse(JSON.stringify(getPagesJSON(roomId) || currentConfig));
+    const key = path[path.length - 2];
+    const index = path[path.length - 1];
+    const parent = navigatePath(config, path.slice(0, -2));
+    if (parent && parent[key]) {
+      parent[key].splice(index, 1);
+      savePagesJSON(config, roomId);
+      refreshEditor();
+    }
+  };
+
+  const deletePage = (path) => {
+    if (!confirm('¿Eliminar esta página?')) return;
+    const config = JSON.parse(JSON.stringify(getPagesJSON(roomId) || currentConfig));
+    const key = path[path.length - 2];
+    const index = path[path.length - 1];
+    const parent = navigatePath(config, path.slice(0, -2));
+    if (parent && parent[key]) {
+      parent[key].splice(index, 1);
+      savePagesJSON(config, roomId);
+      refreshEditor();
+    }
+  };
+
+  // Función para refrescar el editor
+  const refreshEditor = () => {
+    const config = getPagesJSON(roomId) || currentConfig;
+    contentArea.innerHTML = '';
+    
+    // Botón para agregar categoría en nivel raíz
+    const addRootCategoryBtn = document.createElement('button');
+    addRootCategoryBtn.textContent = '➕ Nueva categoría';
+    addRootCategoryBtn.style.cssText = `
+      margin-bottom: 16px;
+      padding: 8px 16px;
+      background: rgba(74, 158, 255, 0.2);
+      border: 1px solid rgba(74, 158, 255, 0.3);
+      border-radius: 6px;
+      color: #4a9eff;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+      transition: all 0.2s;
+    `;
+    addRootCategoryBtn.addEventListener('mouseenter', () => {
+      addRootCategoryBtn.style.background = 'rgba(74, 158, 255, 0.3)';
+    });
+    addRootCategoryBtn.addEventListener('mouseleave', () => {
+      addRootCategoryBtn.style.background = 'rgba(74, 158, 255, 0.2)';
+    });
+    addRootCategoryBtn.addEventListener('click', () => addCategory());
+    contentArea.appendChild(addRootCategoryBtn);
+
+    // Renderizar categorías
+    if (config.categories && config.categories.length > 0) {
+      config.categories.forEach((category, index) => {
+        renderEditorItem(category, contentArea, 0, ['categories', index]);
+      });
+    } else {
+      const emptyState = document.createElement('div');
+      emptyState.style.cssText = `
+        text-align: center;
+        padding: 40px;
+        color: #666;
+      `;
+      emptyState.innerHTML = `
+        <p style="margin-bottom: 12px;">No hay categorías</p>
+        <p style="font-size: 12px; color: #555;">Haz clic en "➕ Nueva categoría" para comenzar</p>
+      `;
+      contentArea.appendChild(emptyState);
+    }
+  };
+
+  editorContainer.appendChild(header);
+  editorContainer.appendChild(contentArea);
+  document.body.appendChild(editorContainer);
+
+  // Botón volver
+  const backBtn = header.querySelector('#back-from-visual-editor');
+  backBtn.addEventListener('click', () => {
+    document.body.removeChild(editorContainer);
+    if (mainContainer) mainContainer.classList.remove('hidden');
+    if (pageList) pageList.classList.remove('hidden');
+    
+    // Recargar la lista de páginas
+    const savedConfig = getPagesJSON(roomId);
+    if (savedConfig && pageList) {
+      renderPagesByCategories(savedConfig, pageList, roomId);
+    }
+  });
+
+  // Inicializar editor
+  refreshEditor();
 }
 
 // Log adicional para verificar que el script se ejecutó completamente
