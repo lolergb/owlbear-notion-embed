@@ -1670,25 +1670,75 @@ try {
       // Cargar configuración desde JSON (específica para esta room)
       log('🔍 Intentando cargar configuración para room:', roomId);
       let pagesConfig = getPagesJSON(roomId);
+      
+      // Si no se encuentra configuración para este roomId, buscar cualquier configuración guardada
       if (!pagesConfig) {
-        // Verificar si hay alguna configuración guardada (puede ser que el roomId haya cambiado)
+        log('⚠️ No se encontró configuración para roomId:', roomId);
         const allConfigs = getAllRoomConfigs();
         const configKeys = Object.keys(allConfigs);
+        
         if (configKeys.length > 0) {
-          log('⚠️ No se encontró configuración para este roomId, pero hay configuraciones guardadas:', configKeys);
-          log('📋 Usando la primera configuración encontrada:', configKeys[0]);
-          pagesConfig = allConfigs[configKeys[0]];
-          // Guardar esta configuración con el roomId actual
-          savePagesJSON(pagesConfig, roomId);
-          log('✅ Configuración migrada al roomId actual:', roomId);
+          // Usar la configuración más reciente (la última en el objeto, que suele ser la más reciente)
+          // O mejor, usar la primera que encontremos que tenga contenido válido
+          let foundConfig = null;
+          for (const key of configKeys) {
+            const config = allConfigs[key];
+            if (config && config.categories && config.categories.length > 0) {
+              foundConfig = config;
+              log('📋 Usando configuración guardada de roomId:', key);
+              break;
+            }
+          }
+          
+          if (foundConfig) {
+            pagesConfig = foundConfig;
+            // Guardar esta configuración con el roomId actual para futuras cargas
+            savePagesJSON(pagesConfig, roomId);
+            log('✅ Configuración migrada al roomId actual:', roomId);
+          } else {
+            log('📝 No se encontró ninguna configuración válida, creando una nueva para room:', roomId);
+            pagesConfig = await getDefaultJSON();
+            savePagesJSON(pagesConfig, roomId);
+            log('✅ Configuración por defecto creada para room:', roomId);
+          }
         } else {
-          log('📝 No se encontró ninguna configuración, creando una nueva para room:', roomId);
+          log('📝 No se encontró ninguna configuración guardada, creando una nueva para room:', roomId);
           pagesConfig = await getDefaultJSON();
           savePagesJSON(pagesConfig, roomId);
           log('✅ Configuración por defecto creada para room:', roomId);
         }
       } else {
         log('✅ Configuración encontrada para room:', roomId);
+      }
+      
+      // Verificar que la configuración cargada no sea la por defecto vacía
+      if (pagesConfig && pagesConfig.categories && pagesConfig.categories.length > 0) {
+        const firstCategory = pagesConfig.categories[0];
+        // Si solo tiene una categoría "General" vacía, podría ser la por defecto
+        if (pagesConfig.categories.length === 1 && 
+            firstCategory.name === 'General' && 
+            (!firstCategory.pages || firstCategory.pages.length === 0) &&
+            (!firstCategory.categories || firstCategory.categories.length === 0)) {
+          log('⚠️ La configuración parece ser la por defecto vacía, buscando otras configuraciones...');
+          const allConfigs = getAllRoomConfigs();
+          const configKeys = Object.keys(allConfigs);
+          for (const key of configKeys) {
+            const config = allConfigs[key];
+            if (config && config.categories && config.categories.length > 0) {
+              // Verificar si esta configuración tiene más contenido
+              const hasContent = config.categories.some(cat => 
+                (cat.pages && cat.pages.length > 0) || 
+                (cat.categories && cat.categories.length > 0)
+              );
+              if (hasContent) {
+                log('📋 Encontrada configuración con contenido, usando:', key);
+                pagesConfig = config;
+                savePagesJSON(pagesConfig, roomId);
+                break;
+              }
+            }
+          }
+        }
       }
 
       console.log('📊 Configuración cargada para room:', roomId);
