@@ -1951,7 +1951,10 @@ function renderCategory(category, parentElement, level = 0, roomId = null, categ
   }
   
   // Contenedor de páginas de la categoría
-  if (categoryPages.length > 0 || !hasContent) {
+  // Siempre crear el contenedor si no hay contenido, o si hay páginas
+  // Si tiene subcategorías pero no páginas, también crear el contenedor para mantener la estructura
+  // Esto asegura que las categorías vacías anidadas se muestren correctamente
+  if (categoryPages.length > 0 || !hasContent || (hasSubcategories && categoryPages.length === 0)) {
     const pagesContainer = document.createElement('div');
     pagesContainer.className = 'category-pages';
     // Permitir drop en el contenedor para reordenar
@@ -3519,66 +3522,70 @@ function showTokenConfig() {
   backBtn.addEventListener('click', closeTokenConfig);
   
   // Limpiar toda la cache
-  clearCacheBtn.addEventListener('mouseenter', () => {
-    clearCacheBtn.style.background = CSS_VARS.bgHover;
-    clearCacheBtn.style.borderColor = CSS_VARS.borderPrimary;
-  });
-  clearCacheBtn.addEventListener('mouseleave', () => {
-    clearCacheBtn.style.background = CSS_VARS.bgPrimary;
-    clearCacheBtn.style.borderColor = CSS_VARS.borderPrimary;
-  });
-  clearCacheBtn.addEventListener('mousedown', () => {
-    clearCacheBtn.style.background = CSS_VARS.bgActive;
-    clearCacheBtn.style.borderColor = CSS_VARS.borderActive;
-  });
-  clearCacheBtn.addEventListener('mouseup', () => {
-    clearCacheBtn.style.background = CSS_VARS.bgHover;
-    clearCacheBtn.style.borderColor = CSS_VARS.borderPrimary;
-  });
-  clearCacheBtn.addEventListener('click', () => {
-    if (confirm('¿Limpiar toda la caché? Esto eliminará todas las páginas en caché.')) {
-      const cleared = clearAllCache();
-      alert(`✅ Caché limpiada: ${cleared} entradas eliminadas`);
-    }
-  });
+  if (clearCacheBtn) {
+    clearCacheBtn.addEventListener('mouseenter', () => {
+      clearCacheBtn.style.background = CSS_VARS.bgHover;
+      clearCacheBtn.style.borderColor = CSS_VARS.borderPrimary;
+    });
+    clearCacheBtn.addEventListener('mouseleave', () => {
+      clearCacheBtn.style.background = CSS_VARS.bgPrimary;
+      clearCacheBtn.style.borderColor = CSS_VARS.borderPrimary;
+    });
+    clearCacheBtn.addEventListener('mousedown', () => {
+      clearCacheBtn.style.background = CSS_VARS.bgActive;
+      clearCacheBtn.style.borderColor = CSS_VARS.borderActive;
+    });
+    clearCacheBtn.addEventListener('mouseup', () => {
+      clearCacheBtn.style.background = CSS_VARS.bgHover;
+      clearCacheBtn.style.borderColor = CSS_VARS.borderPrimary;
+    });
+    clearCacheBtn.addEventListener('click', () => {
+      if (confirm('¿Limpiar toda la caché? Esto eliminará todas las páginas en caché.')) {
+        const cleared = clearAllCache();
+        alert(`✅ Caché limpiada: ${cleared} entradas eliminadas`);
+      }
+    });
+  }
   
   // Descargar JSON
-  downloadJsonBtn.addEventListener('mouseenter', () => {
-    downloadJsonBtn.style.background = CSS_VARS.bgHover;
-    downloadJsonBtn.style.borderColor = CSS_VARS.borderPrimary;
-  });
-  downloadJsonBtn.addEventListener('mouseleave', () => {
-    downloadJsonBtn.style.background = CSS_VARS.bgPrimary;
-    downloadJsonBtn.style.borderColor = CSS_VARS.borderPrimary;
-  });
-  downloadJsonBtn.addEventListener('mousedown', () => {
-    downloadJsonBtn.style.background = CSS_VARS.bgActive;
-    downloadJsonBtn.style.borderColor = CSS_VARS.borderActive;
-  });
-  downloadJsonBtn.addEventListener('mouseup', () => {
-    downloadJsonBtn.style.background = CSS_VARS.bgHover;
-    downloadJsonBtn.style.borderColor = CSS_VARS.borderPrimary;
-  });
-  downloadJsonBtn.addEventListener('click', async () => {
-    try {
-      const roomId = await OBR.room.getId();
-      const config = getPagesJSON(roomId) || await getDefaultJSON();
-      const jsonStr = JSON.stringify(config, null, 2);
-      const blob = new Blob([jsonStr], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `notion-pages-config-${roomId ? getFriendlyRoomId(roomId) : 'default'}.json`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      alert('✅ JSON descargado exitosamente');
-    } catch (e) {
-      console.error('Error al descargar JSON:', e);
-      alert('❌ Error al descargar JSON: ' + e.message);
-    }
-  });
+  if (downloadJsonBtn) {
+    downloadJsonBtn.addEventListener('mouseenter', () => {
+      downloadJsonBtn.style.background = CSS_VARS.bgHover;
+      downloadJsonBtn.style.borderColor = CSS_VARS.borderPrimary;
+    });
+    downloadJsonBtn.addEventListener('mouseleave', () => {
+      downloadJsonBtn.style.background = CSS_VARS.bgPrimary;
+      downloadJsonBtn.style.borderColor = CSS_VARS.borderPrimary;
+    });
+    downloadJsonBtn.addEventListener('mousedown', () => {
+      downloadJsonBtn.style.background = CSS_VARS.bgActive;
+      downloadJsonBtn.style.borderColor = CSS_VARS.borderActive;
+    });
+    downloadJsonBtn.addEventListener('mouseup', () => {
+      downloadJsonBtn.style.background = CSS_VARS.bgHover;
+      downloadJsonBtn.style.borderColor = CSS_VARS.borderPrimary;
+    });
+    downloadJsonBtn.addEventListener('click', async () => {
+      try {
+        const roomId = await OBR.room.getId();
+        const config = getPagesJSON(roomId) || await getDefaultJSON();
+        const jsonStr = JSON.stringify(config, null, 2);
+        const blob = new Blob([jsonStr], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `notion-pages-config-${roomId ? getFriendlyRoomId(roomId) : 'default'}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        alert('✅ JSON descargado exitosamente');
+      } catch (e) {
+        console.error('Error al descargar JSON:', e);
+        alert('❌ Error al descargar JSON: ' + e.message);
+      }
+    });
+  }
 }
 
 // ============================================
