@@ -1748,6 +1748,37 @@ try {
       tokenButton.title = hasUserToken() ? "Token configurado - Clic para cambiar" : "Configurar token de Notion";
       tokenButton.addEventListener("click", () => showTokenConfig());
       
+      // Botón para agregar (categoría o página)
+      const addButton = document.createElement("button");
+      addButton.className = "icon-button";
+      const addIcon = document.createElement("img");
+      addIcon.src = "img/icon-add.svg";
+      addIcon.alt = "Agregar";
+      addIcon.className = "icon-button-icon";
+      addButton.appendChild(addIcon);
+      addButton.title = "Agregar categoría o página";
+      addButton.addEventListener("click", async (e) => {
+        const rect = addButton.getBoundingClientRect();
+        const menuItems = [
+          { 
+            icon: '📁', 
+            text: 'Agregar categoría', 
+            action: async () => {
+              await addCategoryToPageList([], roomId);
+            }
+          },
+          { 
+            icon: '📄', 
+            text: 'Agregar página', 
+            action: async () => {
+              await addPageToPageListWithCategorySelector([], roomId);
+            }
+          }
+        ];
+        createContextMenu(menuItems, { x: rect.right, y: rect.top });
+      });
+      
+      buttonContainer.appendChild(addButton);
       buttonContainer.appendChild(tokenButton);
       buttonContainer.appendChild(clearCacheButton);
       buttonContainer.appendChild(visualEditorButton);
@@ -1888,7 +1919,8 @@ function renderCategory(category, parentElement, level = 0, roomId = null, categ
         icon: '➕', 
         text: 'Agregar página', 
         action: async () => {
-          await addPageToPageList(categoryPath, roomId);
+          // Pasar categoryPath para que se autocomplete en el modal
+          await addPageToPageListWithCategorySelector(categoryPath, roomId);
         }
       },
       { separator: true },
@@ -2011,7 +2043,8 @@ function renderCategory(category, parentElement, level = 0, roomId = null, categ
             icon: '➕', 
             text: 'Agregar página aquí', 
             action: async () => {
-              await addPageToPageList(pageCategoryPath, roomId);
+              // Pasar pageCategoryPath para que se autocomplete en el modal
+              await addPageToPageListWithCategorySelector(pageCategoryPath, roomId);
             }
           },
           { separator: true },
@@ -2168,8 +2201,125 @@ async function addCategoryToPageList(categoryPath, roomId) {
   );
 }
 
+// Función auxiliar para obtener todas las categorías como opciones
+function getCategoryOptions(config, currentPath = [], level = 0) {
+  const options = [];
+  if (!config.categories) return options;
+  
+  config.categories.forEach((category, index) => {
+    const categoryPath = ['categories', index];
+    const fullPath = [...currentPath, ...categoryPath];
+    const indent = '  '.repeat(level);
+    options.push({
+      value: JSON.stringify(fullPath),
+      label: `${indent}${category.name}`
+    });
+    
+    // Agregar subcategorías recursivamente
+    if (category.categories && category.categories.length > 0) {
+      const subOptions = getCategoryOptions({ categories: category.categories }, fullPath, level + 1);
+      options.push(...subOptions);
+    }
+  });
+  
+  return options;
+}
+
+// Función para agregar página desde la vista de page-list con selector de categoría
+async function addPageToPageListWithCategorySelector(defaultCategoryPath, roomId) {
+  const currentConfig = getPagesJSON(roomId) || await getDefaultJSON();
+  const categoryOptions = getCategoryOptions(currentConfig);
+  
+  // Preparar campos del formulario
+  const fields = [
+    { name: 'name', label: 'Nombre', type: 'text', required: true, placeholder: 'Nombre de la página' },
+    { name: 'url', label: 'URL', type: 'url', required: true, placeholder: 'https://...' }
+  ];
+  
+  // Agregar selector de categoría si hay categorías disponibles
+  if (categoryOptions.length > 0) {
+    const defaultCategoryValue = defaultCategoryPath.length > 0 ? JSON.stringify(defaultCategoryPath) : categoryOptions[0].value;
+    fields.push({
+      name: 'category',
+      label: 'Categoría',
+      type: 'select',
+      required: true,
+      options: categoryOptions,
+      value: defaultCategoryValue
+    });
+  }
+  
+  fields.push(
+    { name: 'selector', label: 'Selector (opcional)', type: 'text', placeholder: '#main-content', help: 'Solo para URLs externas' },
+    { name: 'blockTypes', label: 'Tipos de bloques (opcional)', type: 'text', placeholder: 'quote, callout', help: 'Solo para URLs de Notion. Ej: "quote" o "quote,callout"' }
+  );
+  
+  showModalForm(
+    'Agregar Página',
+    fields,
+    async (data) => {
+      const config = JSON.parse(JSON.stringify(getPagesJSON(roomId) || currentConfig));
+      const newPage = {
+        name: data.name,
+        url: data.url
+      };
+      if (data.selector) newPage.selector = data.selector;
+      if (data.blockTypes) {
+        newPage.blockTypes = data.blockTypes.includes(',') 
+          ? data.blockTypes.split(',').map(s => s.trim())
+          : data.blockTypes.trim();
+      }
+      
+      // Determinar el path de la categoría
+      let targetCategoryPath = defaultCategoryPath;
+      if (data.category) {
+        try {
+          targetCategoryPath = JSON.parse(data.category);
+        } catch (e) {
+          console.error('Error al parsear categoría:', e);
+        }
+      }
+      
+      if (targetCategoryPath.length === 0) {
+        // Si no hay categorías, crear una
+        if (!config.categories || config.categories.length === 0) {
+          config.categories = [{ name: 'General', pages: [], categories: [] }];
+        }
+        if (!config.categories[0].pages) config.categories[0].pages = [];
+        config.categories[0].pages.push(newPage);
+      } else {
+        // Agregar dentro de la categoría seleccionada
+        const parent = navigateConfigPath(config, targetCategoryPath);
+        if (parent) {
+          if (!parent.pages) parent.pages = [];
+          parent.pages.push(newPage);
+        }
+      }
+      
+      savePagesJSON(config, roomId);
+      
+      // Recargar la vista
+      const pageList = document.getElementById("page-list");
+      if (pageList) {
+        renderPagesByCategories(config, pageList, roomId);
+      }
+    }
+  );
+}
+
 // Función para agregar página desde la vista de page-list
 async function addPageToPageList(categoryPath, roomId) {
+  // Si categoryPath está definido, usar la versión simple (sin selector)
+  // Si no, usar la versión con selector
+  if (categoryPath && categoryPath.length > 0) {
+    await addPageToPageListSimple(categoryPath, roomId);
+  } else {
+    await addPageToPageListWithCategorySelector(categoryPath, roomId);
+  }
+}
+
+// Función simple para agregar página en una categoría específica (sin selector)
+async function addPageToPageListSimple(categoryPath, roomId) {
   const currentConfig = getPagesJSON(roomId) || await getDefaultJSON();
   
   showModalForm(
@@ -3072,6 +3222,26 @@ function showModalForm(title, fields, onSubmit, onCancel) {
                 min-height: 60px;
               "
             >${field.value || ''}</textarea>
+          ` : field.type === 'select' ? `
+            <select 
+              id="field-${field.name}" 
+              name="${field.name}"
+              ${field.required ? 'required' : ''}
+              style="
+                width: 100%;
+                padding: 10px 12px;
+                background: rgba(255, 255, 255, 0.05);
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                border-radius: 6px;
+                color: #e0e0e0;
+                font-size: 14px;
+                font-family: Roboto, Helvetica, Arial, sans-serif;
+              "
+            >
+              ${(field.options || []).map(opt => `
+                <option value="${opt.value}" ${(field.value === opt.value) ? 'selected' : ''}>${opt.label}</option>
+              `).join('')}
+            </select>
           ` : `
             <input 
               type="${field.type || 'text'}" 
