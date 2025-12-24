@@ -3169,7 +3169,7 @@ async function showVisualEditor(pagesConfig, roomId = null) {
     left: 0;
     right: 0;
     bottom: 0;
-    background: ${CSS_VARS.bgPrimary};
+    background: #1a1a1a;
     z-index: 1000;
     display: flex;
     flex-direction: column;
@@ -3179,8 +3179,8 @@ async function showVisualEditor(pagesConfig, roomId = null) {
   // Header
   const header = document.createElement('div');
   header.style.cssText = `
-    background: ${CSS_VARS.bgPrimary};
-    border-bottom: 1px solid ${CSS_VARS.borderPrimary};
+    background: #1a1a1a;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
     padding: 12px 16px;
     display: flex;
     align-items: center;
@@ -3188,18 +3188,40 @@ async function showVisualEditor(pagesConfig, roomId = null) {
   `;
 
   header.innerHTML = `
-    <div style="display: flex; align-items: center; gap: 12px;">
-      <button id="back-from-visual-editor" style="
-        background: ${CSS_VARS.bgPrimary};
-        border: 1px solid ${CSS_VARS.borderPrimary};
-        border-radius: 6px;
-        padding: 6px 12px;
-        color: #e0e0e0;
+    <h1 style="margin: 0; font-size: 18px; font-weight: 700; color: #fff;">Editor de Configuración</h1>
+    <div style="display: flex; align-items: center; gap: 8px;">
+      <button id="editor-filter-btn" class="icon-button" style="
+        background: transparent;
+        border: none;
+        border-radius: 50%;
+        width: 32px;
+        height: 32px;
+        padding: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
         cursor: pointer;
-        font-size: 14px;
         transition: all 0.2s;
-      ">← Volver</button>
-      <h1 style="margin: 0; font-size: 18px; font-weight: 700; color: #fff;">Editor de Configuración</h1>
+      " title="Filtros">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M4 6H20M7 12H17M10 18H14" stroke="white" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+      </button>
+      <button id="editor-add-btn" class="icon-button" style="
+        background: transparent;
+        border: none;
+        border-radius: 50%;
+        width: 32px;
+        height: 32px;
+        padding: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.2s;
+      " title="Agregar">
+        <img src="img/icon-add.svg" alt="Agregar" style="width: 20px; height: 20px;" />
+      </button>
     </div>
   `;
 
@@ -3209,14 +3231,14 @@ async function showVisualEditor(pagesConfig, roomId = null) {
   contentArea.style.cssText = `
     flex: 1;
     overflow-y: auto;
-    padding: 24px;
-    max-width: 800px;
-    margin: 0 auto;
+    padding: 8px;
+    max-width: 100%;
     width: 100%;
+    background: #1a1a1a;
   `;
 
   // Función para renderizar items recursivamente
-  const renderEditorItem = (item, parentElement, level = 0, path = []) => {
+  const renderEditorItem = (item, parentElement, level = 0, path = [], isExpanded = false) => {
     const itemDiv = document.createElement('div');
     itemDiv.className = 'editor-item';
     itemDiv.dataset.level = level;
@@ -3228,7 +3250,7 @@ async function showVisualEditor(pagesConfig, roomId = null) {
 
     itemDiv.style.cssText = `
       margin-left: ${indent}px;
-      margin-bottom: 2px;
+      margin-bottom: 0;
       position: relative;
     `;
 
@@ -3238,18 +3260,19 @@ async function showVisualEditor(pagesConfig, roomId = null) {
       display: flex;
       align-items: center;
       gap: 8px;
-      padding: 6px 8px;
+      padding: 8px 12px;
       border-radius: 4px;
       cursor: pointer;
       transition: background 0.15s;
       position: relative;
+      background: rgba(255, 255, 255, 0.02);
+      margin-bottom: 2px;
     `;
 
     // Toggle para categorías con hijos
     if (isCategory && hasChildren) {
       const toggle = document.createElement('button');
       toggle.className = 'editor-toggle';
-      toggle.innerHTML = '▶';
       toggle.style.cssText = `
         background: transparent;
         border: none;
@@ -3261,9 +3284,13 @@ async function showVisualEditor(pagesConfig, roomId = null) {
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 10px;
         transition: transform 0.2s;
       `;
+      const toggleIcon = document.createElement('img');
+      toggleIcon.src = isExpanded ? 'img/folder-open.svg' : 'img/folder-close.svg';
+      toggleIcon.style.width = '16px';
+      toggleIcon.style.height = '16px';
+      toggle.appendChild(toggleIcon);
       itemRow.appendChild(toggle);
     } else {
       const spacer = document.createElement('div');
@@ -3271,11 +3298,33 @@ async function showVisualEditor(pagesConfig, roomId = null) {
       itemRow.appendChild(spacer);
     }
 
-    // Icono
-    const icon = document.createElement('span');
-    icon.textContent = isCategory ? '📁' : '📄';
-    icon.style.fontSize = '16px';
-    itemRow.appendChild(icon);
+    // Icono - carpeta o círculo con inicial
+    if (isCategory) {
+      const folderIcon = document.createElement('img');
+      folderIcon.src = (isExpanded && hasChildren) ? 'img/folder-open.svg' : 'img/folder-close.svg';
+      folderIcon.style.width = '20px';
+      folderIcon.style.height = '20px';
+      itemRow.appendChild(folderIcon);
+    } else {
+      // Icono circular con inicial
+      const circleIcon = document.createElement('div');
+      const initial = item.name ? item.name.charAt(0).toUpperCase() : '?';
+      circleIcon.style.cssText = `
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        background: #4a4a4a;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #fff;
+        font-weight: 700;
+        font-size: 12px;
+        flex-shrink: 0;
+      `;
+      circleIcon.textContent = initial;
+      itemRow.appendChild(circleIcon);
+    }
 
     // Nombre
     const name = document.createElement('span');
@@ -3287,30 +3336,77 @@ async function showVisualEditor(pagesConfig, roomId = null) {
     `;
     itemRow.appendChild(name);
 
-    // Botón de menú contextual (•••)
+    // Icono a la derecha (Notion o ampersand)
+    if (!isCategory) {
+      const rightIcon = document.createElement('div');
+      // Detectar si es URL de Notion
+      const isNotionUrl = item.url && (item.url.includes('notion.so') || item.url.includes('notion.site'));
+      if (isNotionUrl) {
+        const notionIcon = document.createElement('div');
+        notionIcon.style.cssText = `
+          width: 20px;
+          height: 20px;
+          border-radius: 4px;
+          background: #4a4a4a;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: #fff;
+          font-weight: 700;
+          font-size: 11px;
+          flex-shrink: 0;
+        `;
+        notionIcon.textContent = 'N';
+        rightIcon.appendChild(notionIcon);
+      } else {
+        const ampersandIcon = document.createElement('div');
+        ampersandIcon.style.cssText = `
+          width: 20px;
+          height: 20px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: #999;
+          font-size: 16px;
+          font-weight: 400;
+          flex-shrink: 0;
+        `;
+        ampersandIcon.textContent = '&';
+        rightIcon.appendChild(ampersandIcon);
+      }
+      itemRow.appendChild(rightIcon);
+    }
+
+    // Botón de menú contextual
     const menuBtn = document.createElement('button');
     menuBtn.className = 'editor-menu-btn';
-    menuBtn.innerHTML = '⋯';
     menuBtn.style.cssText = `
       background: transparent;
       border: none;
-      color: #666;
       cursor: pointer;
-      padding: 4px 8px;
+      padding: 4px;
       border-radius: 4px;
-      font-size: 18px;
-      line-height: 1;
       opacity: 0;
       transition: all 0.15s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 24px;
+      height: 24px;
     `;
+    const menuIcon = document.createElement('img');
+    menuIcon.src = 'img/icon-contextualmenu.svg';
+    menuIcon.style.width = '16px';
+    menuIcon.style.height = '16px';
+    menuBtn.appendChild(menuIcon);
 
     itemRow.addEventListener('mouseenter', () => {
-      itemRow.style.background = 'rgba(255, 255, 255, 0.05)';
+      itemRow.style.background = 'rgba(255, 255, 255, 0.06)';
       menuBtn.style.opacity = '1';
     });
 
     itemRow.addEventListener('mouseleave', () => {
-      itemRow.style.background = 'transparent';
+      itemRow.style.background = 'rgba(255, 255, 255, 0.02)';
       menuBtn.style.opacity = '0';
     });
 
@@ -3344,8 +3440,9 @@ async function showVisualEditor(pagesConfig, roomId = null) {
     const childrenContainer = document.createElement('div');
     childrenContainer.className = 'editor-children';
     childrenContainer.style.cssText = `
-      display: ${hasChildren ? 'block' : 'none'};
-      margin-left: 24px;
+      display: ${isExpanded && hasChildren ? 'block' : 'none'};
+      margin-left: 20px;
+      margin-top: 2px;
     `;
 
     if (isCategory && hasChildren) {
@@ -3353,7 +3450,7 @@ async function showVisualEditor(pagesConfig, roomId = null) {
       if (item.categories && item.categories.length > 0) {
         item.categories.forEach((subcat, index) => {
           const newPath = path.length > 0 ? [...path, 'categories', index] : ['categories', index];
-          renderEditorItem(subcat, childrenContainer, level + 1, newPath);
+          renderEditorItem(subcat, childrenContainer, level + 1, newPath, false);
         });
       }
 
@@ -3361,7 +3458,7 @@ async function showVisualEditor(pagesConfig, roomId = null) {
       if (item.pages && item.pages.length > 0) {
         item.pages.forEach((page, index) => {
           const newPath = path.length > 0 ? [...path, 'pages', index] : ['pages', index];
-          renderEditorItem(page, childrenContainer, level + 1, newPath);
+          renderEditorItem(page, childrenContainer, level + 1, newPath, false);
         });
       }
 
@@ -3370,9 +3467,18 @@ async function showVisualEditor(pagesConfig, roomId = null) {
       if (toggle) {
         toggle.addEventListener('click', (e) => {
           e.stopPropagation();
-          const isExpanded = childrenContainer.style.display === 'block';
-          childrenContainer.style.display = isExpanded ? 'none' : 'block';
-          toggle.style.transform = isExpanded ? 'rotate(0deg)' : 'rotate(90deg)';
+          const currentlyExpanded = childrenContainer.style.display === 'block';
+          childrenContainer.style.display = currentlyExpanded ? 'none' : 'block';
+          // Actualizar icono de carpeta
+          const folderIcon = itemRow.querySelector('img[src*="folder"]');
+          if (folderIcon) {
+            folderIcon.src = currentlyExpanded ? 'img/folder-close.svg' : 'img/folder-open.svg';
+          }
+          // Actualizar icono del toggle
+          const toggleIcon = toggle.querySelector('img');
+          if (toggleIcon) {
+            toggleIcon.src = currentlyExpanded ? 'img/folder-close.svg' : 'img/folder-open.svg';
+          }
         });
       }
     }
@@ -3552,35 +3658,11 @@ async function showVisualEditor(pagesConfig, roomId = null) {
   const refreshEditor = () => {
     const config = getPagesJSON(roomId) || currentConfig;
     contentArea.innerHTML = '';
-    
-    // Botón para agregar categoría en nivel raíz
-    const addRootCategoryBtn = document.createElement('button');
-    addRootCategoryBtn.textContent = '➕ Nueva categoría';
-    addRootCategoryBtn.style.cssText = `
-      margin-bottom: 16px;
-      padding: 8px 16px;
-      background: rgba(74, 158, 255, 0.2);
-      border: 1px solid rgba(74, 158, 255, 0.3);
-      border-radius: 6px;
-      color: #4a9eff;
-      cursor: pointer;
-      font-size: 14px;
-      font-weight: 500;
-      transition: all 0.2s;
-    `;
-    addRootCategoryBtn.addEventListener('mouseenter', () => {
-      addRootCategoryBtn.style.background = 'rgba(74, 158, 255, 0.3)';
-    });
-    addRootCategoryBtn.addEventListener('mouseleave', () => {
-      addRootCategoryBtn.style.background = 'rgba(74, 158, 255, 0.2)';
-    });
-    addRootCategoryBtn.addEventListener('click', () => addCategory());
-    contentArea.appendChild(addRootCategoryBtn);
 
     // Renderizar categorías
     if (config.categories && config.categories.length > 0) {
       config.categories.forEach((category, index) => {
-        renderEditorItem(category, contentArea, 0, ['categories', index]);
+        renderEditorItem(category, contentArea, 0, ['categories', index], false);
       });
     } else {
       const emptyState = document.createElement('div');
@@ -3591,7 +3673,7 @@ async function showVisualEditor(pagesConfig, roomId = null) {
       `;
       emptyState.innerHTML = `
         <p style="margin-bottom: 12px;">No hay categorías</p>
-        <p style="font-size: 12px; color: #555;">Haz clic en "➕ Nueva categoría" para comenzar</p>
+        <p style="font-size: 12px; color: #555;">Haz clic en el botón + para agregar una categoría</p>
       `;
       contentArea.appendChild(emptyState);
     }
@@ -3601,19 +3683,33 @@ async function showVisualEditor(pagesConfig, roomId = null) {
   editorContainer.appendChild(contentArea);
   document.body.appendChild(editorContainer);
 
-  // Botón volver
-  const backBtn = header.querySelector('#back-from-visual-editor');
-  backBtn.addEventListener('click', () => {
-    document.body.removeChild(editorContainer);
-    if (mainContainer) mainContainer.classList.remove('hidden');
-    if (pageList) pageList.classList.remove('hidden');
-    
-    // Recargar la lista de páginas
-    const savedConfig = getPagesJSON(roomId);
-    if (savedConfig && pageList) {
-      renderPagesByCategories(savedConfig, pageList, roomId);
-    }
-  });
+  // Event listeners para botones del header
+  const filterBtn = header.querySelector('#editor-filter-btn');
+  if (filterBtn) {
+    filterBtn.addEventListener('mouseenter', () => {
+      filterBtn.style.background = CSS_VARS.bgHover;
+    });
+    filterBtn.addEventListener('mouseleave', () => {
+      filterBtn.style.background = 'transparent';
+    });
+    filterBtn.addEventListener('click', () => {
+      // TODO: Implementar funcionalidad de filtros
+      console.log('Filtros - funcionalidad pendiente');
+    });
+  }
+
+  const addBtn = header.querySelector('#editor-add-btn');
+  if (addBtn) {
+    addBtn.addEventListener('mouseenter', () => {
+      addBtn.style.background = CSS_VARS.bgHover;
+    });
+    addBtn.addEventListener('mouseleave', () => {
+      addBtn.style.background = 'transparent';
+    });
+    addBtn.addEventListener('click', () => {
+      addCategory();
+    });
+  }
 
   // Inicializar editor
   refreshEditor();
