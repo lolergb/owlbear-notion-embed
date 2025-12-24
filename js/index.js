@@ -1840,9 +1840,9 @@ function renderCategory(category, parentElement, level = 0, roomId = null, categ
   
   // Crear contenedor de categoría
   const categoryDiv = document.createElement('div');
-  categoryDiv.className = `category-group category-level-${Math.min(level, 5)}`;
+  categoryDiv.className = 'category-group';
   categoryDiv.dataset.categoryName = category.name;
-  categoryDiv.dataset.level = level;
+  categoryDiv.dataset.level = Math.min(level, 5);
   
   // Contenedor del título con botón de colapsar
   const titleContainer = document.createElement('div');
@@ -1921,6 +1921,14 @@ function renderCategory(category, parentElement, level = 0, roomId = null, categ
         action: async () => {
           // Pasar categoryPath para que se autocomplete en el modal
           await addPageToPageListWithCategorySelector(categoryPath, roomId);
+        }
+      },
+      { separator: true },
+      { 
+        icon: '✏️', 
+        text: 'Editar', 
+        action: async () => {
+          await editCategoryFromPageList(category, categoryPath, roomId);
         }
       },
       { separator: true },
@@ -2045,6 +2053,14 @@ function renderCategory(category, parentElement, level = 0, roomId = null, categ
             action: async () => {
               // Pasar pageCategoryPath para que se autocomplete en el modal
               await addPageToPageListWithCategorySelector(pageCategoryPath, roomId);
+            }
+          },
+          { separator: true },
+          { 
+            icon: '✏️', 
+            text: 'Editar', 
+            action: async () => {
+              await editPageFromPageList(page, pageCategoryPath, roomId);
             }
           },
           { separator: true },
@@ -2180,13 +2196,197 @@ async function addCategoryToPageList(categoryPath, roomId) {
       if (categoryPath.length === 0) {
         // Agregar al nivel raíz
         if (!config.categories) config.categories = [];
-        config.categories.push(newCategory);
+        config.categories.push(newCategory); // Agregar al final
       } else {
         // Agregar dentro de una categoría
         const parent = navigateConfigPath(config, categoryPath);
         if (parent) {
           if (!parent.categories) parent.categories = [];
-          parent.categories.push(newCategory);
+          parent.categories.push(newCategory); // Agregar al final
+        }
+      }
+      
+      savePagesJSON(config, roomId);
+      
+      // Recargar la vista
+      const pageList = document.getElementById("page-list");
+      if (pageList) {
+        renderPagesByCategories(config, pageList, roomId);
+      }
+    }
+  );
+}
+
+// Función para editar categoría desde la vista de page-list
+async function editCategoryFromPageList(category, categoryPath, roomId) {
+  const currentConfig = getPagesJSON(roomId) || await getDefaultJSON();
+  const categoryOptions = getCategoryOptions(currentConfig);
+  
+  // Obtener el path del padre (si existe)
+  const parentPath = categoryPath.slice(0, -2);
+  const parentPathValue = parentPath.length > 0 ? JSON.stringify(parentPath) : '';
+  
+  const fields = [
+    { name: 'name', label: 'Nombre', type: 'text', required: true, value: category.name, placeholder: 'Nombre de la categoría' }
+  ];
+  
+  // Agregar selector de categoría padre si hay categorías disponibles y no es raíz
+  if (categoryOptions.length > 0 && categoryPath.length > 0) {
+    fields.push({
+      name: 'parentCategory',
+      label: 'Categoría padre',
+      type: 'select',
+      required: false,
+      options: [
+        { value: '', label: 'Raíz (sin categoría padre)' },
+        ...categoryOptions.filter(opt => {
+          // Excluir la categoría actual y sus hijos
+          const optPath = JSON.parse(opt.value);
+          return JSON.stringify(optPath) !== JSON.stringify(categoryPath) && 
+                 !optPath.every((val, idx) => val === categoryPath[idx]);
+        })
+      ],
+      value: parentPathValue
+    });
+  }
+  
+  showModalForm(
+    'Editar Categoría',
+    fields,
+    async (data) => {
+      const config = JSON.parse(JSON.stringify(getPagesJSON(roomId) || currentConfig));
+      
+      // Obtener la categoría actual
+      const key = categoryPath[categoryPath.length - 2];
+      const index = categoryPath[categoryPath.length - 1];
+      const parent = navigateConfigPath(config, parentPath);
+      const currentCategory = parent && parent[key] ? parent[key][index] : null;
+      
+      if (!currentCategory) {
+        alert('Error: No se pudo encontrar la categoría a editar');
+        return;
+      }
+      
+      // Actualizar nombre
+      currentCategory.name = data.name;
+      
+      // Si se cambió la categoría padre, mover la categoría
+      if (data.parentCategory && data.parentCategory.trim()) {
+        try {
+          const newParentPath = JSON.parse(data.parentCategory);
+          const newParent = navigateConfigPath(config, newParentPath);
+          
+          if (newParent) {
+            // Remover de la ubicación actual
+            parent[key].splice(index, 1);
+            
+            // Agregar a la nueva ubicación
+            if (!newParent.categories) newParent.categories = [];
+            newParent.categories.push(currentCategory);
+          }
+        } catch (e) {
+          console.error('Error al mover categoría:', e);
+        }
+      } else if (data.parentCategory === '' && parentPath.length > 0) {
+        // Mover a raíz
+        parent[key].splice(index, 1);
+        if (!config.categories) config.categories = [];
+        config.categories.push(currentCategory);
+      }
+      
+      savePagesJSON(config, roomId);
+      
+      // Recargar la vista
+      const pageList = document.getElementById("page-list");
+      if (pageList) {
+        renderPagesByCategories(config, pageList, roomId);
+      }
+    }
+  );
+}
+
+// Función para editar página desde la vista de page-list
+async function editPageFromPageList(page, pageCategoryPath, roomId) {
+  const currentConfig = getPagesJSON(roomId) || await getDefaultJSON();
+  const categoryOptions = getCategoryOptions(currentConfig);
+  
+  const pageCategoryPathValue = pageCategoryPath.length > 0 ? JSON.stringify(pageCategoryPath) : '';
+  
+  const fields = [
+    { name: 'name', label: 'Nombre', type: 'text', required: true, value: page.name, placeholder: 'Nombre de la página' },
+    { name: 'url', label: 'URL', type: 'url', required: true, value: page.url, placeholder: 'https://...' }
+  ];
+  
+  // Agregar selector de categoría si hay categorías disponibles
+  if (categoryOptions.length > 0) {
+    fields.push({
+      name: 'category',
+      label: 'Categoría',
+      type: 'select',
+      required: true,
+      options: categoryOptions,
+      value: pageCategoryPathValue || categoryOptions[0].value
+    });
+  }
+  
+  fields.push(
+    { name: 'selector', label: 'Selector (opcional)', type: 'text', value: page.selector || '', placeholder: '#main-content', help: 'Solo para URLs externas' },
+    { name: 'blockTypes', label: 'Tipos de bloques (opcional)', type: 'text', value: Array.isArray(page.blockTypes) ? page.blockTypes.join(', ') : (page.blockTypes || ''), placeholder: 'quote, callout', help: 'Solo para URLs de Notion. Ej: "quote" o "quote,callout"' }
+  );
+  
+  showModalForm(
+    'Editar Página',
+    fields,
+    async (data) => {
+      const config = JSON.parse(JSON.stringify(getPagesJSON(roomId) || currentConfig));
+      
+      // Encontrar la página actual
+      const parent = navigateConfigPath(config, pageCategoryPath);
+      if (!parent || !parent.pages) {
+        alert('Error: No se pudo encontrar la página a editar');
+        return;
+      }
+      
+      const pageIndex = parent.pages.findIndex(p => p.name === page.name && p.url === page.url);
+      if (pageIndex === -1) {
+        alert('Error: No se pudo encontrar la página a editar');
+        return;
+      }
+      
+      const currentPage = parent.pages[pageIndex];
+      
+      // Actualizar datos
+      currentPage.name = data.name;
+      currentPage.url = data.url;
+      if (data.selector) {
+        currentPage.selector = data.selector;
+      } else {
+        delete currentPage.selector;
+      }
+      if (data.blockTypes) {
+        currentPage.blockTypes = data.blockTypes.includes(',') 
+          ? data.blockTypes.split(',').map(s => s.trim())
+          : data.blockTypes.trim();
+      } else {
+        delete currentPage.blockTypes;
+      }
+      
+      // Si se cambió la categoría, mover la página
+      if (data.category && data.category.trim()) {
+        try {
+          const newCategoryPath = JSON.parse(data.category);
+          const newParent = navigateConfigPath(config, newCategoryPath);
+          
+          if (newParent && JSON.stringify(newCategoryPath) !== JSON.stringify(pageCategoryPath)) {
+            // Remover de la ubicación actual
+            parent.pages.splice(pageIndex, 1);
+            
+            // Agregar a la nueva ubicación
+            if (!newParent.pages) newParent.pages = [];
+            newParent.pages.push(currentPage);
+          }
+        } catch (e) {
+          console.error('Error al mover página:', e);
         }
       }
       
@@ -2272,11 +2472,12 @@ async function addPageToPageListWithCategorySelector(defaultCategoryPath, roomId
       
       // Determinar el path de la categoría
       let targetCategoryPath = defaultCategoryPath;
-      if (data.category) {
+      if (data.category && data.category.trim()) {
         try {
           targetCategoryPath = JSON.parse(data.category);
         } catch (e) {
           console.error('Error al parsear categoría:', e);
+          console.error('Valor recibido:', data.category);
         }
       }
       
@@ -2286,13 +2487,13 @@ async function addPageToPageListWithCategorySelector(defaultCategoryPath, roomId
           config.categories = [{ name: 'General', pages: [], categories: [] }];
         }
         if (!config.categories[0].pages) config.categories[0].pages = [];
-        config.categories[0].pages.push(newPage);
+        config.categories[0].pages.unshift(newPage); // Agregar al final
       } else {
         // Agregar dentro de la categoría seleccionada
         const parent = navigateConfigPath(config, targetCategoryPath);
         if (parent) {
           if (!parent.pages) parent.pages = [];
-          parent.pages.push(newPage);
+          parent.pages.push(newPage); // Agregar al final
         }
       }
       
@@ -2349,13 +2550,13 @@ async function addPageToPageListSimple(categoryPath, roomId) {
           config.categories = [{ name: 'General', pages: [], categories: [] }];
         }
         if (!config.categories[0].pages) config.categories[0].pages = [];
-        config.categories[0].pages.push(newPage);
+        config.categories[0].pages.unshift(newPage); // Agregar al final
       } else {
         // Agregar dentro de una categoría
         const parent = navigateConfigPath(config, categoryPath);
         if (parent) {
           if (!parent.pages) parent.pages = [];
-          parent.pages.push(newPage);
+          parent.pages.push(newPage); // Agregar al final
         }
       }
       

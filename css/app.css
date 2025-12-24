@@ -48,6 +48,7 @@ h1 {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  margin-top: 60px; /* Espacio para el header fixed */
 }
 
 h1#page-title {
@@ -105,10 +106,19 @@ h1#page-title {
 
 /* Header */
 .header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  background: var(--bg-primary);
+  backdrop-filter: blur(10px);
+  z-index: 100;
   display: flex;
   align-items: center;
   gap: 8px;
   margin-bottom: 16px;
+  padding: 16px;
+  border-bottom: 1px solid var(--border-primary);
 }
 
 .back-button {
@@ -426,27 +436,27 @@ h1#page-title {
 }
 
 /* Category indent levels */
-.category-level-0 {
+.category-group[data-level="0"] {
   margin-left: 0px;
 }
 
-.category-level-1 {
+.category-group[data-level="1"] {
   margin-left: 16px;
 }
 
-.category-level-2 {
+.category-group[data-level="2"] {
   margin-left: 32px;
 }
 
-.category-level-3 {
+.category-group[data-level="3"] {
   margin-left: 48px;
 }
 
-.category-level-4 {
+.category-group[data-level="4"] {
   margin-left: 64px;
 }
 
-.category-level-5 {
+.category-group[data-level="5"] {
   margin-left: 80px;
 }
 
