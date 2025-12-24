@@ -2093,7 +2093,7 @@ function renderCategory(category, parentElement, level = 0, roomId = null, categ
   
   // Manejar colapso/expansión
   // Solo permitir colapsar si tiene contenido
-  const hasContent = hasSubcategories || categoryPages.length > 0;
+  // hasContent ya está declarado arriba
   if (hasContent) {
     titleContainer.addEventListener('click', (e) => {
       // No colapsar si se hace click en el menú contextual
