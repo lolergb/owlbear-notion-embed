@@ -1670,6 +1670,9 @@ try {
       // Cargar configuración desde JSON (específica para esta room)
       log('🔍 Intentando cargar configuración para room:', roomId);
       
+      // Declarar pagesConfig al inicio para que esté disponible en todo el scope
+      let pagesConfig = null;
+      
       // Obtener todas las configuraciones guardadas
       const allConfigs = getAllRoomConfigs();
       const configKeys = Object.keys(allConfigs);
