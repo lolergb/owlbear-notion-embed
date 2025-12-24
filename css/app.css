@@ -193,13 +193,12 @@ h1#page-title {
 .category-collapse-button {
   background: transparent;
   border: none;
-  padding: 4px;
   cursor: pointer;
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: right;
   width: 24px;
-  height: 24px;
+  height: 32px;
   transition: transform 0.2s;
 }
 
@@ -214,8 +213,7 @@ h1#page-title {
   font-size: 16px;
   line-height: 24px;
   font-weight: 700;
-  color: #999;
-  text-transform: uppercase;
+  color: #fff;
   letter-spacing: 0.5px;
   margin: 0;
   flex: 1;
@@ -449,7 +447,7 @@ h1#page-title {
 }
 
 .category-group[data-level="1"] {
-  margin-left: 16px;
+  margin-left: 28px;
 }
 
 .category-group[data-level="2"] {
