@@ -54,6 +54,7 @@ h1 {
 
 h1#page-title {
   margin-bottom: 0;
+  flex: 1;
 }
 
 .page-button {
@@ -489,6 +490,413 @@ h1#page-title {
 .page-button[draggable="true"] {
   cursor: move;
   user-select: none;
+}
+
+/* Context menu buttons */
+.category-context-menu-button {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  opacity: 0;
+  transition: all 0.15s;
+  width: 32px;
+  height: 32px;
+  margin-left: auto;
+}
+
+.page-context-menu-button {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  opacity: 0;
+  transition: all 0.15s;
+  width: 32px;
+  height: 32px;
+  z-index: 10;
+}
+
+/* Loading state */
+.loading-state {
+  text-align: center;
+  padding: 40px;
+  color: #999;
+}
+
+.loading-state-icon {
+  font-size: 24px;
+  margin-bottom: 12px;
+}
+
+/* Add first category button */
+.add-first-category-btn {
+  margin-top: 16px;
+  padding: 10px 20px;
+  background: #4a9eff;
+  border: none;
+  border-radius: 6px;
+  color: #fff;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.add-first-category-btn:hover {
+  background: #5aaeff;
+}
+
+/* Refresh page button */
+#refresh-page-button {
+  background: transparent;
+  border: none;
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-left: 8px;
+}
+
+#refresh-page-button:hover {
+  background: var(--bg-hover);
+}
+
+#refresh-page-button:active {
+  background: var(--bg-active);
+}
+
+.refresh-icon {
+  width: 20px;
+  height: 20px;
+  display: block;
+}
+
+/* Modal styles */
+#modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  z-index: 10001;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: Roboto, Helvetica, Arial, sans-serif;
+}
+
+.modal {
+  background: rgba(30, 30, 30, 0.95);
+  backdrop-filter: blur(10px);
+  border-radius: 12px;
+  padding: 24px;
+  min-width: 400px;
+  max-width: 500px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.modal-title {
+  color: #fff;
+  font-size: 20px;
+  font-weight: 700;
+  margin-bottom: 20px;
+}
+
+#modal-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* .modal-field - no necesita estilos, solo es un contenedor */
+
+.modal-label {
+  display: block;
+  color: #999;
+  font-size: 12px;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.modal-input,
+.modal-textarea,
+.modal-select {
+  width: 100%;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  color: #e0e0e0;
+  font-size: 14px;
+  font-family: Roboto, Helvetica, Arial, sans-serif;
+}
+
+.modal-textarea {
+  resize: vertical;
+  min-height: 60px;
+}
+
+.modal-help {
+  color: #666;
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  margin-top: 8px;
+}
+
+.modal-button {
+  padding: 10px 20px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s;
+}
+
+.modal-button-cancel {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #e0e0e0;
+  font-weight: 500;
+}
+
+.modal-button-cancel:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.modal-button-submit {
+  background: #4a9eff;
+  border: none;
+  color: #fff;
+  font-weight: 700;
+}
+
+.modal-button-submit:hover {
+  background: #5aaeff;
+}
+
+/* Page button inner layout */
+.page-button-inner-layout {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+}
+
+.page-name-inner {
+  flex: 1;
+  text-align: left;
+}
+
+/* Token config styles */
+#token-config-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--bg-primary);
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  font-family: Roboto, Helvetica, Arial, sans-serif;
+}
+
+.token-config-header {
+  background: var(--bg-primary);
+  border-bottom: 1px solid var(--border-primary);
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.token-config-header-inner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.token-config-back-btn {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-primary);
+  border-radius: 6px;
+  padding: 6px 12px;
+  color: #e0e0e0;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s;
+}
+
+.token-config-back-btn:hover {
+  background: var(--bg-hover);
+}
+
+.token-config-title {
+  font-family: Roboto, Helvetica, Arial, sans-serif;
+  color: #fff;
+  font-size: 18px;
+  line-height: 24px;
+  font-weight: 700;
+  margin: 0;
+}
+
+.token-config-content {
+  flex: 1;
+  padding: 24px;
+  overflow-y: auto;
+  max-width: 600px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.token-config-section {
+  margin-bottom: 24px;
+}
+
+.token-config-text {
+  color: #999;
+  font-size: 14px;
+  margin-bottom: 16px;
+  line-height: 1.6;
+}
+
+.token-config-info-box {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-primary);
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.token-config-info-title {
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  margin-bottom: 12px;
+  font-family: Roboto, Helvetica, Arial, sans-serif;
+}
+
+.token-config-list {
+  color: #ccc;
+  font-size: 13px;
+  line-height: 1.8;
+  margin-left: 20px;
+  padding-left: 0;
+  font-family: Roboto, Helvetica, Arial, sans-serif;
+  font-weight: 400;
+}
+
+.token-config-list ul {
+  margin-top: 8px;
+  margin-left: 20px;
+  padding-left: 0;
+}
+
+.token-config-link {
+  color: #4a9eff;
+  text-decoration: none;
+}
+
+.token-config-label {
+  display: block;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 400;
+  margin-bottom: 8px;
+  font-family: Roboto, Helvetica, Arial, sans-serif;
+}
+
+.token-config-input {
+  width: 100%;
+  padding: 12px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-primary);
+  border-radius: 6px;
+  color: #fff;
+  font-size: 14px;
+  font-family: monospace;
+  box-sizing: border-box;
+}
+
+.token-config-input-info {
+  color: #888;
+  font-size: 12px;
+  margin-top: 8px;
+  font-family: Roboto, Helvetica, Arial, sans-serif;
+  font-weight: 400;
+}
+
+.token-config-error {
+  display: none;
+  background: #4a2d2d;
+  border: 1px solid #6a4040;
+  border-radius: 6px;
+  padding: 12px;
+  color: #ff6b6b;
+  font-size: 13px;
+  margin-bottom: 16px;
+}
+
+.token-config-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-primary);
+}
+
+.token-config-buttons-row {
+  display: flex;
+  gap: 12px;
+}
+
+.token-config-button {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-primary);
+  border-radius: 6px;
+  padding: 10px 20px;
+  color: #e0e0e0;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 400;
+  font-family: Roboto, Helvetica, Arial, sans-serif;
+  transition: all 0.2s;
+  flex: 1;
+}
+
+.token-config-button:hover {
+  background: var(--bg-hover);
+}
+
+.token-config-button-primary {
+  background: #4a9eff;
+  border: none;
+  color: #fff;
+  font-weight: 700;
+}
+
+.token-config-button-primary:hover {
+  background: #5aaeff;
+}
+
+.token-config-actions-bottom {
+  display: flex;
+  gap: 16px;
+  justify-content: flex-end;
 }
 
 

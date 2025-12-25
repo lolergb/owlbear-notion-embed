@@ -51,6 +51,34 @@ import {
   NOTION_PAGES 
 } from "../config/config.js";
 
+/* 
+ * NOTA SOBRE ESTILOS INLINE:
+ * 
+ * Los siguientes estilos DEBEN permanecer inline porque son dinámicos o calculados:
+ * 
+ * 1. Colores generados dinámicamente:
+ *    - `style="background: ${color}"` (línea ~477, ~2073): Color generado a partir del nombre de la página
+ *    - `style="background: ${placeholderColor}"`: Color calculado para placeholders
+ * 
+ * 2. Estilos calculados dinámicamente:
+ *    - `contentContainer.style.display = isCollapsed ? 'none' : 'block'`: Lógica condicional
+ *    - `contentContainer.style.maxHeight = scrollHeight + 'px'`: Valor calculado para animaciones
+ *    - `contentContainer.style.opacity`: Valores calculados para transiciones
+ * 
+ * 3. Estilos que cambian en tiempo de ejecución (event listeners):
+ *    - `contextMenuButton.style.opacity`: Cambia según hover/interacción
+ *    - `pageContextMenuButton.style.opacity`: Cambia según hover/interacción
+ *    - `button.style.background`: Cambia según hover/interacción
+ *    - `img.style.opacity`: Cambia según hover
+ *    - `iframe.style.display`: Cambia según estado de carga
+ * 
+ * 4. Estilos en modales dinámicos:
+ *    - `jsonModal.style.cssText`: Modal creado dinámicamente para mostrar JSON
+ *    - `jsonContent.style.cssText`: Contenido del modal con variables CSS dinámicas
+ * 
+ * Todos los demás estilos estáticos han sido movidos a app.css
+ */
+
 // Variables de color CSS (deben coincidir con las del index.html)
 const CSS_VARS = {
   bgPrimary: '#ffffff0d',
@@ -1838,17 +1866,6 @@ function renderCategory(category, parentElement, level = 0, roomId = null, categ
   // Botón de menú contextual para carpetas
   const contextMenuButton = document.createElement('button');
   contextMenuButton.className = 'category-context-menu-button icon-button';
-  contextMenuButton.style.cssText = `
-    position: absolute;
-    right: 8px;
-    top: 50%;
-    transform: translateY(-50%);
-    opacity: 0;
-    transition: all 0.15s;
-    width: 32px;
-    height: 32px;
-    margin-left: auto;
-  `;
   const contextMenuIcon = document.createElement('img');
   contextMenuIcon.src = 'img/icon-contextualmenu.svg';
   contextMenuIcon.className = 'icon-button-icon';
@@ -1992,13 +2009,9 @@ function renderCategory(category, parentElement, level = 0, roomId = null, categ
       button.dataset.selector = page.selector || '';
       button.dataset.pageIndex = index;
       button.dataset.categoryPath = JSON.stringify(categoryPath);
-      button.style.cssText = `
-        width: 100%;
-        margin-bottom: 8px;
-        background: ${CSS_VARS.bg};
-        border: 1px solid ${CSS_VARS.border};
-        position: relative;
-      `;
+      // Los estilos base del botón están en CSS (.page-button)
+      // Solo establecer position: relative que es necesario para el menú contextual
+      button.style.position = 'relative';
       
       // Placeholder para el icono (se cargará después)
       const placeholderColor = generateColorFromString(pageId || page.name);
@@ -2007,17 +2020,6 @@ function renderCategory(category, parentElement, level = 0, roomId = null, categ
       // Botón de menú contextual para páginas
       const pageContextMenuButton = document.createElement('button');
       pageContextMenuButton.className = 'page-context-menu-button icon-button';
-      pageContextMenuButton.style.cssText = `
-        position: absolute;
-        right: 8px;
-        top: 50%;
-        transform: translateY(-50%);
-        opacity: 0;
-        transition: all 0.15s;
-        width: 32px;
-        height: 32px;
-        z-index: 10;
-      `;
       const pageContextMenuIcon = document.createElement('img');
       pageContextMenuIcon.src = 'img/icon-contextualmenu.svg';
       pageContextMenuIcon.className = 'icon-button-icon';
@@ -2141,9 +2143,9 @@ function renderCategory(category, parentElement, level = 0, roomId = null, categ
             const menuButtonParent = pageContextMenuButton ? pageContextMenuButton.parentNode : null;
             
             button.innerHTML = `
-              <div style="display: flex; align-items: center; gap: 12px; width: 100%;">
+              <div class="page-button-inner-layout">
                 ${iconHtml}
-                <div class="page-name" style="flex: 1; text-align: left;">${pageName}</div>
+                <div class="page-name page-name-inner">${pageName}</div>
                 ${linkIconHtml}
               </div>
             `;
@@ -2907,7 +2909,7 @@ async function addPageToPageListSimple(categoryPath, roomId) {
 // Función para renderizar páginas agrupadas por carpetas
 function renderPagesByCategories(pagesConfig, pageList, roomId = null) {
   // Mostrar loading
-  pageList.innerHTML = '<div class="loading-state" style="text-align: center; padding: 40px; color: #999;"><div style="font-size: 24px; margin-bottom: 12px;">⏳</div><div>Cargando páginas...</div></div>';
+  pageList.innerHTML = '<div class="loading-state"><div class="loading-state-icon">⏳</div><div>Cargando páginas...</div></div>';
   
   // Usar setTimeout para permitir que el DOM se actualice con el loading
   setTimeout(() => {
@@ -2918,18 +2920,7 @@ function renderPagesByCategories(pagesConfig, pageList, roomId = null) {
       emptyState.className = 'empty-state';
       emptyState.innerHTML = `
         <p>No hay páginas configuradas</p>
-        <button id="add-first-category" style="
-          margin-top: 16px;
-          padding: 10px 20px;
-          background: #4a9eff;
-          border: none;
-          border-radius: 6px;
-          color: #fff;
-          cursor: pointer;
-          font-size: 14px;
-          font-weight: 600;
-          transition: all 0.2s;
-        ">➕ Agregar primera carpeta</button>
+        <button id="add-first-category" class="add-first-category-btn">➕ Agregar primera carpeta</button>
       `;
       pageList.appendChild(emptyState);
       
@@ -2939,12 +2930,7 @@ function renderPagesByCategories(pagesConfig, pageList, roomId = null) {
         addFirstCategoryBtn.addEventListener('click', async () => {
           await addCategoryToPageList([], roomId);
         });
-        addFirstCategoryBtn.addEventListener('mouseenter', () => {
-          addFirstCategoryBtn.style.background = '#5aaeff';
-        });
-        addFirstCategoryBtn.addEventListener('mouseleave', () => {
-          addFirstCategoryBtn.style.background = '#4a9eff';
-        });
+        // Los estilos hover se manejan con CSS
       }
       return;
     }
@@ -3196,23 +3182,10 @@ async function loadPageContent(url, name, selector = null, blockTypes = null) {
     const reloadIcon = document.createElement("img");
     reloadIcon.src = "img/icon-reload.svg";
     reloadIcon.alt = "Recargar contenido";
-    reloadIcon.style.cssText = "width: 20px; height: 20px; display: block;";
+    reloadIcon.className = "refresh-icon";
     refreshButton.appendChild(reloadIcon);
     refreshButton.title = "Recargar contenido";
-    refreshButton.style.cssText = `
-      background: transparent;
-      border: none;
-      border-radius: 50%;
-      width: 32px;
-      height: 32px;
-      padding: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      transition: all 0.2s;
-      margin-left: 8px;
-    `;
+    refreshButton.className = "icon-button";
     
     // Remover listeners anteriores si existen
     const newRefreshButton = refreshButton.cloneNode(true);
@@ -3226,19 +3199,7 @@ async function loadPageContent(url, name, selector = null, blockTypes = null) {
       delete refreshButton.dataset.blockTypes;
     }
     
-      refreshButton.addEventListener('mouseenter', () => {
-        refreshButton.style.background = CSS_VARS.bgHover;
-        refreshButton.style.borderRadius = '50%';
-      });
-      refreshButton.addEventListener('mouseleave', () => {
-        refreshButton.style.background = 'transparent';
-      });
-      refreshButton.addEventListener('mousedown', () => {
-        refreshButton.style.background = CSS_VARS.bgActive;
-      });
-      refreshButton.addEventListener('mouseup', () => {
-        refreshButton.style.background = CSS_VARS.bgHover;
-      });
+      // Los estilos hover se manejan con CSS (.icon-button:hover)
     
     refreshButton.addEventListener('click', async () => {
       // Obtener la URL actual del botón
@@ -3271,7 +3232,7 @@ async function loadPageContent(url, name, selector = null, blockTypes = null) {
       const clockIcon = document.createElement("img");
       clockIcon.src = "img/icon-clock.svg";
       clockIcon.alt = "Cargando...";
-      clockIcon.style.cssText = "width: 20px; height: 20px; display: block;";
+      clockIcon.className = "refresh-icon";
       refreshButton.appendChild(clockIcon);
       try {
         console.log('🔄 Llamando a loadNotionContent con forceRefresh = true');
@@ -3287,7 +3248,7 @@ async function loadPageContent(url, name, selector = null, blockTypes = null) {
         const reloadIconRestore = document.createElement("img");
         reloadIconRestore.src = "img/icon-reload.svg";
         reloadIconRestore.alt = "Recargar contenido";
-        reloadIconRestore.style.cssText = "width: 20px; height: 20px; display: block;";
+        reloadIconRestore.className = "refresh-icon";
         refreshButton.appendChild(reloadIconRestore);
       }
     });
@@ -3365,69 +3326,35 @@ async function showTokenConfig() {
   
   const tokenContainer = document.createElement('div');
   tokenContainer.id = 'token-config-container';
-  tokenContainer.style.cssText = `
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: ${CSS_VARS.bgPrimary};
-    z-index: 1000;
-    display: flex;
-    flex-direction: column;
-    font-family: Roboto, Helvetica, Arial, sans-serif;
-  `;
+  tokenContainer.id = 'token-config-container';
   
   const header = document.createElement('div');
-  header.style.cssText = `
-    background: ${CSS_VARS.bgPrimary};
-    border-bottom: 1px solid ${CSS_VARS.borderPrimary};
-    padding: 12px 16px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-  `;
+  header.className = 'token-config-header';
   
   header.innerHTML = `
-    <div style="display: flex; align-items: center; gap: 12px;">
-      <button id="back-from-token" style="
-        background: ${CSS_VARS.bgPrimary};
-        border: 1px solid ${CSS_VARS.borderPrimary};
-        border-radius: 6px;
-        padding: 6px 12px;
-        color: #e0e0e0;
-        cursor: pointer;
-        font-size: 14px;
-        transition: all 0.2s;
-      ">← Volver</button>
+    <div class="token-config-header-inner">
+      <button id="back-from-token" class="token-config-back-btn">← Volver</button>
       <div>
-        <h1 style="font-family: Roboto, Helvetica, Arial, sans-serif; color: #fff; font-size: 18px; line-height: 24px; font-weight: 700; margin: 0;">🔑 Configurar Token de Notion</h1>
+        <h1 class="token-config-title">🔑 Configurar Token de Notion</h1>
       </div>
     </div>
   `;
   
   const contentArea = document.createElement('div');
-  contentArea.style.cssText = `
-    flex: 1;
-    padding: 24px;
-    overflow-y: auto;
-    max-width: 600px;
-    margin: 0 auto;
-    width: 100%;
-  `;
+  contentArea.className = 'token-config-content';
   
   contentArea.innerHTML = `
-    <div style="margin-bottom: 24px;">
-      <p style="color: #999; font-size: 14px; margin-bottom: 16px; line-height: 1.6;">
+    <div class="token-config-section">
+      <p class="token-config-text">
         Configura tu token de Notion para usar tus propias páginas. Este token es global para toda la extensión (todas las rooms).
       </p>
       
-      <div style="background: ${CSS_VARS.bgPrimary}; border: 1px solid ${CSS_VARS.borderPrimary}; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
-        <h3 style="color: #fff; font-size: 14px; font-weight: 700; margin-bottom: 12px; font-family: Roboto, Helvetica, Arial, sans-serif;">📝 Cómo obtener tu token:</h3>
-        <ol style="color: #ccc; font-size: 13px; line-height: 1.8; margin-left: 20px; padding-left: 0; font-family: Roboto, Helvetica, Arial, sans-serif; font-weight: 400;">
-          <li>Ve a <a href="https://www.notion.so/my-integrations" target="_blank" style="color: #4a9eff; text-decoration: none;">notion.so/my-integrations</a></li>
+      <div class="token-config-info-box">
+        <h3 class="token-config-info-title">📝 Cómo obtener tu token:</h3>
+        <ol class="token-config-list">
+          <li>Ve a <a href="https://www.notion.so/my-integrations" target="_blank" class="token-config-link">notion.so/my-integrations</a></li>
           <li><strong>Crea una nueva integración:</strong>
-            <ul style="margin-top: 8px; margin-left: 20px; padding-left: 0;">
+            <ul>
               <li>Clic en <strong>"+ Nueva integración"</strong></li>
               <li>Dale un nombre (ej: "Owlbear Notion")</li>
               <li>Selecciona el workspace donde están tus páginas</li>
@@ -3435,13 +3362,13 @@ async function showTokenConfig() {
             </ul>
           </li>
           <li><strong>Copia el token:</strong>
-            <ul style="margin-top: 8px; margin-left: 20px; padding-left: 0;">
+            <ul>
               <li>En la página de la integración, busca <strong>"Internal Integration Token"</strong></li>
               <li>Clic en <strong>"Mostrar"</strong> y copia el token completo</li>
             </ul>
           </li>
           <li><strong>Comparte tus páginas:</strong>
-            <ul style="margin-top: 8px; margin-left: 20px; padding-left: 0;">
+            <ul>
               <li>En Notion, abre cada página que quieres usar</li>
               <li>Clic en <strong>"Compartir"</strong> (arriba a la derecha)</li>
               <li>Busca el nombre de tu integración y dale acceso</li>
@@ -3452,109 +3379,30 @@ async function showTokenConfig() {
       </div>
       
       <div style="margin-bottom: 16px;">
-        <label style="display: block; color: #fff; font-size: 14px; font-weight: 400; margin-bottom: 8px; font-family: Roboto, Helvetica, Arial, sans-serif;">
+        <label class="token-config-label">
           Token de Notion:
         </label>
         <input 
           type="password" 
           id="token-input" 
+          class="token-config-input"
           placeholder="ntn_... o secret_..." 
           value="${currentToken}"
-          style="
-            width: 100%;
-            padding: 12px;
-            background: ${CSS_VARS.bgPrimary};
-            border: 1px solid ${CSS_VARS.borderPrimary};
-            border-radius: 6px;
-            color: #fff;
-            font-size: 14px;
-            font-family: monospace;
-            box-sizing: border-box;
-          "
         />
-        ${currentToken ? `<p style="color: #888; font-size: 12px; margin-top: 8px; font-family: Roboto, Helvetica, Arial, sans-serif; font-weight: 400;">Token actual: ${maskedToken}</p>` : ''}
+        ${currentToken ? `<p class="token-config-input-info">Token actual: ${maskedToken}</p>` : ''}
       </div>
       
-      <div id="token-error" style="
-        display: none;
-        background: #4a2d2d;
-        border: 1px solid #6a4040;
-        border-radius: 6px;
-        padding: 12px;
-        color: #ff6b6b;
-        font-size: 13px;
-        margin-bottom: 16px;
-      "></div>
+      <div id="token-error" class="token-config-error"></div>
       
-      <div style="display: flex; flex-direction: column; gap: 12px; padding-top: 16px; border-top: 1px solid ${CSS_VARS.borderPrimary};">
-        <div style="display: flex; gap: 12px;">
-          <button id="view-json-btn" style="
-            background: ${CSS_VARS.bgPrimary};
-            border: 1px solid ${CSS_VARS.borderPrimary};
-            border-radius: 6px;
-            padding: 10px 20px;
-            color: #e0e0e0;
-            cursor: pointer;
-            font-size: 14px;
-            font-weight: 400;
-            font-family: Roboto, Helvetica, Arial, sans-serif;
-            transition: all 0.2s;
-            flex: 1;
-          ">Ver JSON</button>
-          <button id="load-json-btn" style="
-            background: ${CSS_VARS.bgPrimary};
-            border: 1px solid ${CSS_VARS.borderPrimary};
-            border-radius: 6px;
-            padding: 10px 20px;
-            color: #e0e0e0;
-            cursor: pointer;
-            font-size: 14px;
-            font-weight: 400;
-            font-family: Roboto, Helvetica, Arial, sans-serif;
-            transition: all 0.2s;
-            flex: 1;
-          ">Cargar JSON</button>
-          <button id="download-json-btn" style="
-            background: ${CSS_VARS.bgPrimary};
-            border: 1px solid ${CSS_VARS.borderPrimary};
-            border-radius: 6px;
-            padding: 10px 20px;
-            color: #e0e0e0;
-            cursor: pointer;
-            font-size: 14px;
-            font-weight: 400;
-            font-family: Roboto, Helvetica, Arial, sans-serif;
-            transition: all 0.2s;
-            flex: 1;
-          ">Descargar JSON</button>
+      <div class="token-config-actions">
+        <div class="token-config-buttons-row">
+          <button id="view-json-btn" class="token-config-button">Ver JSON</button>
+          <button id="load-json-btn" class="token-config-button">Cargar JSON</button>
+          <button id="download-json-btn" class="token-config-button">Descargar JSON</button>
         </div>
-        <div style="display: flex; gap: 16px; justify-content: flex-end;">
-          <button id="clear-token" style="
-            background: ${CSS_VARS.bgPrimary};
-            border: 1px solid ${CSS_VARS.borderPrimary};
-            border-radius: 6px;
-            padding: 10px 20px;
-            color: #e0e0e0;
-            cursor: pointer;
-            font-size: 14px;
-            font-weight: 400;
-            font-family: Roboto, Helvetica, Arial, sans-serif;
-            transition: all 0.2s;
-            flex: 1;
-          ">Eliminar Token</button>
-          <button id="save-token" style="
-            background: #4a9eff;
-            border: none;
-            border-radius: 6px;
-            padding: 10px 20px;
-            color: #fff;
-            cursor: pointer;
-            font-size: 14px;
-            font-weight: 700;
-            font-family: Roboto, Helvetica, Arial, sans-serif;
-            transition: all 0.2s;
-            flex: 1;
-          ">Guardar Token</button>
+        <div class="token-config-actions-bottom">
+          <button id="clear-token" class="token-config-button">Eliminar Token</button>
+          <button id="save-token" class="token-config-button token-config-button-primary">Guardar Token</button>
         </div>
       </div>
     </div>
@@ -4078,44 +3926,24 @@ function showModalForm(title, fields, onSubmit, onCancel) {
     <h2 style="color: #fff; font-size: 20px; font-weight: 700; margin-bottom: 20px;">${title}</h2>
     <form id="modal-form" style="display: flex; flex-direction: column; gap: 16px;">
       ${fields.map(field => `
-        <div>
-          <label style="display: block; color: #999; font-size: 12px; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px;">
+        <div class="modal-field">
+          <label class="modal-label">
             ${field.label}${field.required ? ' *' : ''}
           </label>
           ${field.type === 'textarea' ? `
             <textarea 
               id="field-${field.name}" 
               name="${field.name}"
+              class="modal-textarea"
               ${field.required ? 'required' : ''}
               placeholder="${field.placeholder || ''}"
-              style="
-                width: 100%;
-                padding: 10px 12px;
-                background: rgba(255, 255, 255, 0.05);
-                border: 1px solid rgba(255, 255, 255, 0.1);
-                border-radius: 6px;
-                color: #e0e0e0;
-                font-size: 14px;
-                font-family: Roboto, Helvetica, Arial, sans-serif;
-                resize: vertical;
-                min-height: 60px;
-              "
             >${field.value || ''}</textarea>
           ` : field.type === 'select' ? `
             <select 
               id="field-${field.name}" 
               name="${field.name}"
+              class="modal-select"
               ${field.required ? 'required' : ''}
-              style="
-                width: 100%;
-                padding: 10px 12px;
-                background: rgba(255, 255, 255, 0.05);
-                border: 1px solid rgba(255, 255, 255, 0.1);
-                border-radius: 6px;
-                color: #e0e0e0;
-                font-size: 14px;
-                font-family: Roboto, Helvetica, Arial, sans-serif;
-              "
             >
               ${(field.options || []).map(opt => {
                 // Escapar el valor para HTML (especialmente importante para JSON con corchetes y comillas)
@@ -4136,47 +3964,18 @@ function showModalForm(title, fields, onSubmit, onCancel) {
               type="${field.type || 'text'}" 
               id="field-${field.name}" 
               name="${field.name}"
+              class="modal-input"
               ${field.required ? 'required' : ''}
               placeholder="${field.placeholder || ''}"
               value="${field.value || ''}"
-              style="
-                width: 100%;
-                padding: 10px 12px;
-                background: rgba(255, 255, 255, 0.05);
-                border: 1px solid rgba(255, 255, 255, 0.1);
-                border-radius: 6px;
-                color: #e0e0e0;
-                font-size: 14px;
-                font-family: Roboto, Helvetica, Arial, sans-serif;
-              "
             />
           `}
-          ${field.help ? `<div style="color: #666; font-size: 12px; margin-top: 4px;">${field.help}</div>` : ''}
+          ${field.help ? `<div class="modal-help">${field.help}</div>` : ''}
         </div>
       `).join('')}
-      <div style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 8px;">
-        <button type="button" id="modal-cancel" style="
-          padding: 10px 20px;
-          background: transparent;
-          border: 1px solid rgba(255, 255, 255, 0.2);
-          border-radius: 6px;
-          color: #e0e0e0;
-          cursor: pointer;
-          font-size: 14px;
-          font-weight: 500;
-          transition: all 0.2s;
-        ">Cancelar</button>
-        <button type="submit" id="modal-submit" style="
-          padding: 10px 20px;
-          background: #4a9eff;
-          border: none;
-          border-radius: 6px;
-          color: #fff;
-          cursor: pointer;
-          font-size: 14px;
-          font-weight: 700;
-          transition: all 0.2s;
-        ">Guardar</button>
+      <div class="modal-actions">
+        <button type="button" id="modal-cancel" class="modal-button modal-button-cancel">Cancelar</button>
+        <button type="submit" id="modal-submit" class="modal-button modal-button-submit">Guardar</button>
       </div>
     </form>
   `;
