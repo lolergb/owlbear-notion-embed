@@ -1792,7 +1792,55 @@ try {
     createContextMenu(menuItems, { x: rect.right, y: rect.top + 48 });
       });
       
+      // Botón para colapsar/expandir todas las carpetas
+      const collapseAllButton = document.createElement("button");
+      collapseAllButton.className = "icon-button";
+      collapseAllButton.id = "collapse-all-button";
+      const collapseIcon = document.createElement("img");
+      collapseIcon.src = "img/icon-collapse-false.svg"; // false = expandidas
+      collapseIcon.alt = "Colapsar todo";
+      collapseIcon.className = "icon-button-icon";
+      collapseAllButton.appendChild(collapseIcon);
+      collapseAllButton.title = "Colapsar todas las carpetas";
+      collapseAllButton.dataset.collapsed = "false";
+      
+      collapseAllButton.addEventListener("click", () => {
+        const isCollapsed = collapseAllButton.dataset.collapsed === "true";
+        const newState = !isCollapsed;
+        
+        // Actualizar icono y estado
+        collapseIcon.src = newState ? "img/icon-collapse-true.svg" : "img/icon-collapse-false.svg";
+        collapseAllButton.dataset.collapsed = newState.toString();
+        collapseAllButton.title = newState ? "Expandir todas las carpetas" : "Colapsar todas las carpetas";
+        
+        // Colapsar o expandir todas las carpetas
+        const categories = document.querySelectorAll('.category-group');
+        categories.forEach(categoryDiv => {
+          const contentContainer = categoryDiv.querySelector('.category-content');
+          const collapseBtn = categoryDiv.querySelector('.collapse-button img');
+          
+          if (contentContainer && collapseBtn) {
+            if (newState) {
+              // Colapsar
+              contentContainer.style.display = 'none';
+              collapseBtn.src = 'img/folder-close.svg';
+            } else {
+              // Expandir
+              contentContainer.style.display = 'block';
+              collapseBtn.src = 'img/folder-open.svg';
+            }
+            
+            // Guardar estado en localStorage
+            const categoryName = categoryDiv.dataset.categoryName;
+            if (categoryName) {
+              localStorage.setItem(`category-collapsed-${categoryName}`, (!newState).toString());
+            }
+          }
+        });
+      });
+      
       buttonContainer.appendChild(tokenButton);
+      buttonContainer.appendChild(collapseAllButton);
       buttonContainer.appendChild(addButton);
       header.appendChild(buttonContainer);
 
