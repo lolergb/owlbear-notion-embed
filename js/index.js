@@ -2739,6 +2739,7 @@ async function deleteCategoryFromPageList(category, categoryPath, roomId) {
 
 // Función para eliminar página desde la vista de page-list
 async function deletePageFromPageList(page, pageCategoryPath, roomId) {
+  console.log('🗑️ Eliminando página:', page.name, 'con path:', pageCategoryPath);
   if (!confirm(`¿Eliminar la página "${page.name}"?`)) {
     return;
   }
