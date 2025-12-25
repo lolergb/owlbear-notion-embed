@@ -1915,6 +1915,8 @@ function renderCategory(category, parentElement, level = 0, roomId = null, categ
   // Menú contextual para carpetas
   contextMenuButton.addEventListener('click', async (e) => {
     e.stopPropagation();
+    console.log('🟢 [CARPETA MENU] Click en menú contextual de carpeta:', category.name);
+    console.log('🟢 [CARPETA MENU] categoryPath:', categoryPath);
     const rect = contextMenuButton.getBoundingClientRect();
     
     // Obtener información para determinar si se puede mover arriba/abajo
@@ -2087,6 +2089,8 @@ function renderCategory(category, parentElement, level = 0, roomId = null, categ
       // Menú contextual para páginas
       pageContextMenuButton.addEventListener('click', async (e) => {
         e.stopPropagation();
+        console.log('🟡 [PÁGINA MENU] Click en menú contextual de página:', page.name);
+        console.log('🟡 [PÁGINA MENU] categoryPath:', categoryPath);
         const rect = pageContextMenuButton.getBoundingClientRect();
         const config = getPagesJSON(roomId) || await getDefaultJSON();
         // Obtener el path de la carpeta padre para agregar páginas en la misma carpeta
