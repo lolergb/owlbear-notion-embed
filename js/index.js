@@ -2636,9 +2636,6 @@ async function editPageFromPageList(page, pageCategoryPath, roomId) {
         delete currentPage.blockTypes;
       }
       
-      // Eliminar la propiedad 'category' si existe (no debería estar en el objeto page)
-      delete currentPage.category;
-      
       // Si se cambió la carpeta, mover la página
       if (data.category && data.category.trim() && data.category !== 'undefined') {
         try {
@@ -2682,44 +2679,79 @@ async function deleteCategoryFromPageList(category, categoryPath, roomId) {
   }
   
   try {
+    // Asegurarse de que categoryPath sea un array
+    let path = categoryPath;
+    if (typeof categoryPath === 'string') {
+      try {
+        path = JSON.parse(categoryPath);
+      } catch (e) {
+        console.error('Error al parsear categoryPath:', e);
+        alert('Error: Path de carpeta inválido');
+        return;
+      }
+    }
+    if (!Array.isArray(path)) {
+      console.error('categoryPath no es un array:', path);
+      alert('Error: Path de carpeta inválido');
+      return;
+    }
+    
     const config = JSON.parse(JSON.stringify(getPagesJSON(roomId) || await getDefaultJSON()));
     
-    console.log('🗑️ Eliminando carpeta:', category.name, 'con path:', categoryPath);
+    console.log('🗑️ Eliminando carpeta:', category.name);
+    console.log('📋 Path recibido:', categoryPath);
+    console.log('📋 Path procesado:', path);
+    console.log('📋 Tipo de path:', typeof path, 'Es array:', Array.isArray(path));
+    console.log('📋 Longitud del path:', path.length);
     
-    if (categoryPath.length === 0) {
+    if (path.length === 0) {
       // Si el path está vacío (no debería pasar, pero por si acaso)
       const index = config.categories.findIndex(cat => cat.name === category.name);
       if (index !== -1) {
         config.categories.splice(index, 1);
+        console.log('✅ Carpeta eliminada del nivel raíz (por nombre)');
       } else {
         console.error('No se encontró la carpeta en el nivel raíz');
         alert('Error: No se pudo encontrar la carpeta a eliminar');
         return;
       }
-    } else if (categoryPath.length === 2) {
+    } else if (path.length === 2) {
       // Eliminar del nivel raíz (path es ['categories', index])
-      const key = categoryPath[0];
-      const index = categoryPath[1];
-      if (config[key] && config[key][index]) {
+      const key = path[0];
+      const index = parseInt(path[1]);
+      console.log('🔍 Nivel raíz - key:', key, 'index:', index);
+      if (config[key] && config[key][index] !== undefined) {
+        console.log('✅ Encontrado:', config[key][index].name);
         config[key].splice(index, 1);
         console.log('✅ Carpeta eliminada del nivel raíz');
       } else {
-        console.error('No se encontró la carpeta en el nivel raíz:', key, index);
+        console.error('❌ No se encontró la carpeta en el nivel raíz:', key, index);
+        console.error('   config[key]:', config[key]);
+        console.error('   config[key][index]:', config[key] ? config[key][index] : 'undefined');
         alert('Error: No se pudo encontrar la carpeta a eliminar');
         return;
       }
     } else {
       // Eliminar de una carpeta padre (path tiene más de 2 elementos)
-      const key = categoryPath[categoryPath.length - 2];
-      const index = categoryPath[categoryPath.length - 1];
-      const parentPath = categoryPath.slice(0, -2);
+      const key = path[path.length - 2];
+      const index = parseInt(path[path.length - 1]);
+      const parentPath = path.slice(0, -2);
+      console.log('🔍 Carpeta anidada - key:', key, 'index:', index, 'parentPath:', parentPath);
       const parent = navigateConfigPath(config, parentPath);
-      console.log('🔍 Buscando carpeta en parent:', parent, 'key:', key, 'index:', index);
-      if (parent && parent[key] && parent[key][index]) {
+      console.log('🔍 Parent encontrado:', parent ? parent.name : 'null');
+      if (parent) {
+        console.log('   parent[key]:', parent[key]);
+        console.log('   parent[key][index]:', parent[key] ? parent[key][index] : 'undefined');
+      }
+      if (parent && parent[key] && parent[key][index] !== undefined) {
+        console.log('✅ Encontrado:', parent[key][index].name);
         parent[key].splice(index, 1);
         console.log('✅ Carpeta eliminada de carpeta padre');
       } else {
-        console.error('No se encontró la carpeta en el path:', categoryPath, 'parent:', parent);
+        console.error('❌ No se encontró la carpeta en el path:', path);
+        console.error('   parent:', parent);
+        console.error('   parent[key]:', parent ? parent[key] : 'null');
+        console.error('   parent[key][index]:', parent && parent[key] ? parent[key][index] : 'undefined');
         alert('Error: No se pudo encontrar la carpeta a eliminar');
         return;
       }
@@ -2735,7 +2767,8 @@ async function deleteCategoryFromPageList(category, categoryPath, roomId) {
       console.log('🔄 Vista recargada');
     }
   } catch (error) {
-    console.error('Error al eliminar carpeta:', error);
+    console.error('❌ Error al eliminar carpeta:', error);
+    console.error('Stack:', error.stack);
     alert('Error al eliminar la carpeta: ' + error.message);
   }
 }
