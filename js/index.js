@@ -1673,70 +1673,16 @@ try {
       // Declarar pagesConfig al inicio para que esté disponible en todo el scope
       let pagesConfig = null;
       
-      // Obtener todas las configuraciones guardadas
-      const allConfigs = getAllRoomConfigs();
-      const configKeys = Object.keys(allConfigs);
-      
-      // Función para contar el contenido de una configuración
-      const countContent = (config) => {
-        if (!config || !config.categories) return 0;
-        const countRecursive = (cats) => {
-          if (!cats) return 0;
-          return cats.reduce((total, cat) => {
-            const pages = (cat.pages && cat.pages.length) || 0;
-            const subcats = (cat.categories && cat.categories.length) || 0;
-            return total + pages + subcats + (subcats > 0 ? countRecursive(cat.categories) : 0);
-          }, 0);
-        };
-        return countRecursive(config.categories);
-      };
-      
-      // Buscar la configuración con más contenido (evitar las por defecto vacías)
-      let bestConfig = null;
-      let bestConfigKey = null;
-      let maxContent = 0;
-      
-      // Verificar todas las configuraciones, incluso la del roomId actual
-      for (const key of configKeys) {
-        const config = allConfigs[key];
-        if (config && config.categories && config.categories.length > 0) {
-          const contentCount = countContent(config);
-          
-          // Evitar usar la configuración "default" si hay otras opciones con contenido
-          const isDefault = key === 'default';
-          
-          // Preferir configuraciones con contenido sobre las vacías
-          // Si encontramos una con contenido, preferirla sobre "default" vacía
-          if (contentCount > maxContent || (contentCount > 0 && bestConfigKey === 'default' && !isDefault)) {
-            maxContent = contentCount;
-            bestConfig = config;
-            bestConfigKey = key;
-          }
-        }
-      }
-      
       // PRIORIDAD 1: Intentar cargar la configuración del roomId actual
       const currentRoomConfig = getPagesJSON(roomId);
-      if (currentRoomConfig && currentRoomConfig.categories && currentRoomConfig.categories.length > 0) {
-        const currentContent = countContent(currentRoomConfig);
-        if (currentContent > 0) {
-          log('✅ Configuración encontrada para room actual:', roomId, '(contenido:', currentContent, ')');
-          pagesConfig = currentRoomConfig;
-        }
+      if (currentRoomConfig && currentRoomConfig.categories) {
+        log('✅ Configuración encontrada para room:', roomId);
+        pagesConfig = currentRoomConfig;
       }
       
-      // PRIORIDAD 2: Si no hay configuración para el roomId actual, usar la mejor disponible
-      if (!pagesConfig && bestConfig && maxContent > 0) {
-        log('📋 Usando la configuración con más contenido de:', bestConfigKey, '(contenido:', maxContent, ')');
-        pagesConfig = bestConfig;
-        // Migrar la configuración al roomId actual
-        savePagesJSON(pagesConfig, roomId);
-        log('✅ Configuración migrada al roomId actual:', roomId);
-      }
-      
-      // PRIORIDAD 3: Si no hay ninguna configuración, crear una nueva por defecto
+      // PRIORIDAD 2: Si no hay configuración, crear una nueva por defecto
       if (!pagesConfig) {
-        log('📝 No se encontró ninguna configuración, creando una nueva para room:', roomId);
+        log('📝 No se encontró configuración para room:', roomId, ', creando una nueva por defecto');
         pagesConfig = await getDefaultJSON();
         savePagesJSON(pagesConfig, roomId);
         log('✅ Configuración por defecto creada para room:', roomId);
@@ -3209,9 +3155,15 @@ async function loadPageContent(url, name, selector = null, blockTypes = null) {
   const notionContent = document.getElementById("notion-content");
   const header = document.getElementById("header");
   
-  if (pageList && notionContainer && backButton && pageTitle && notionContent && header) {
-    pageList.classList.add("hidden");
-    notionContainer.classList.remove("hidden");
+    if (pageList && notionContainer && backButton && pageTitle && notionContent && header) {
+      pageList.classList.add("hidden");
+      notionContainer.classList.remove("hidden");
+      
+      // Ocultar el button-container cuando se está en la vista de detalle
+      const buttonContainer = document.querySelector('.button-container');
+      if (buttonContainer) {
+        buttonContainer.classList.add("hidden");
+      }
     backButton.classList.remove("hidden");
     pageTitle.textContent = name;
     
@@ -3377,6 +3329,11 @@ async function loadPageContent(url, name, selector = null, blockTypes = null) {
         const refreshButton = document.getElementById("refresh-page-button");
         if (refreshButton) {
           refreshButton.classList.add("hidden");
+        }
+        // Mostrar el button-container cuando se vuelve a la vista principal
+        const buttonContainer = document.querySelector('.button-container');
+        if (buttonContainer) {
+          buttonContainer.classList.remove("hidden");
         }
       });
       backButton.dataset.listenerAdded = "true";
