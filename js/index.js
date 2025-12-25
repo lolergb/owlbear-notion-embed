@@ -2685,10 +2685,7 @@ async function editPageFromPageList(page, pageCategoryPath, roomId) {
 // Función para eliminar carpeta desde la vista de page-list
 async function deleteCategoryFromPageList(category, categoryPath, roomId) {
   console.log('🔵 [deleteCategoryFromPageList] Iniciando eliminación de carpeta:', category.name);
-  if (!confirm(`¿Eliminar la carpeta "${category.name}" y todo su contenido?`)) {
-    console.log('🔵 [deleteCategoryFromPageList] Usuario canceló');
-    return false;
-  }
+  // Eliminar directamente sin confirmación (el menú contextual ya es suficiente confirmación)
   
   try {
     // Asegurarse de que categoryPath sea un array
@@ -2788,10 +2785,7 @@ async function deleteCategoryFromPageList(category, categoryPath, roomId) {
 // Función para eliminar página desde la vista de page-list
 async function deletePageFromPageList(page, pageCategoryPath, roomId) {
   console.log('🔴 [deletePageFromPageList] Iniciando eliminación de página:', page.name);
-  if (!confirm(`¿Eliminar la página "${page.name}"?`)) {
-    console.log('🔴 [deletePageFromPageList] Usuario canceló');
-    return;
-  }
+  // Eliminar directamente sin confirmación (el menú contextual ya es suficiente confirmación)
   
   try {
     const config = JSON.parse(JSON.stringify(getPagesJSON(roomId) || await getDefaultJSON()));
