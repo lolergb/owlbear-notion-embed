@@ -1979,9 +1979,10 @@ function renderCategory(category, parentElement, level = 0, roomId = null, categ
       icon: 'img/icon-trash.svg', 
       text: 'Eliminar', 
       action: async () => {
-        console.log('🗑️ Eliminando carpeta:', category.name, 'con path:', categoryPath);
+        console.log('🗑️ [CARPETA] Eliminando carpeta:', category.name, 'con path:', categoryPath);
+        console.log('🗑️ [CARPETA] Tipo de categoryPath:', typeof categoryPath, 'Es array:', Array.isArray(categoryPath));
         await deleteCategoryFromPageList(category, categoryPath, roomId);
-        console.log('✅ Carpeta eliminada');
+        console.log('✅ [CARPETA] Carpeta eliminada');
       }
     });
     
@@ -2135,9 +2136,10 @@ function renderCategory(category, parentElement, level = 0, roomId = null, categ
           icon: 'img/icon-trash.svg', 
           text: 'Eliminar', 
           action: async () => {
-            console.log('🗑️ Eliminando página:', page.name, 'con path:', pageCategoryPath);
+            console.log('🗑️ [PÁGINA] Eliminando página:', page.name, 'con path:', pageCategoryPath);
+            console.log('🗑️ [PÁGINA] Tipo de pageCategoryPath:', typeof pageCategoryPath, 'Es array:', Array.isArray(pageCategoryPath));
             await deletePageFromPageList(page, pageCategoryPath, roomId);
-            console.log('✅ Página eliminada');
+            console.log('✅ [PÁGINA] Página eliminada');
           }
         });
         
@@ -2674,7 +2676,9 @@ async function editPageFromPageList(page, pageCategoryPath, roomId) {
 
 // Función para eliminar carpeta desde la vista de page-list
 async function deleteCategoryFromPageList(category, categoryPath, roomId) {
+  console.log('🔵 [deleteCategoryFromPageList] Iniciando eliminación de carpeta:', category.name);
   if (!confirm(`¿Eliminar la carpeta "${category.name}" y todo su contenido?`)) {
+    console.log('🔵 [deleteCategoryFromPageList] Usuario canceló');
     return;
   }
   
@@ -2775,8 +2779,9 @@ async function deleteCategoryFromPageList(category, categoryPath, roomId) {
 
 // Función para eliminar página desde la vista de page-list
 async function deletePageFromPageList(page, pageCategoryPath, roomId) {
-  console.log('🗑️ Eliminando página:', page.name, 'con path:', pageCategoryPath);
+  console.log('🔴 [deletePageFromPageList] Iniciando eliminación de página:', page.name);
   if (!confirm(`¿Eliminar la página "${page.name}"?`)) {
+    console.log('🔴 [deletePageFromPageList] Usuario canceló');
     return;
   }
   
