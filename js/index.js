@@ -1979,7 +1979,9 @@ function renderCategory(category, parentElement, level = 0, roomId = null, categ
       icon: 'img/icon-trash.svg', 
       text: 'Eliminar', 
       action: async () => {
+        console.log('🗑️ Eliminando carpeta:', category.name, 'con path:', categoryPath);
         await deleteCategoryFromPageList(category, categoryPath, roomId);
+        console.log('✅ Carpeta eliminada');
       }
     });
     
@@ -2133,7 +2135,9 @@ function renderCategory(category, parentElement, level = 0, roomId = null, categ
           icon: 'img/icon-trash.svg', 
           text: 'Eliminar', 
           action: async () => {
+            console.log('🗑️ Eliminando página:', page.name, 'con path:', pageCategoryPath);
             await deletePageFromPageList(page, pageCategoryPath, roomId);
+            console.log('✅ Página eliminada');
           }
         });
         
