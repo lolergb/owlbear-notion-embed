@@ -1673,16 +1673,41 @@ try {
       // Declarar pagesConfig al inicio para que esté disponible en todo el scope
       let pagesConfig = null;
       
+      // Función auxiliar para contar contenido (páginas y carpetas anidadas)
+      const countContent = (config) => {
+        if (!config || !config.categories) return 0;
+        let count = 0;
+        const countRecursive = (cats) => {
+          if (!cats || !Array.isArray(cats)) return;
+          cats.forEach(cat => {
+            if (cat.pages && Array.isArray(cat.pages)) {
+              count += cat.pages.length;
+            }
+            if (cat.categories && Array.isArray(cat.categories)) {
+              count += cat.categories.length;
+              countRecursive(cat.categories);
+            }
+          });
+        };
+        countRecursive(config.categories);
+        return count;
+      };
+      
       // PRIORIDAD 1: Intentar cargar la configuración del roomId actual
       const currentRoomConfig = getPagesJSON(roomId);
       if (currentRoomConfig && currentRoomConfig.categories) {
-        log('✅ Configuración encontrada para room:', roomId);
-        pagesConfig = currentRoomConfig;
+        const contentCount = countContent(currentRoomConfig);
+        if (contentCount > 0) {
+          log('✅ Configuración encontrada para room:', roomId, 'con', contentCount, 'elementos');
+          pagesConfig = currentRoomConfig;
+        } else {
+          log('⚠️ Configuración encontrada para room:', roomId, 'pero está vacía');
+        }
       }
       
-      // PRIORIDAD 2: Si no hay configuración, crear una nueva por defecto
+      // PRIORIDAD 2: Si no hay configuración con contenido, crear una nueva por defecto
       if (!pagesConfig) {
-        log('📝 No se encontró configuración para room:', roomId, ', creando una nueva por defecto');
+        log('📝 No se encontró configuración con contenido para room:', roomId, ', creando una nueva por defecto');
         pagesConfig = await getDefaultJSON();
         savePagesJSON(pagesConfig, roomId);
         log('✅ Configuración por defecto creada para room:', roomId);
