@@ -4048,7 +4048,7 @@ function createContextMenu(items, position, onClose) {
       } else if (item.text === 'Mover abajo') {
         rotation = 'transform: rotate(-90deg);';
       }
-      iconHtml = `<img src="${item.icon}" alt="" style="width: 16px; height: 16px; display: block; ${rotation}" />`;
+      iconHtml = `<img src="${item.icon}" alt="" style="width: 24px; height: 24px; display: block; ${rotation}" />`;
     } else {
       iconHtml = `<span style="font-size: 16px; width: 20px; text-align: center;">${item.icon || ''}</span>`;
     }
