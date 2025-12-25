@@ -2636,6 +2636,9 @@ async function editPageFromPageList(page, pageCategoryPath, roomId) {
         delete currentPage.blockTypes;
       }
       
+      // Eliminar la propiedad 'category' si existe (no debería estar en el objeto page)
+      delete currentPage.category;
+      
       // Si se cambió la carpeta, mover la página
       if (data.category && data.category.trim() && data.category !== 'undefined') {
         try {
