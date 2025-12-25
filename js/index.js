@@ -1675,17 +1675,25 @@ try {
       
       // Función auxiliar para contar contenido (páginas y carpetas anidadas)
       const countContent = (config) => {
-        if (!config || !config.categories) return 0;
+        if (!config || !config.categories || !Array.isArray(config.categories)) return 0;
         let count = 0;
         const countRecursive = (cats) => {
           if (!cats || !Array.isArray(cats)) return;
           cats.forEach(cat => {
+            // Contar páginas válidas (con URL válida)
             if (cat.pages && Array.isArray(cat.pages)) {
-              count += cat.pages.length;
+              const validPages = cat.pages.filter(p => 
+                p && p.url && 
+                !p.url.includes('...') && 
+                p.url.startsWith('http')
+              );
+              count += validPages.length;
             }
+            // Contar carpetas (solo si tienen nombre)
             if (cat.categories && Array.isArray(cat.categories)) {
-              count += cat.categories.length;
-              countRecursive(cat.categories);
+              const validCategories = cat.categories.filter(c => c && c.name);
+              count += validCategories.length;
+              countRecursive(validCategories);
             }
           });
         };
@@ -1695,22 +1703,34 @@ try {
       
       // PRIORIDAD 1: Intentar cargar la configuración del roomId actual
       const currentRoomConfig = getPagesJSON(roomId);
-      if (currentRoomConfig && currentRoomConfig.categories) {
+      if (currentRoomConfig && currentRoomConfig.categories && Array.isArray(currentRoomConfig.categories)) {
         const contentCount = countContent(currentRoomConfig);
+        console.log('🔍 Contenido encontrado en configuración actual:', contentCount, 'elementos');
         if (contentCount > 0) {
           log('✅ Configuración encontrada para room:', roomId, 'con', contentCount, 'elementos');
           pagesConfig = currentRoomConfig;
         } else {
-          log('⚠️ Configuración encontrada para room:', roomId, 'pero está vacía');
+          log('⚠️ Configuración encontrada para room:', roomId, 'pero está vacía o no tiene contenido válido');
         }
+      } else {
+        log('⚠️ No se encontró configuración para room:', roomId);
       }
       
       // PRIORIDAD 2: Si no hay configuración con contenido, crear una nueva por defecto
       if (!pagesConfig) {
         log('📝 No se encontró configuración con contenido para room:', roomId, ', creando una nueva por defecto');
         pagesConfig = await getDefaultJSON();
-        savePagesJSON(pagesConfig, roomId);
-        log('✅ Configuración por defecto creada para room:', roomId);
+        // Solo guardar si realmente no existe ninguna configuración para este roomId
+        // (no sobrescribir si ya existe una, aunque esté vacía)
+        const existingConfig = getPagesJSON(roomId);
+        if (!existingConfig) {
+          savePagesJSON(pagesConfig, roomId);
+          log('✅ Configuración por defecto creada para room:', roomId);
+        } else {
+          log('⚠️ Ya existe una configuración para room:', roomId, ', no se sobrescribe con la por defecto');
+          // Usar la existente aunque esté vacía, para no perder datos
+          pagesConfig = existingConfig;
+        }
       }
 
       console.log('📊 Configuración cargada para room:', roomId);
