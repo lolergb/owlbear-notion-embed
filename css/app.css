@@ -255,11 +255,44 @@ body {
   margin-top: var(--spacing-xs);
 }
 
+.form__error {
+  display: none;
+  background: var(--color-error-bg);
+  border: 1px solid var(--color-error-border);
+  border-radius: var(--radius-md);
+  padding: var(--spacing-md);
+  color: var(--color-error-text);
+  font-size: var(--font-size-sm);
+  margin-bottom: var(--spacing-lg);
+}
+
+.form__error--visible {
+  display: block;
+}
+
 .form__actions {
   display: flex;
   gap: var(--spacing-md);
-  justify-content: flex-end;
-  margin-top: var(--spacing-sm);
+}
+
+.form__actions-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  padding-top: var(--spacing-lg);
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+/* ==========================================================================
+   Componentes Base - Links
+   ========================================================================== */
+.link {
+  color: var(--color-accent-link);
+  text-decoration: none;
+}
+
+.link:hover {
+  text-decoration: underline;
 }
 
 /* ==========================================================================
@@ -551,43 +584,6 @@ body {
   line-height: 1.6;
 }
 
-.settings__link {
-  color: var(--color-accent-link);
-  text-decoration: none;
-}
-
-.settings__link:hover {
-  text-decoration: underline;
-}
-
-.settings__error {
-  display: none;
-  background: var(--color-error-bg);
-  border: 1px solid var(--color-error-border);
-  border-radius: var(--radius-md);
-  padding: var(--spacing-md);
-  color: var(--color-error-text);
-  font-size: 13px;
-  margin-bottom: var(--spacing-lg);
-}
-
-.settings__error--visible {
-  display: block;
-}
-
-.settings__actions {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-md);
-  padding-top: var(--spacing-lg);
-  border-top: 1px solid var(--color-border-primary);
-}
-
-.settings__row {
-  display: flex;
-  gap: var(--spacing-md);
-}
-
 /* ==========================================================================
    Context Menu
    ========================================================================== */
@@ -802,14 +798,11 @@ body {
   line-height: 1.5;
 }
 
-/* Alias para compatibilidad */
+/* Notion blocked message */
 .notion-blocked-message { padding: 40px 20px; text-align: center; color: var(--color-text-secondary); }
 .notion-blocked-icon { font-size: 48px; margin-bottom: var(--spacing-lg); }
 .notion-blocked-title { color: var(--color-text-primary); margin-bottom: var(--spacing-md); font-size: var(--font-size-md); line-height: 24px; font-weight: var(--font-weight-bold); }
 .notion-blocked-text { color: var(--color-text-muted); margin-bottom: 20px; font-size: var(--font-size-base); line-height: 1.5; }
-.notion-blocked-button { background: var(--color-accent-primary); border: none; border-radius: var(--radius-lg); padding: var(--spacing-md) var(--spacing-xl); color: var(--color-text-primary); font-size: var(--font-size-base); font-weight: 600; cursor: pointer; transition: all var(--transition-normal); }
-.notion-blocked-button:hover { background: var(--color-accent-primary-hover); }
-.notion-blocked-button-small { background: var(--color-accent-primary); border: none; border-radius: var(--radius-sm); padding: var(--spacing-sm) var(--spacing-lg); color: var(--color-text-primary); cursor: pointer; }
 
 /* ==========================================================================
    Image Components
@@ -836,16 +829,7 @@ body {
   margin: 10px 0;
 }
 
-.notion-image-error-button {
-  margin-top: 10px;
-  padding: 6px var(--spacing-md);
-  background: #4a90e2;
-  color: white;
-  border: none;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  font-size: var(--font-size-sm);
-}
+/* .notion-image-error-button eliminado - usa .btn .btn--sm .btn--primary */
 
 .notion-image-unavailable {
   padding: 10px;
@@ -877,54 +861,14 @@ body {
   margin-left: auto;
 }
 
-/* Icon button (usa .btn--icon) */
-.icon-button {
-  background: transparent;
-  border: none;
-  border-radius: var(--radius-full);
-  width: 32px;
-  height: 32px;
-  padding: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: all var(--transition-normal);
-}
+/* Alias: icon-button → btn--icon (para compatibilidad) */
+.icon-button { background: transparent; border: none; border-radius: var(--radius-full); width: 32px; height: 32px; padding: 0; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all var(--transition-normal); }
+.icon-button:hover { background: var(--color-bg-hover); }
+.icon-button:active { background: var(--color-bg-active); }
+.icon-button-icon { width: var(--icon-size-md); height: var(--icon-size-md); display: block; }
 
-.icon-button:hover {
-  background: var(--color-bg-hover);
-}
-
-.icon-button:active {
-  background: var(--color-bg-active);
-}
-
-.icon-button-icon {
-  width: var(--icon-size-md);
-  height: var(--icon-size-md);
-  display: block;
-}
-
-/* ==========================================================================
-   Add First Category Button
-   ========================================================================== */
-.add-first-category-button {
-  margin-top: var(--spacing-lg);
-  padding: 10px 20px;
-  background: var(--color-accent-primary);
-  border: none;
-  border-radius: var(--radius-md);
-  color: var(--color-text-primary);
-  cursor: pointer;
-  font-size: var(--font-size-base);
-  font-weight: 600;
-  transition: all var(--transition-normal);
-}
-
-.add-first-category-button:hover {
-  background: var(--color-accent-primary-hover);
-}
+/* Alias: add-first-category-button → btn--primary (para compatibilidad) */
+.add-first-category-button { margin-top: var(--spacing-lg); }
 
 /* ==========================================================================
    Refresh Button

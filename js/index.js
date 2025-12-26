@@ -1495,7 +1495,7 @@ function attachImageClickHandlers() {
       this.style.display = 'none';
       const errorDiv = document.createElement('div');
       errorDiv.className = 'notion-image-error';
-      errorDiv.innerHTML = '⚠️ No se pudo cargar la imagen<br><small>La URL puede haber expirado</small><br><button class="notion-image-error-button">🔄 Recargar página</button>';
+      errorDiv.innerHTML = '⚠️ No se pudo cargar la imagen<br><small>La URL puede haber expirado</small><br><button class="btn btn--sm btn--primary">🔄 Recargar página</button>';
       
       // Agregar event listener al botón de recargar
       const refreshButton = errorDiv.querySelector('button');
@@ -1581,7 +1581,7 @@ async function loadNotionContent(url, container, forceRefresh = false, blockType
       <div class="notion-error">
         <strong>Error al cargar el contenido:</strong><br>
         ${error.message}<br><br>
-        <button onclick="window.open('${url}', '_blank')" class="notion-blocked-button-small">Abrir en Notion</button>
+        <button onclick="window.open('${url}', '_blank')" class="btn btn--sm btn--primary">Abrir en Notion</button>
       </div>
     `;
   }
@@ -1597,7 +1597,7 @@ function showNotionBlockedMessage(container, url) {
         Notion no permite que sus páginas se carguen en iframes por razones de seguridad.<br>
         Puedes abrir la página en una nueva ventana para verla.
       </p>
-      <button id="open-notion-window" class="notion-blocked-button">Abrir en nueva ventana</button>
+      <button id="open-notion-window" class="btn btn--primary">Abrir en nueva ventana</button>
     </div>
   `;
   
@@ -3038,7 +3038,7 @@ function renderPagesByCategories(pagesConfig, pageList, roomId = null) {
       emptyState.className = 'empty-state';
       emptyState.innerHTML = `
           <p>No hay páginas configuradas</p>
-        <button id="add-first-category" class="add-first-category-button">➕ Agregar primera carpeta</button>
+        <button id="add-first-category" class="btn btn--primary add-first-category-button">➕ Agregar primera carpeta</button>
       `;
       pageList.appendChild(emptyState);
       
@@ -3547,7 +3547,7 @@ async function showSettings() {
   }
   
   if (errorDiv) {
-    errorDiv.style.display = 'none';
+    errorDiv.classList.remove('form__error--visible');
     errorDiv.textContent = '';
   }
   
@@ -3572,13 +3572,13 @@ async function showSettings() {
       if (!token) {
         if (errorDiv) {
           errorDiv.textContent = 'Por favor, ingresa un token de Notion';
-          errorDiv.style.display = 'block';
+          errorDiv.classList.add('form__error--visible');
         }
         return;
       }
       
       if (saveUserToken(token)) {
-        if (errorDiv) errorDiv.style.display = 'none';
+        if (errorDiv) errorDiv.classList.remove('form__error--visible');
         alert('✅ Token guardado exitosamente. Ahora puedes usar tus propias páginas de Notion.');
         closeSettings();
         // Actualizar el título del botón de token sin recargar la página
@@ -3590,7 +3590,7 @@ async function showSettings() {
       } else {
         if (errorDiv) {
           errorDiv.textContent = 'Error al guardar el token. Revisa la consola para más detalles.';
-          errorDiv.style.display = 'block';
+          errorDiv.classList.add('form__error--visible');
         }
       }
     });
