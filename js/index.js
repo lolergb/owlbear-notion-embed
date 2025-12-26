@@ -3460,8 +3460,60 @@ async function showTokenConfig() {
   if (tokenContainer) tokenContainer.classList.remove('hidden');
   
   // Actualizar header como en loadPageContent
-  if (backButton) backButton.classList.remove('hidden');
-  if (pageTitle) pageTitle.textContent = '🔑 Configurar Token de Notion';
+  if (backButton) {
+    backButton.classList.remove('hidden');
+  }
+  if (pageTitle) {
+    pageTitle.textContent = '🔑 Configurar Token de Notion';
+  }
+  
+  // Asegurar que el listener esté configurado (se agrega en loadPageContent o aquí si es necesario)
+  if (backButton && !backButton.dataset.listenerAdded) {
+    backButton.addEventListener("click", () => {
+      const tokenContainer = document.getElementById("token-config-container");
+      const notionContainer = document.getElementById("notion-container");
+      const pageList = document.getElementById("page-list");
+      const pageTitle = document.getElementById("page-title");
+      const notionContent = document.getElementById("notion-content");
+      
+      const isTokenConfigVisible = tokenContainer && !tokenContainer.classList.contains('hidden');
+      const isNotionContainerVisible = notionContainer && !notionContainer.classList.contains('hidden');
+      
+      if (isTokenConfigVisible) {
+        // Cerrar token config
+        tokenContainer.classList.add("hidden");
+      } else if (isNotionContainerVisible) {
+        // Volver a la vista principal desde notion-container
+        notionContainer.classList.add("hidden");
+        notionContainer.classList.remove("show-content");
+        if (notionContent) {
+          notionContent.innerHTML = "";
+        }
+        // Limpiar iframe
+        const iframe = notionContainer.querySelector('#notion-iframe');
+        if (iframe) {
+          iframe.src = '';
+          iframe.style.display = 'none';
+        }
+        // Ocultar botón de recargar
+        const refreshButton = document.getElementById("refresh-page-button");
+        if (refreshButton) {
+          refreshButton.classList.add("hidden");
+        }
+      }
+      
+      // Restaurar vista principal
+      if (pageList) pageList.classList.remove("hidden");
+      if (backButton) backButton.classList.add("hidden");
+      if (pageTitle) pageTitle.textContent = "DM screen";
+      // Mostrar el button-container cuando se vuelve a la vista principal
+      const buttonContainer = document.querySelector('.button-container');
+      if (buttonContainer) {
+        buttonContainer.classList.remove("hidden");
+      }
+    });
+    backButton.dataset.listenerAdded = "true";
+  }
   
   // Ocultar el button-container cuando se está en la vista de token config
   const buttonContainer = document.querySelector('.button-container');
