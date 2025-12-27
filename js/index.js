@@ -2043,7 +2043,7 @@ function renderCategory(category, parentElement, level = 0, roomId = null, categ
     titleContainer.classList.add('context-menu-open');
     
     // Posicionar el menú a 8px del botón
-    createContextMenu(menuItems, { x: rect.right + 8, y: rect.bottom + 8 }, () => {
+    createContextMenu(menuItems, { x: rect.right + 8, y: rect.bottom + 4 }, () => {
       // Callback cuando se cierra el menú
       contextMenuButton.classList.remove('context-menu-active');
       titleContainer.classList.remove('context-menu-open');
