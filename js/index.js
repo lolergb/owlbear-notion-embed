@@ -1657,7 +1657,7 @@ async function setupTokenContextMenus(pagesConfig, roomId) {
       id: `${METADATA_KEY}/view-page`,
       icons: [
         {
-          icon: `${baseUrl}/img/icon-open.svg`,
+          icon: `${baseUrl}/img/icon-view-page.svg`,
           label: "Ver página vinculada",
           filter: {
             every: [
