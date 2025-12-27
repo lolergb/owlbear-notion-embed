@@ -1,23 +1,27 @@
-# 📚 Notion Embed for Owlbear Rodeo
+# 📚 DM screen for Owlbear Rodeo
 
-Simple extension to embed Notion pages directly in Owlbear Rodeo.
+Extension to embed Notion pages and external content directly in Owlbear Rodeo.
 
 ## ✨ Features
 
 - 🎯 Open Notion pages in modals within Owlbear
-- 📝 Page management by categories from the interface
+- 📝 Page management by folders from the interface
 - 🎨 Clean and dark interface
 - 💾 Persistent cache for fast loading
 - 🏠 Independent configuration per Owlbear room
 - 🖼️ Full-size image viewing in modal
-- 🔄 Visual editor for managing pages and categories
 - 📥 Import/Export JSON configuration
 - 🔑 User token management (global for all rooms)
 - 🌐 Support for external URLs with CSS selectors
 - 🎛️ Block type filtering for Notion pages
-- 📊 Nested categories with unlimited depth
+- 📊 Nested folders with unlimited depth
 - 🎨 Automatic page icons from Notion
 - 🗑️ Cache management (clear all or per page)
+- 🔗 **Multi-service support:** Google Drive, Docs, Sheets, Slides, Dropbox, OneDrive, YouTube, Vimeo, Figma, PDFs
+- 🔄 **Automatic URL conversion:** URLs are automatically converted to embed format
+- 📁 **Folder management:** Collapse/expand all folders, reorder items
+- ⚙️ **Settings panel:** Unified configuration interface
+- 🎯 **Token integration:** Link pages to scene tokens via context menu
 
 ---
 
@@ -75,16 +79,20 @@ Simple extension to embed Notion pages directly in Owlbear Rodeo.
 
 **Each room has its own configuration:**
 
-1. Click the **⚙️** button (top right)
-2. A visual editor opens where you can:
-   - Add new pages
-   - Create new categories
-   - Edit names and URLs
-   - Delete pages and categories
-   - Reorder items by drag and drop
-   - Import/Export JSON configuration
-3. Click **"Save"** to apply changes
-4. Click **"Reset"** if you want to return to the default configuration
+1. Click the **⚙️** button (top right) to open Settings
+2. From the main view, you can:
+   - Click **➕** to add new folders or pages
+   - Use the **⋯** menu on any item to:
+     - Edit name and URL
+     - Move up/down to reorder
+     - Delete items
+   - Click on folders to collapse/expand them
+   - Use **📁** button to collapse/expand all folders at once
+3. In Settings, you can:
+   - Configure your Notion token
+   - View current JSON configuration
+   - Load JSON from file
+   - Download JSON configuration
 
 **JSON Configuration Structure:**
 
@@ -92,7 +100,7 @@ Simple extension to embed Notion pages directly in Owlbear Rodeo.
 {
   "categories": [
     {
-      "name": "Category name",
+      "name": "Folder name",
       "pages": [
         {
           "name": "Page name",
@@ -103,10 +111,10 @@ Simple extension to embed Notion pages directly in Owlbear Rodeo.
       ],
       "categories": [
         {
-          "name": "Subcategory",
+          "name": "Subfolder",
           "pages": [
             {
-              "name": "Page in subcategory",
+              "name": "Page in subfolder",
               "url": "Page URL"
             }
           ]
@@ -119,26 +127,26 @@ Simple extension to embed Notion pages directly in Owlbear Rodeo.
 
 **Configuration Properties:**
 
-#### Categories (`categories`)
+#### Folders (`categories`)
 - **Type:** Array of objects
 - **Required:** Yes
-- **Description:** List of categories that group pages
+- **Description:** List of folders that group pages (note: JSON uses "categories" key for backward compatibility)
 
-#### Category (`categories[].name`)
+#### Folder (`categories[].name`)
 - **Type:** String
 - **Required:** Yes
-- **Description:** Category name (displayed as title)
+- **Description:** Folder name (displayed as title)
 
 #### Pages (`categories[].pages`)
 - **Type:** Array of objects
-- **Required:** No (optional if there are subcategories)
-- **Description:** List of pages within the category
+- **Required:** No (optional if there are subfolders)
+- **Description:** List of pages within the folder
 
-#### Subcategories (`categories[].categories`)
+#### Subfolders (`categories[].categories`)
 - **Type:** Array of objects
 - **Required:** No (optional)
-- **Description:** List of nested subcategories within the category
-- **Note:** Subcategories can have their own pages and subcategories (unlimited nesting)
+- **Description:** List of nested subfolders within the folder
+- **Note:** Subfolders can have their own pages and subfolders (unlimited nesting)
 
 #### Page (`categories[].pages[].name`)
 - **Type:** String
@@ -148,11 +156,21 @@ Simple extension to embed Notion pages directly in Owlbear Rodeo.
 #### Page (`categories[].pages[].url`)
 - **Type:** String (URL)
 - **Required:** Yes
-- **Description:** Complete page URL
+- **Description:** Complete page URL. URLs are automatically converted to embed format when supported.
 - **Examples:**
   - Notion: `https://your-workspace.notion.site/Title-2d0d4856c90e80f6801dcafb6b7366e6`
   - Notion (www): `https://www.notion.so/Title-2d0d4856c90e80f6801dcafb6b7366e6`
   - External: `https://5e.tools/book.html#mm,1`
+  - **Google Drive:** `https://drive.google.com/file/d/FILE_ID/view?usp=sharing` (auto-converted to preview)
+  - **Google Docs:** `https://docs.google.com/document/d/DOC_ID/edit` (auto-converted to preview)
+  - **Google Sheets:** `https://docs.google.com/spreadsheets/d/SHEET_ID/edit` (auto-converted to preview)
+  - **Google Slides:** `https://docs.google.com/presentation/d/SLIDE_ID/edit` (auto-converted to embed)
+  - **YouTube:** `https://www.youtube.com/watch?v=VIDEO_ID` (auto-converted to embed)
+  - **Vimeo:** `https://vimeo.com/VIDEO_ID` (auto-converted to embed)
+  - **Figma:** `https://www.figma.com/file/FILE_ID/Design` (auto-converted to embed)
+  - **Dropbox:** `https://www.dropbox.com/s/HASH/file.pdf?dl=0` (auto-converted to raw)
+  - **OneDrive:** `https://onedrive.live.com/?resid=RESID` (auto-converted to embed)
+  - **PDF:** `https://example.com/document.pdf` (direct embed)
 
 #### Page (`categories[].pages[].selector`)
 - **Type:** String (CSS selector)
@@ -287,7 +305,7 @@ Simple extension to embed Notion pages directly in Owlbear Rodeo.
 }
 ```
 
-**Minimum example (one category, one page):**
+**Minimum example (one folder, one page):**
 
 ```json
 {
@@ -305,23 +323,62 @@ Simple extension to embed Notion pages directly in Owlbear Rodeo.
 }
 ```
 
+**Note:** The JSON structure uses `"categories"` as the key name for backward compatibility, but in the UI they are displayed as "folders" (carpetas).
+
 **Important notes:**
-- Categories and pages are displayed in the same order as in the JSON (no automatic sorting)
-- Subcategories are displayed with visual indentation to indicate hierarchy
-- Each category and subcategory can be collapsed/expanded independently
+- Folders and pages are displayed in the same order as in the JSON (no automatic sorting)
+- Subfolders are displayed with visual indentation to indicate hierarchy
+- Each folder and subfolder can be collapsed/expanded independently
 - `selector` only works with external URLs (non-Notion)
 - `blockTypes` only works with Notion URLs (ignored in external URLs)
 - For Notion pages, `selector` is ignored (Notion API is used)
 - For external URLs, `blockTypes` is ignored (only applies to Notion)
-- Page icons are automatically loaded from Notion
-- You can nest subcategories to any level (unlimited depth)
+- Page icons are automatically loaded from Notion or detected by service type
+- You can nest subfolders to any level (unlimited depth)
 - Use `blockTypes` to create filtered views of a page (e.g., only quotes, only callouts, etc.)
+- **URL Conversion:** Supported services are automatically converted to embed format
+- **Service Icons:** Each service type has its own icon (Google Drive, YouTube, PDF, etc.)
+- **Public Sharing Required:** For Google Drive/Docs/Sheets/Slides, files must be shared as "Anyone with the link can view"
 
 ### 🔄 Update content
 
 - **Automatic reload:** Content is cached for fast loading
 - **🔄 Button:** Forces reload of a specific page (useful if you updated Notion)
-- **🗑️ Button:** Clears all cache (useful if something doesn't update)
+- **Cache management:** Available in Settings panel
+
+### 🎯 Token Integration
+
+You can link pages directly to tokens/characters in the scene:
+
+1. **Right-click on any token** in the scene
+2. Select **"Vincular página"** (Link page)
+3. Choose a page from your configuration
+4. The page is now linked to that token
+
+**To view a linked page:**
+- Right-click on the token → **"Ver página vinculada"** (View linked page)
+
+**To unlink:**
+- Right-click on the token → **"Desvincular página"** (Unlink page) - GM only
+
+**Note:** Only the GM can link/unlink pages. All players can view linked pages.
+
+### 🔗 Supported External Services
+
+The extension automatically converts URLs to embed format for:
+
+- **Google Drive** - Files shared publicly
+- **Google Docs** - Documents shared publicly
+- **Google Sheets** - Spreadsheets shared publicly
+- **Google Slides** - Presentations shared publicly
+- **Dropbox** - Files with public links
+- **OneDrive** - Files with embed links
+- **YouTube** - Public videos
+- **Vimeo** - Public videos
+- **Figma** - Files shared publicly
+- **PDFs** - Any publicly accessible PDF file
+
+**Note:** For Google services, files must be shared as "Anyone with the link can view" to work in iframes.
 
 ### 💡 Tips
 
@@ -539,6 +596,12 @@ This extension uses the official Owlbear Rodeo SDK:
 - Make sure the URL is complete (without `?source=...` parameters)
 - Check that the page is shared with your integration
 
+**External service doesn't load:**
+- For Google services: Make sure the file is shared as "Anyone with the link can view"
+- For Dropbox/OneDrive: Verify the file has a public link
+- For YouTube/Vimeo: Ensure the video is public or unlisted (not private)
+- Check browser console for CORS or iframe errors
+
 **Extension doesn't appear:**
 - Verify that `manifest.json` is publicly accessible
 - Check that the manifest URL is correct in Owlbear
@@ -566,17 +629,23 @@ This extension uses the official Owlbear Rodeo SDK:
 - ✅ Columns (2, 3, 4, 5 columns)
 - ✅ Code, Quote, Callout
 - ✅ Divider
-- ✅ Visual editor for managing pages and categories
-- ✅ Drag and drop reordering
+- ✅ Folder-based page management
+- ✅ Move up/down reordering
 - ✅ Import/Export JSON configuration
 - ✅ User token management (global)
 - ✅ Per-room configuration
 - ✅ External URL support with CSS selectors
 - ✅ Block type filtering (`blockTypes`)
-- ✅ Nested categories (unlimited depth)
+- ✅ Nested folders (unlimited depth)
 - ✅ Automatic page icons
 - ✅ Cache management
 - ✅ Debug mode (controlled by Netlify environment variable)
+- ✅ **Multi-service URL support** (Google Drive, Docs, Sheets, Slides, Dropbox, OneDrive, YouTube, Vimeo, Figma, PDFs)
+- ✅ **Automatic URL conversion** to embed format
+- ✅ **Service-specific icons** for each supported service
+- ✅ **Collapse/expand all folders** functionality
+- ✅ **Settings panel** with unified configuration interface
+- ✅ **Token integration** via context menu (link/view/unlink pages)
 
 ### 🔜 Future Implementations
 

@@ -1609,6 +1609,198 @@ function showNotionBlockedMessage(container, url) {
   }
 }
 
+// ============================================
+// MENÚ CONTEXTUAL PARA TOKENS
+// ============================================
+
+// Namespace para metadatos
+const METADATA_KEY = "com.dmscreen";
+
+// Función para configurar menús contextuales en tokens
+async function setupTokenContextMenus(pagesConfig, roomId) {
+  try {
+    console.log('🎯 Configurando menús contextuales para tokens...');
+    
+    // Menú: Vincular página (solo GM)
+    await OBR.contextMenu.create({
+      id: `${METADATA_KEY}/link-page`,
+      icons: [
+        {
+          icon: "/img/icon-page.svg",
+          label: "Vincular página",
+          filter: {
+            every: [{ key: "layer", value: "CHARACTER" }],
+            roles: ["GM"]
+          }
+        }
+      ],
+      onClick: async (context) => {
+        const item = context.items[0];
+        if (!item) return;
+        
+        // Mostrar selector de páginas
+        showPageSelectorForToken(item.id, pagesConfig, roomId);
+      }
+    });
+    
+    // Menú: Ver página vinculada (todos, si tiene página)
+    await OBR.contextMenu.create({
+      id: `${METADATA_KEY}/view-page`,
+      icons: [
+        {
+          icon: "/img/icon-open.svg",
+          label: "Ver página vinculada",
+          filter: {
+            every: [
+              { key: "layer", value: "CHARACTER" },
+              { key: ["metadata", `${METADATA_KEY}/pageUrl`], value: undefined, operator: "!=" }
+            ]
+          }
+        }
+      ],
+      onClick: async (context) => {
+        const item = context.items[0];
+        if (!item) return;
+        
+        const pageUrl = item.metadata[`${METADATA_KEY}/pageUrl`];
+        const pageName = item.metadata[`${METADATA_KEY}/pageName`] || "Página vinculada";
+        
+        if (pageUrl) {
+          // Abrir la página usando la función existente
+          await loadPageContent(pageUrl, pageName);
+        }
+      }
+    });
+    
+    // Menú: Desvincular página (solo GM)
+    await OBR.contextMenu.create({
+      id: `${METADATA_KEY}/unlink-page`,
+      icons: [
+        {
+          icon: "/img/icon-trash.svg",
+          label: "Desvincular página",
+          filter: {
+            every: [
+              { key: "layer", value: "CHARACTER" },
+              { key: ["metadata", `${METADATA_KEY}/pageUrl`], value: undefined, operator: "!=" }
+            ],
+            roles: ["GM"]
+          }
+        }
+      ],
+      onClick: async (context) => {
+        const item = context.items[0];
+        if (!item) return;
+        
+        // Eliminar metadatos de página
+        await OBR.scene.items.updateItems([item], (items) => {
+          delete items[0].metadata[`${METADATA_KEY}/pageUrl`];
+          delete items[0].metadata[`${METADATA_KEY}/pageName`];
+          delete items[0].metadata[`${METADATA_KEY}/pageIcon`];
+        });
+        
+        console.log('🗑️ Página desvinculada del token:', item.name || item.id);
+      }
+    });
+    
+    console.log('✅ Menús contextuales para tokens configurados');
+    
+  } catch (error) {
+    console.error('❌ Error al configurar menús contextuales:', error);
+  }
+}
+
+// Función para mostrar selector de páginas para vincular a un token
+function showPageSelectorForToken(itemId, pagesConfig, roomId) {
+  // Recopilar todas las páginas de la configuración
+  const allPages = [];
+  
+  function collectPages(categories, path = []) {
+    if (!categories) return;
+    
+    for (const category of categories) {
+      const currentPath = [...path, category.name];
+      
+      if (category.pages) {
+        for (const page of category.pages) {
+          if (page.url) {
+            allPages.push({
+              name: page.name,
+              url: page.url,
+              path: currentPath.join(' / '),
+              icon: page.icon || null
+            });
+          }
+        }
+      }
+      
+      if (category.categories) {
+        collectPages(category.categories, currentPath);
+      }
+    }
+  }
+  
+  collectPages(pagesConfig.categories);
+  
+  if (allPages.length === 0) {
+    alert('No hay páginas configuradas. Añade páginas desde el panel principal.');
+    return;
+  }
+  
+  // Crear opciones para el select
+  const pageOptions = allPages.map((page, index) => ({
+    label: `${page.path} → ${page.name}`,
+    value: index.toString()
+  }));
+  
+  // Mostrar modal de selección
+  showModalForm(
+    'Vincular página al token',
+    [
+      {
+        name: 'pageIndex',
+        label: 'Selecciona una página',
+        type: 'select',
+        options: pageOptions,
+        required: true
+      }
+    ],
+    async (data) => {
+      const selectedPage = allPages[parseInt(data.pageIndex)];
+      
+      if (!selectedPage) {
+        alert('Error: página no encontrada');
+        return;
+      }
+      
+      try {
+        // Obtener el item y actualizar sus metadatos
+        const items = await OBR.scene.items.getItems([itemId]);
+        if (items.length === 0) {
+          alert('Error: token no encontrado');
+          return;
+        }
+        
+        await OBR.scene.items.updateItems([items[0]], (updateItems) => {
+          updateItems[0].metadata[`${METADATA_KEY}/pageUrl`] = selectedPage.url;
+          updateItems[0].metadata[`${METADATA_KEY}/pageName`] = selectedPage.name;
+          updateItems[0].metadata[`${METADATA_KEY}/pageIcon`] = selectedPage.icon;
+        });
+        
+        console.log('✅ Página vinculada al token:', selectedPage.name);
+        alert(`✅ Página "${selectedPage.name}" vinculada al token`);
+        
+      } catch (error) {
+        console.error('Error al vincular página:', error);
+        alert('Error al vincular página: ' + error.message);
+      }
+    },
+    () => {
+      // Cancelar - no hacer nada
+    }
+  );
+}
+
 // Intentar inicializar Owlbear con manejo de errores
 console.log('🔄 Intentando inicializar Owlbear SDK...');
 
@@ -1853,6 +2045,10 @@ try {
 
       // Renderizar páginas agrupadas por carpetas
       renderPagesByCategories(pagesConfig, pageList, roomId);
+      
+      // Registrar menús contextuales para tokens
+      await setupTokenContextMenus(pagesConfig, roomId);
+      
     } catch (error) {
       console.error('❌ Error dentro de OBR.onReady:', error);
       console.error('Stack:', error.stack);
