@@ -22,9 +22,9 @@
   --color-text-disabled: #666;
   
   /* Colores de acento */
-  --color-accent-primary: #4a9eff;
-  --color-accent-primary-hover: #5aaeff;
-  --color-accent-link: #4a9eff;
+  --color-accent-primary: #967ACC;
+  --color-accent-primary-hover: #603EA2;
+  --color-accent-link: #603EA2;
   
   /* Colores de error */
   --color-error-bg: #4a2d2d;
@@ -132,7 +132,6 @@ body {
   background: var(--color-accent-primary);
   border: none;
   color: var(--color-text-primary);
-  font-weight: var(--font-weight-bold);
 }
 
 .btn--primary:hover {
