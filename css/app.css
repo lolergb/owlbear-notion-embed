@@ -3,17 +3,17 @@
    ========================================================================== */
 :root {
   /* Colores de fondo */
-  --color-bg-primary: #ffffff0d;
-  --color-bg-hover: #ffffff1a;
-  --color-bg-active: #bb99ff4d;
+  --color-bg-primary: rgba(0, 0, 0, 0.12);
+  --color-bg-hover: rgba(187, 153, 255, 0.12);
+  --color-bg-active: rgba(187, 153, 255, 0.12);
   --color-bg-overlay: rgba(34, 38, 57, 0.9);
   --color-bg-surface: rgb(34, 38, 57);
   
   /* Colores de borde */
   --color-border-primary: transparent;
-  --color-border-active: #bb99ff4d;
+  --color-border-active: rgba(187, 153, 255, 0.48);
   --color-border-subtle: rgba(255, 255, 255, 0.1);
-  
+
   /* Colores de texto */
   --color-text-primary: #fff;
   --color-text-secondary: #e0e0e0;
