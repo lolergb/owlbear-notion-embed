@@ -1,102 +1,121 @@
-# 📚 Notion Embed para Owlbear Rodeo
+# 📚 DM screen for Owlbear Rodeo
 
-Extensión simple para embebber páginas de Notion directamente en Owlbear Rodeo.
+Extension to embed Notion pages and external content directly in Owlbear Rodeo.
 
-## ✨ Características
+## ✨ Features
 
-- 🎯 Abre páginas de Notion en modales dentro de Owlbear
-- 📝 Gestión de páginas por categorías desde la interfaz
-- 🎨 Interfaz limpia y oscura
-- 💾 Caché persistente para carga rápida
-- 🏠 Configuración independiente por room de Owlbear
-- 🖼️ Visualización de imágenes en modal a tamaño real
+- 🎯 Open Notion pages in modals within Owlbear
+- 📝 Page management by folders from the interface
+- 🎨 Clean and dark interface
+- 💾 Persistent cache for fast loading
+- 🏠 Independent configuration per Owlbear room
+- 🖼️ Full-size image viewing in modal
+- 📥 Import/Export JSON configuration
+- 🔑 User token management (global for all rooms)
+- 🌐 Support for external URLs with CSS selectors
+- 🎛️ Block type filtering for Notion pages
+- 📊 Nested folders with unlimited depth
+- 🎨 Automatic page icons from Notion
+- 🗑️ Cache management (clear all or per page)
+- 🔗 **Multi-service support:** Google Drive, Docs, Sheets, Slides, Dropbox, OneDrive, YouTube, Vimeo, Figma, PDFs
+- 🔄 **Automatic URL conversion:** URLs are automatically converted to embed format
+- 📁 **Folder management:** Collapse/expand all folders, reorder items
+- ⚙️ **Settings panel:** Unified configuration interface
+- 🎯 **Token integration:** Link pages to scene tokens via context menu
 
 ---
 
-## 👥 Para DMs (Usuarios Finales)
+## 👥 For DMs (End Users)
 
-**¡Cada usuario usa su propia cuenta de Notion!** Solo necesitas configurar tu token una vez.
+**Each user uses their own Notion account!** You only need to configure your token once.
 
-### 🚀 Instalación (Una vez)
+### 🚀 Installation (One-time)
 
-1. **Obtén la URL de la extensión** del desarrollador
-   - Ejemplo: `https://tu-proyecto.netlify.app/manifest.json`
+1. **Get the extension URL** from the developer
+   - Example: `https://your-project.netlify.app/manifest.json`
 
-2. **En Owlbear Rodeo:**
-   - Ve a tu perfil → "Agregar Extensión"
-   - Pega la URL del `manifest.json`
-   - Instala
+2. **In Owlbear Rodeo:**
+   - Go to your profile → "Add Extension"
+   - Paste the `manifest.json` URL
+   - Install
 
-3. **Configura tu token de Notion:**
-   - Abre la extensión
-   - Clic en **🔑** (arriba a la derecha)
-   - Sigue las instrucciones en pantalla
-   - **¡Listo!** Ya puedes usar tus páginas de Notion
+3. **Configure your Notion token:**
+   - Open the extension
+   - Click on **🔑** (top right)
+   - Follow the on-screen instructions
+   - **Done!** You can now use your Notion pages
 
-### 🔑 Obtener tu Token de Notion
+### 🔑 Get your Notion Token
 
-**Paso 1: Crear la integración**
-1. Ve a https://www.notion.so/my-integrations
-2. Clic en **"+ Nueva integración"**
-3. Dale un nombre (ej: "Owlbear Notion")
-4. Selecciona tu workspace
-5. Clic en **"Enviar"**
+**Step 1: Create the integration**
+1. Go to https://www.notion.so/my-integrations
+2. Click **"+ New integration"**
+3. Give it a name (e.g., "Owlbear Notion")
+4. Select your workspace
+5. Click **"Submit"**
 
-**Paso 2: Copiar el token**
-1. En la página de la integración, busca **"Internal Integration Token"**
-2. Clic en **"Mostrar"** y copia el token (empieza con `secret_`)
+**Step 2: Copy the token**
+1. On the integration page, find **"Internal Integration Token"**
+2. Click **"Show"** and copy the token (starts with `secret_`)
 
-**Paso 3: Compartir tus páginas**
-1. En Notion, abre cada página que quieres usar
-2. Clic en **"Compartir"** (arriba a la derecha)
-3. Busca el nombre de tu integración y dale acceso
+**Step 3: Share your pages**
+1. In Notion, open each page you want to use
+2. Click **"Share"** (top right)
+3. Find your integration name and give it access
 
-**Paso 4: Configurar en la extensión**
-1. En la extensión: **🔑** → Pega el token → **Guardar**
-2. ¡Listo! Ya puedes usar tus páginas
+**Step 4: Configure in the extension**
+1. In the extension: **🔑** → Paste the token → **Save**
+2. Done! You can now use your pages
 
-### 📖 Uso Diario
+### 📖 Daily Usage
 
-1. **Abre Owlbear Rodeo** y entra a tu sala de juego
-2. **Abre la extensión** desde el menú de extensiones (icono en la barra superior)
-3. **Verás una lista** de páginas de Notion organizadas por categorías
-4. **Haz clic en una página** para abrirla y ver su contenido
-5. **Usa el botón ← Volver** para regresar a la lista
+1. **Open Owlbear Rodeo** and enter your game room
+2. **Open the extension** from the extensions menu (icon in the top bar)
+3. **You'll see a list** of Notion pages organized by categories
+4. **Click on a page** to open it and view its content
+5. **Use the ← Back button** to return to the list
 
-### 📝 Gestionar tus páginas
+### 📝 Manage your pages
 
-**Cada room tiene su propia configuración:**
+**Each room has its own configuration:**
 
-1. Clic en el botón **⚙️** (arriba a la derecha)
-2. Se abre un editor JSON donde puedes:
-   - Agregar nuevas páginas
-   - Crear nuevas categorías
-   - Editar nombres y URLs
-   - Eliminar páginas
-3. Clic en **"Guardar"** para aplicar los cambios
-4. Clic en **"Resetear"** si quieres volver a la configuración por defecto
+1. Click the **⚙️** button (top right) to open Settings
+2. From the main view, you can:
+   - Click **➕** to add new folders or pages
+   - Use the **⋯** menu on any item to:
+     - Edit name and URL
+     - Move up/down to reorder
+     - Delete items
+   - Click on folders to collapse/expand them
+   - Use **📁** button to collapse/expand all folders at once
+3. In Settings, you can:
+   - Configure your Notion token
+   - View current JSON configuration
+   - Load JSON from file
+   - Download JSON configuration
 
-**Estructura del JSON de configuración:**
+**JSON Configuration Structure:**
 
 ```json
 {
   "categories": [
     {
-      "name": "Nombre de la categoría",
+      "name": "Folder name",
       "pages": [
         {
-          "name": "Nombre de la página",
-          "url": "URL de la página",
-          "selector": "selector-opcional"
+          "name": "Page name",
+          "url": "Page URL",
+          "selector": "optional-selector",
+          "blockTypes": ["optional", "block", "types"]
         }
       ],
       "categories": [
         {
-          "name": "Subcategoría",
+          "name": "Subfolder",
           "pages": [
             {
-              "name": "Página en subcategoría",
-              "url": "URL de la página"
+              "name": "Page in subfolder",
+              "url": "Page URL"
             }
           ]
         }
@@ -106,149 +125,179 @@ Extensión simple para embebber páginas de Notion directamente en Owlbear Rodeo
 }
 ```
 
-**Propiedades de configuración:**
+**Configuration Properties:**
 
-#### Categorías (`categories`)
-- **Tipo:** Array de objetos
-- **Requerido:** Sí
-- **Descripción:** Lista de categorías que agrupan las páginas
+#### Folders (`categories`)
+- **Type:** Array of objects
+- **Required:** Yes
+- **Description:** List of folders that group pages (note: JSON uses "categories" key for backward compatibility)
 
-#### Categoría (`categories[].name`)
-- **Tipo:** String
-- **Requerido:** Sí
-- **Descripción:** Nombre de la categoría (se muestra como título)
+#### Folder (`categories[].name`)
+- **Type:** String
+- **Required:** Yes
+- **Description:** Folder name (displayed as title)
 
-#### Páginas (`categories[].pages`)
-- **Tipo:** Array de objetos
-- **Requerido:** No (opcional si hay subcategorías)
-- **Descripción:** Lista de páginas dentro de la categoría
+#### Pages (`categories[].pages`)
+- **Type:** Array of objects
+- **Required:** No (optional if there are subfolders)
+- **Description:** List of pages within the folder
 
-#### Subcategorías (`categories[].categories`)
-- **Tipo:** Array de objetos
-- **Requerido:** No (opcional)
-- **Descripción:** Lista de subcategorías anidadas dentro de la categoría
-- **Nota:** Las subcategorías pueden tener sus propias páginas y subcategorías (anidación ilimitada)
+#### Subfolders (`categories[].categories`)
+- **Type:** Array of objects
+- **Required:** No (optional)
+- **Description:** List of nested subfolders within the folder
+- **Note:** Subfolders can have their own pages and subfolders (unlimited nesting)
 
-#### Página (`categories[].pages[].name`)
-- **Tipo:** String
-- **Requerido:** Sí
-- **Descripción:** Nombre que se muestra en el botón de la página
+#### Page (`categories[].pages[].name`)
+- **Type:** String
+- **Required:** Yes
+- **Description:** Name displayed on the page button
 
-#### Página (`categories[].pages[].url`)
-- **Tipo:** String (URL)
-- **Requerido:** Sí
-- **Descripción:** URL completa de la página
-- **Ejemplos:**
-  - Notion: `https://tu-workspace.notion.site/Titulo-2d0d4856c90e80f6801dcafb6b7366e6`
-  - Notion (www): `https://www.notion.so/Titulo-2d0d4856c90e80f6801dcafb6b7366e6`
-  - Externa: `https://5e.tools/book.html#mm,1`
+#### Page (`categories[].pages[].url`)
+- **Type:** String (URL)
+- **Required:** Yes
+- **Description:** Complete page URL. URLs are automatically converted to embed format when supported.
+- **Examples:**
+  - Notion: `https://your-workspace.notion.site/Title-2d0d4856c90e80f6801dcafb6b7366e6`
+  - Notion (www): `https://www.notion.so/Title-2d0d4856c90e80f6801dcafb6b7366e6`
+  - External: `https://5e.tools/book.html#mm,1`
+  - **Google Drive:** `https://drive.google.com/file/d/FILE_ID/view?usp=sharing` (auto-converted to preview)
+  - **Google Docs:** `https://docs.google.com/document/d/DOC_ID/edit` (auto-converted to preview)
+  - **Google Sheets:** `https://docs.google.com/spreadsheets/d/SHEET_ID/edit` (auto-converted to preview)
+  - **Google Slides:** `https://docs.google.com/presentation/d/SLIDE_ID/edit` (auto-converted to embed)
+  - **YouTube:** `https://www.youtube.com/watch?v=VIDEO_ID` (auto-converted to embed)
+  - **Vimeo:** `https://vimeo.com/VIDEO_ID` (auto-converted to embed)
+  - **Figma:** `https://www.figma.com/file/FILE_ID/Design` (auto-converted to embed)
+  - **Dropbox:** `https://www.dropbox.com/s/HASH/file.pdf?dl=0` (auto-converted to raw)
+  - **OneDrive:** `https://onedrive.live.com/?resid=RESID` (auto-converted to embed)
+  - **PDF:** `https://example.com/document.pdf` (direct embed)
 
-#### Página (`categories[].pages[].selector`)
-- **Tipo:** String (CSS selector)
-- **Requerido:** No (opcional)
-- **Descripción:** Selector CSS (ID o clase) para cargar solo un elemento específico de la página
-- **Cuándo usarlo:** Solo para URLs que NO son de Notion (URLs externas)
-- **Ejemplos:**
-  - Por ID: `"#main-content"`
-  - Por clase: `".article-body"`
-  - Por selector: `"div.container > section.content"`
-- **Nota:** Si se omite, se carga toda la página. Si se proporciona, solo se muestra el elemento seleccionado (útil para páginas externas donde solo quieres mostrar una sección específica)
+#### Page (`categories[].pages[].selector`)
+- **Type:** String (CSS selector)
+- **Required:** No (optional)
+- **Description:** CSS selector (ID or class) to load only a specific element from the page
+- **When to use:** Only for URLs that are NOT from Notion (external URLs)
+- **Examples:**
+  - By ID: `"#main-content"`
+  - By class: `".article-body"`
+  - By selector: `"div.container > section.content"`
+- **Note:** If omitted, the entire page is loaded. If provided, only the selected element is shown (useful for external pages where you only want to show a specific section)
 
-#### Página (`categories[].pages[].blockTypes`)
-- **Tipo:** String o Array de strings
-- **Requerido:** No (opcional)
-- **Descripción:** Filtro de tipos de bloques para mostrar solo ciertos tipos de contenido en páginas de Notion
-- **Cuándo usarlo:** Solo para URLs de Notion (se ignora en URLs externas)
-- **Ejemplos:**
-  - Un solo tipo: `"quote"` (solo mostrar citas)
-  - Múltiples tipos: `["quote", "callout"]` (solo mostrar citas y callouts)
-- **Tipos de bloques disponibles:**
+#### Page (`categories[].pages[].blockTypes`)
+- **Type:** String or Array of strings
+- **Required:** No (optional)
+- **Description:** Block type filter to show only certain types of content in Notion pages
+- **When to use:** Only for Notion URLs (ignored in external URLs)
+- **Examples:**
+  - Single type: `"quote"` (only show quotes)
+  - Multiple types: `["quote", "callout"]` (only show quotes and callouts)
+- **Available block types:**
   - `paragraph`, `heading_1`, `heading_2`, `heading_3`, `bulleted_list_item`, `numbered_list_item`
   - `to_do`, `toggle`, `toggle_heading_1`, `toggle_heading_2`, `toggle_heading_3`
   - `code`, `quote`, `callout`, `divider`, `image`, `table`, `column_list`, `column`
-- **Nota:** Si se omite, se muestran todos los bloques. Si se proporciona, solo se muestran los bloques de los tipos especificados (útil para crear vistas filtradas de una página, por ejemplo, solo las citas o solo los callouts)
+- **Note:** If omitted, all blocks are shown. If provided, only blocks of the specified types are shown (useful for creating filtered views of a page, e.g., only quotes or only callouts)
 
-**Ejemplo completo con todas las opciones:**
+**Complete example with all options:**
 
 ```json
 {
   "categories": [
     {
-      "name": "Aventuras",
+      "name": "Adventures",
       "pages": [
         {
-          "name": "Mi Primera Aventura",
-          "url": "https://tu-workspace.notion.site/Mi-Primera-Aventura-2d0d4856c90e80f6801dcafb6b7366e6"
+          "name": "My First Adventure",
+          "url": "https://your-workspace.notion.site/My-First-Adventure-2d0d4856c90e80f6801dcafb6b7366e6"
         }
       ],
       "categories": [
         {
-          "name": "Cortas",
+          "name": "Short",
           "pages": [
             {
-              "name": "Encuentros Aleatorios",
-              "url": "https://www.notion.so/Encuentros-Aleatorios-3e1e5967d01e91f7912ec8bf7c8477f8"
+              "name": "Random Encounters",
+              "url": "https://www.notion.so/Random-Encounters-3e1e5967d01e91f7912ec8bf7c8477f8"
             }
           ]
         },
         {
-          "name": "Largas",
+          "name": "Long",
           "pages": [
             {
-              "name": "NPCs Importantes",
-              "url": "https://tu-workspace.notion.site/NPCs-Importantes-4f2f6078e02e02f8023fd9cf8d9589f9"
+              "name": "Important NPCs",
+              "url": "https://your-workspace.notion.site/Important-NPCs-4f2f6078e02e02f8023fd9cf8d9589f9"
             }
           ]
         }
       ]
     },
     {
-      "name": "Referencias Externas",
+      "name": "External References",
       "pages": [
         {
-          "name": "Manual D&D 5e",
+          "name": "D&D 5e Manual",
           "url": "https://5e.tools/book.html#mm,1",
           "selector": "#content"
         },
         {
-          "name": "Wiki de Reglas",
-          "url": "https://ejemplo.com/wiki/reglas",
+          "name": "Rules Wiki",
+          "url": "https://example.com/wiki/rules",
           "selector": ".main-article"
         },
         {
-          "name": "Calculadora de Daño",
-          "url": "https://calculadora.com/damage",
+          "name": "Damage Calculator",
+          "url": "https://calculator.com/damage",
           "selector": "#calculator-container"
         },
         {
-          "name": "Página Completa (sin selector)",
-          "url": "https://ejemplo.com/pagina-completa"
+          "name": "Full Page (no selector)",
+          "url": "https://example.com/full-page"
         }
       ]
     },
     {
-      "name": "Tokens y Mapas",
+      "name": "Tokens and Maps",
       "pages": [
         {
-          "name": "Colección de Tokens",
-          "url": "https://tu-workspace.notion.site/Tokens-5a3a7189f03e03f9034ge0df0e0690a0"
+          "name": "Token Collection",
+          "url": "https://your-workspace.notion.site/Tokens-5a3a7189f03e03f9034ge0df0e0690a0"
         },
         {
-          "name": "Mapas de Batalla",
-          "url": "https://www.notion.so/Mapas-de-Batalla-6b4b8290g14f14g0145ih1ef1f17a1b1"
+          "name": "Battle Maps",
+          "url": "https://www.notion.so/Battle-Maps-6b4b8290g14f14g0145ih1ef1f17a1b1"
         }
       ]
     },
     {
-      "name": "Notas de Sesión",
+      "name": "Session Notes",
       "pages": [
         {
-          "name": "Sesión 1 - Introducción",
-          "url": "https://tu-workspace.notion.site/Sesion-1-7c5c93a1h25g25h1256ji2fg2g28b2c2"
+          "name": "Session 1 - Introduction",
+          "url": "https://your-workspace.notion.site/Session-1-7c5c93a1h25g25h1256ji2fg2g28b2c2"
         },
         {
-          "name": "Sesión 2 - El Bosque",
-          "url": "https://tu-workspace.notion.site/Sesion-2-8d6d04b2i36h36i2367kj3gh3h39c3d3"
+          "name": "Session 2 - The Forest",
+          "url": "https://your-workspace.notion.site/Session-2-8d6d04b2i36h36i2367kj3gh3h39c3d3"
+        }
+      ]
+    },
+    {
+      "name": "Filtered Views",
+      "pages": [
+        {
+          "name": "Only Quotes",
+          "url": "https://your-workspace.notion.site/My-Page-abc123",
+          "blockTypes": "quote"
+        },
+        {
+          "name": "Quotes and Callouts",
+          "url": "https://your-workspace.notion.site/My-Page-abc123",
+          "blockTypes": ["quote", "callout"]
+        },
+        {
+          "name": "Only Headings",
+          "url": "https://your-workspace.notion.site/My-Page-abc123",
+          "blockTypes": ["heading_1", "heading_2", "heading_3"]
         }
       ]
     }
@@ -256,7 +305,7 @@ Extensión simple para embebber páginas de Notion directamente en Owlbear Rodeo
 }
 ```
 
-**Ejemplo mínimo (una categoría, una página):**
+**Minimum example (one folder, one page):**
 
 ```json
 {
@@ -265,8 +314,8 @@ Extensión simple para embebber páginas de Notion directamente en Owlbear Rodeo
       "name": "General",
       "pages": [
         {
-          "name": "Mi Página",
-          "url": "https://tu-notion.notion.site/Mi-Pagina-2d0d4856c90e80f6801dcafb6b7366e6"
+          "name": "My Page",
+          "url": "https://your-notion.notion.site/My-Page-2d0d4856c90e80f6801dcafb6b7366e6"
         }
       ]
     }
@@ -274,272 +323,358 @@ Extensión simple para embebber páginas de Notion directamente en Owlbear Rodeo
 }
 ```
 
-**Notas importantes:**
-- Las categorías y páginas se muestran en el mismo orden que en el JSON (sin ordenación automática)
-- Las subcategorías se muestran con indentación visual para indicar la jerarquía
-- Cada categoría y subcategoría puede colapsarse/expandirse independientemente
-- El `selector` solo funciona con URLs externas (no-Notion)
-- El `blockTypes` solo funciona con URLs de Notion (se ignora en URLs externas)
-- Para páginas de Notion, el `selector` se ignora (se usa la API de Notion)
-- Para URLs externas, el `blockTypes` se ignora (solo aplica a Notion)
-- Los iconos de las páginas se cargan automáticamente desde Notion
-- Puedes anidar subcategorías a cualquier nivel (sin límite de profundidad)
-- Usa `blockTypes` para crear vistas filtradas de una página (ej: solo citas, solo callouts, etc.)
+**Note:** The JSON structure uses `"categories"` as the key name for backward compatibility, but in the UI they are displayed as "folders" (carpetas).
 
-### 🔄 Actualizar contenido
+**Important notes:**
+- Folders and pages are displayed in the same order as in the JSON (no automatic sorting)
+- Subfolders are displayed with visual indentation to indicate hierarchy
+- Each folder and subfolder can be collapsed/expanded independently
+- `selector` only works with external URLs (non-Notion)
+- `blockTypes` only works with Notion URLs (ignored in external URLs)
+- For Notion pages, `selector` is ignored (Notion API is used)
+- For external URLs, `blockTypes` is ignored (only applies to Notion)
+- Page icons are automatically loaded from Notion or detected by service type
+- You can nest subfolders to any level (unlimited depth)
+- Use `blockTypes` to create filtered views of a page (e.g., only quotes, only callouts, etc.)
+- **URL Conversion:** Supported services are automatically converted to embed format
+- **Service Icons:** Each service type has its own icon (Google Drive, YouTube, PDF, etc.)
+- **Public Sharing Required:** For Google Drive/Docs/Sheets/Slides, files must be shared as "Anyone with the link can view"
 
-- **Recarga automática:** El contenido se cachea para cargar rápido
-- **Botón 🔄:** Fuerza la recarga de una página específica (útil si actualizaste Notion)
-- **Botón 🗑️:** Limpia todo el caché (útil si algo no se actualiza)
+### 🔄 Update content
 
-### 💡 Consejos
+- **Automatic reload:** Content is cached for fast loading
+- **🔄 Button:** Forces reload of a specific page (useful if you updated Notion)
+- **Cache management:** Available in Settings panel
 
-- **Cada usuario tiene su propio token:** Configura tu token una vez y úsalo en todas las rooms
-- **Cada room es independiente:** Las páginas se configuran por room, pero el token es compartido
-- **Token privado:** Tu token se guarda localmente en tu navegador, solo tú lo ves
-- **URLs de Notion:** Puedes usar páginas privadas (no necesitan ser públicas) si las compartes con tu integración
-- **Iconos:** Las páginas muestran su icono de Notion automáticamente
-- **Imágenes:** Haz clic en cualquier imagen para verla a tamaño real
-- **Cambiar token:** Clic en **🔑** → Eliminar Token para volver a usar el token del servidor (si está configurado)
+### 🎯 Token Integration
+
+You can link pages directly to tokens/characters in the scene:
+
+1. **Right-click on any token** in the scene
+2. Select **"Vincular página"** (Link page)
+3. Choose a page from your configuration
+4. The page is now linked to that token
+
+**To view a linked page:**
+- Right-click on the token → **"Ver página vinculada"** (View linked page)
+
+**To unlink:**
+- Right-click on the token → **"Desvincular página"** (Unlink page) - GM only
+
+**Note:** Only the GM can link/unlink pages. All players can view linked pages.
+
+### 🔗 Supported External Services
+
+The extension automatically converts URLs to embed format for:
+
+- **Google Drive** - Files shared publicly
+- **Google Docs** - Documents shared publicly
+- **Google Sheets** - Spreadsheets shared publicly
+- **Google Slides** - Presentations shared publicly
+- **Dropbox** - Files with public links
+- **OneDrive** - Files with embed links
+- **YouTube** - Public videos
+- **Vimeo** - Public videos
+- **Figma** - Files shared publicly
+- **PDFs** - Any publicly accessible PDF file
+
+**Note:** For Google services, files must be shared as "Anyone with the link can view" to work in iframes.
+
+### 💡 Tips
+
+- **Each user has their own token:** Configure your token once and use it in all rooms
+- **Each room is independent:** Pages are configured per room, but the token is shared
+- **Private token:** Your token is stored locally in your browser, only you can see it
+- **Notion URLs:** You can use private pages (they don't need to be public) if you share them with your integration
+- **Icons:** Pages automatically show their Notion icon
+- **Images:** Click on any image to view it at full size
+- **Change token:** Click **🔑** → Delete Token to go back to using the server token (if configured)
 
 ---
 
----
+## 🛠️ For Developers (Deployment Only)
 
-## 🛠️ Para Desarrolladores (Solo quien despliega)
+> **⚠️ This section is ONLY for whoever deploys the extension. End users do NOT need to do this.**
 
-> **⚠️ Esta sección es SOLO para quien despliega la extensión. Los usuarios finales NO necesitan hacer esto.**
+### 🚀 Deploy to Netlify
 
-### 🚀 Despliegue en Netlify
+1. **Fork/clone this repository**
 
-1. **Fork/clona este repositorio**
+2. **Create a Netlify account** (free)
 
-2. **Crea cuenta en Netlify** (gratis)
-
-3. **Conecta tu repositorio:**
+3. **Connect your repository:**
    - "Add new site" → "Import an existing project"
-   - Conecta GitHub/GitLab → Selecciona este repo
+   - Connect GitHub/GitLab → Select this repo
 
-4. **Deploy automático:**
-   - Netlify detectará y desplegará automáticamente
-   - **No necesitas configurar token** - cada usuario configurará el suyo
+4. **Automatic deployment:**
+   - Netlify will detect and deploy automatically
+   - **You don't need to configure token** - each user will configure their own
 
-5. **Comparte la URL:**
-   - Ejemplo: `https://tu-proyecto.netlify.app/manifest.json`
-   - Comparte esta URL con los usuarios
-   - **Cada usuario configurará su propio token** desde la interfaz (botón 🔑)
+5. **Share the URL:**
+   - Example: `https://your-project.netlify.app/manifest.json`
+   - Share this URL with users
+   - **Each user will configure their own token** from the interface (🔑 button)
 
-### 🔧 Token Opcional del Servidor (Opcional)
+### 🔧 Optional Server Token
 
-Si quieres que funcione sin que los usuarios configuren nada (páginas compartidas):
+If you want it to work without users configuring anything (shared pages):
 
-1. **En Netlify Dashboard:**
+1. **In Netlify Dashboard:**
    - Settings → Environment variables
-   - Agrega: `NOTION_API_TOKEN` = `tu_token_de_notion`
-   - Obtén el token: https://www.notion.so/my-integrations
+   - Add: `NOTION_API_TOKEN` = `your_notion_token`
+   - Get the token: https://www.notion.so/my-integrations
 
-2. **En Notion:**
-   - Comparte tus páginas con la integración
-   - Los usuarios verán estas páginas sin configurar nada
+2. **In Notion:**
+   - Share your pages with the integration
+   - Users will see these pages without configuring anything
 
-3. **Los usuarios pueden:**
-   - Usar páginas compartidas (sin token)
-   - O configurar su propio token (🔑) para sus páginas
+3. **Users can:**
+   - Use shared pages (without token)
+   - Or configure their own token (🔑) for their pages
 
-### 📝 Configurar páginas iniciales (Opcional)
+### 📝 Configure initial pages (Optional)
 
-Las páginas se pueden gestionar desde la interfaz, pero puedes configurar páginas iniciales editando `build-config.js`:
+Pages can be managed from the interface, but you can configure initial pages by editing `build-config.js`:
 
 ```javascript
 export const NOTION_PAGES = [
   {
-    name: "Mi Aventura",
-    url: "https://tu-notion.notion.site/Mi-Aventura-..."
+    name: "My Adventure",
+    url: "https://your-notion.notion.site/My-Adventure-..."
   }
 ];
 ```
 
-### 🔧 Desarrollo Local
+### 🔧 Local Development
 
-1. **Copia el archivo de ejemplo:**
+1. **Copy the example file:**
    ```bash
-   cp config.example.js config.js
+   cp config/config.example.js config/config.js
    ```
 
-2. **Edita `config.js`** y agrega tu token (solo para desarrollo local):
+2. **Edit `config/config.js`** and add your token (only for local development):
    ```javascript
-   export const NOTION_API_TOKEN = "tu_token_de_notion_aqui";
+   export const NOTION_API_TOKEN = "your_notion_token_here";
    ```
 
-3. **Servidor local:**
+3. **Local server:**
    ```bash
+   npm run serve
+   # or
    npx http-server -p 8000
    ```
 
-4. **Usa en Owlbear:**
+4. **Use in Owlbear:**
    - `http://localhost:8000/manifest.json`
 
-#### Para GitHub Pages
+#### For GitHub Pages
 
-GitHub Pages solo sirve archivos estáticos, por lo que no puedes usar variables de entorno directamente. Opciones:
+GitHub Pages only serves static files, so you can't use environment variables directly. Options:
 
-- **Opción A (Simple - Solo desarrollo):** 
-  - Mantén `config.js` local y no lo subas a GitHub (ya está en `.gitignore`)
-  - ⚠️ **Advertencia:** Si alguien accede a tu sitio, el token estará visible en el código del cliente
+- **Option A (Simple - Development only):**
+  - Keep `config.js` local and don't upload it to GitHub (already in `.gitignore`)
+  - ⚠️ **Warning:** If someone accesses your site, the token will be visible in the client code
 
-- **Opción B (Segura - Requiere GitHub Actions):**
-  - Crea un workflow de GitHub Actions
-  - Usa GitHub Secrets para almacenar el token
-  - El workflow genera `config.js` en build time
-  - Ver ejemplo en `.github/workflows/deploy.yml` (crear si es necesario)
+- **Option B (Secure - Requires GitHub Actions):**
+  - Create a GitHub Actions workflow
+  - Use GitHub Secrets to store the token
+  - The workflow generates `config.js` at build time
+  - See example in `.github/workflows/deploy.yml` (create if necessary)
 
-### 🔓 Hacer una página de Notion pública
+### 🔓 Make a Notion page public
 
-1. Abre tu página en Notion
-2. Clic en "Compartir" (arriba a la derecha)
-3. Activa "Compartir en la web"
-4. Copia la URL pública
-5. Pégala en `index.js`
+1. Open your page in Notion
+2. Click "Share" (top right)
+3. Enable "Share to web"
+4. Copy the public URL
+5. Paste it in the extension configuration
 
-## 📦 Estructura del Proyecto
+## 📦 Project Structure
 
 ```
 owlbear-notion-embed/
-├── manifest.json              # Configuración de la extensión
-├── index.html                 # Interfaz de usuario
-├── index.js                   # Lógica principal
-├── notion-markdown.css        # Estilos para renderizar contenido
-├── icon.svg                   # Icono de la extensión
-├── config.example.js          # Plantilla de configuración
-├── build-config.js            # Script de build para Netlify
-├── test-notion-api.js         # Script de prueba (desarrollo)
+├── manifest.json              # Extension configuration
+├── index.html                 # User interface
+├── js/
+│   └── index.js               # Main logic
+├── css/
+│   ├── app.css                # Application styles
+│   └── notion-markdown.css    # Styles for rendering content
+├── html/
+│   └── image-viewer.html      # Image viewer modal
+├── img/                       # Icons and images
+├── icon.svg                   # Extension icon
+├── config/
+│   ├── config.example.js      # Configuration template
+│   └── config.js              # Local configuration (gitignored)
+├── scripts/
+│   ├── build-config.js        # Build script for Netlify
+│   └── test-notion-api.js     # Test script (development)
 ├── netlify/
-│   └── functions/
-│       └── notion-api.js      # Netlify Function (proxy seguro)
-├── netlify.toml               # Configuración de Netlify
-├── package.json               # Configuración de Node.js
-├── .gitignore                 # Archivos ignorados por Git
-└── README.md                  # Esta documentación
+│   ├── functions/
+│   │   ├── notion-api.js      # Netlify Function (secure proxy)
+│   │   └── get-debug-mode.js  # Debug mode function
+│   └── netlify.toml           # Netlify configuration
+├── public/
+│   └── default-config.json    # Default configuration
+├── package.json               # Node.js configuration
+├── .gitignore                 # Files ignored by Git
+└── README.md                  # This documentation
 ```
 
-## 🧪 Probar que funciona
+## 🧪 Test that it works
 
-Antes de usar la extensión, verifica que la API de Notion esté configurada correctamente:
+Before using the extension, verify that the Notion API is configured correctly:
 
 ```bash
-# Ejecuta el script de prueba
+# Run the test script
 npm test
-# o directamente:
-node test-notion-api.js
+# or directly:
+node scripts/test-notion-api.js
 ```
 
-El script verificará:
-- ✅ Que `config.js` existe y tiene el token configurado
-- ✅ Que el token es válido
-- ✅ Que puede acceder a las páginas configuradas
-- ✅ Que obtiene los bloques correctamente
+The script will verify:
+- ✅ That `config.js` exists and has the token configured
+- ✅ That the token is valid
+- ✅ That it can access the configured pages
+- ✅ That it gets blocks correctly
 
-**Si hay errores:**
-- **Token no válido:** Verifica que el token sea correcto en `config.js`
-- **Sin permisos:** Asegúrate de que la integración de Notion tenga acceso a las páginas
-- **Página no encontrada:** Verifica que las URLs en `config.js` sean correctas
+**If there are errors:**
+- **Invalid token:** Verify that the token is correct in `config.js`
+- **No permissions:** Make sure the Notion integration has access to the pages
+- **Page not found:** Verify that the URLs in `config.js` are correct
 
-## 🎮 Uso
+## 🎮 Usage
 
-1. **Abre Owlbear Rodeo** y crea/abre una sala
-2. **Selecciona la extensión** desde el menú de extensiones
-3. **Haz clic en una página** para abrirla en un modal
-4. **Navega** por tu contenido de Notion sin salir de Owlbear
+1. **Open Owlbear Rodeo** and create/open a room
+2. **Select the extension** from the extensions menu
+3. **Click on a page** to open it in a modal
+4. **Navigate** through your Notion content without leaving Owlbear
 
-## 🔧 Desarrollo
+## 🔧 Development
 
-### Requisitos
+### Requirements
 
-- Servidor web estático (cualquiera funciona)
-- Páginas de Notion configuradas como públicas
+- Static web server (any works)
+- Notion pages configured as private (shared with integration) or public
 
-### SDK de Owlbear
+### Owlbear SDK
 
-Esta extensión usa el SDK oficial de Owlbear Rodeo:
-- [Documentación](https://docs.owlbear.rodeo/)
-- [API de Modales](https://docs.owlbear.rodeo/extensions/apis/modal/)
+This extension uses the official Owlbear Rodeo SDK:
+- [Documentation](https://docs.owlbear.rodeo/)
+- [Modal API](https://docs.owlbear.rodeo/extensions/apis/modal/)
 
-## 📝 Notas
+## 📝 Notes
 
-- Las páginas de Notion deben ser **públicas** para funcionar
-- El modal se abre con un tamaño responsive
-- Puedes tener múltiples páginas configuradas
-- La extensión es completamente privada si no la compartes públicamente
-- **⚠️ Seguridad:** El token de la API está en `config.js` que NO se sube a GitHub (está en `.gitignore`)
+- Notion pages can be **private** (they don't need to be public) if shared with the integration
+- The modal opens with a responsive size
+- You can have multiple pages configured
+- The extension is completely private if you don't share it publicly
+- **⚠️ Security:** The API token is in `config.js` which is NOT uploaded to GitHub (it's in `.gitignore`)
 
-## 🔐 Seguridad
+## 🔐 Security
 
-**Para Desarrolladores:**
+**For Developers:**
 
-- ✅ El token se almacena en Netlify (variables de entorno)
-- ✅ El token NUNCA se expone al cliente (usa Netlify Functions como proxy)
-- ✅ `config.js` está en `.gitignore` y NO se sube a GitHub
-- ✅ Los usuarios finales nunca ven ni necesitan el token
+- ✅ Token is stored in Netlify (environment variables)
+- ✅ Token is NEVER exposed to the client (uses Netlify Functions as proxy)
+- ✅ `config.js` is in `.gitignore` and NOT uploaded to GitHub
+- ✅ End users never see or need the token
+- ✅ User tokens are stored locally in the browser (localStorage)
+- ✅ Server token is optional and only used if user token is not configured
 
-**Para Usuarios:**
+**For Users:**
 
-- ✅ No necesitas saber nada sobre tokens
-- ✅ Solo usa la extensión normalmente
+- ✅ You don't need to know anything about tokens
+- ✅ Just use the extension normally
+- ✅ Your token is stored locally and never sent to the server (except through secure Netlify Functions)
 
-## 🐛 Solución de Problemas
+## 🐛 Troubleshooting
 
-**La página no se abre:**
-- Verifica que la URL de Notion sea pública
-- Asegúrate de que la URL esté completa (sin parámetros `?source=...`)
+**Page doesn't open:**
+- Verify that the Notion URL is correct
+- Make sure the URL is complete (without `?source=...` parameters)
+- Check that the page is shared with your integration
 
-**La extensión no aparece:**
-- Verifica que el `manifest.json` sea accesible públicamente
-- Revisa que la URL del manifest sea correcta en Owlbear
+**External service doesn't load:**
+- For Google services: Make sure the file is shared as "Anyone with the link can view"
+- For Dropbox/OneDrive: Verify the file has a public link
+- For YouTube/Vimeo: Ensure the video is public or unlisted (not private)
+- Check browser console for CORS or iframe errors
 
-**Error de CORS:**
-- Asegúrate de alojar la extensión en un servidor (no usar `file://`)
+**Extension doesn't appear:**
+- Verify that `manifest.json` is publicly accessible
+- Check that the manifest URL is correct in Owlbear
 
-## 🗺️ Roadmap / Próximos Pasos
+**CORS error:**
+- Make sure to host the extension on a server (don't use `file://`)
 
-### ✅ Implementado
-- ✅ Texto, encabezados (H1, H2, H3)
-- ✅ Listas (bulleted, numbered, to-do)
-- ✅ Toggle list y Toggle headings (H1, H2, H3)
-- ✅ Imágenes (clickables, modal a tamaño real)
-- ✅ Tablas
-- ✅ Columnas (2, 3, 4, 5 columnas)
+**Token error:**
+- Verify that your token is correct (starts with `secret_` or `ntn_`)
+- Make sure the integration has access to the pages you're trying to view
+
+**Cache issues:**
+- Use the 🔄 button to reload a specific page
+- Use the 🗑️ button to clear all cache
+
+## 🗺️ Roadmap / Next Steps
+
+### ✅ Implemented
+
+- ✅ Text, headings (H1, H2, H3)
+- ✅ Lists (bulleted, numbered, to-do)
+- ✅ Toggle list and Toggle headings (H1, H2, H3)
+- ✅ Images (clickable, full-size modal)
+- ✅ Tables
+- ✅ Columns (2, 3, 4, 5 columns)
 - ✅ Code, Quote, Callout
 - ✅ Divider
+- ✅ Folder-based page management
+- ✅ Move up/down reordering
+- ✅ Import/Export JSON configuration
+- ✅ User token management (global)
+- ✅ Per-room configuration
+- ✅ External URL support with CSS selectors
+- ✅ Block type filtering (`blockTypes`)
+- ✅ Nested folders (unlimited depth)
+- ✅ Automatic page icons
+- ✅ Cache management
+- ✅ Debug mode (controlled by Netlify environment variable)
+- ✅ **Multi-service URL support** (Google Drive, Docs, Sheets, Slides, Dropbox, OneDrive, YouTube, Vimeo, Figma, PDFs)
+- ✅ **Automatic URL conversion** to embed format
+- ✅ **Service-specific icons** for each supported service
+- ✅ **Collapse/expand all folders** functionality
+- ✅ **Settings panel** with unified configuration interface
+- ✅ **Token integration** via context menu (link/view/unlink pages)
 
-### 🔜 Próximas Implementaciones
+### 🔜 Future Implementations
 
-#### Child Database (Bases de datos anidadas)
-- **Estado:** Pendiente
-- **Complejidad:** Media-Alta
-- **Descripción:** Renderizar bases de datos completas que están dentro de una página
-- **Requisitos:** 
-  - Obtener estructura de la base de datos
-  - Renderizar filas y columnas
-  - Soporte para diferentes tipos de propiedades (texto, número, fecha, etc.)
-  - Paginación si hay muchas filas
+#### Child Database (Nested databases)
+- **Status:** Pending
+- **Complexity:** Medium-High
+- **Description:** Render complete databases that are inside a page
+- **Requirements:**
+  - Get database structure
+  - Render rows and columns
+  - Support for different property types (text, number, date, etc.)
+  - Pagination if there are many rows
 
-#### Block Equation (Fórmulas matemáticas)
-- **Estado:** Pendiente
-- **Complejidad:** Media
-- **Descripción:** Renderizar fórmulas matemáticas usando KaTeX o MathJax
-- **Requisitos:**
-  - Integrar librería de renderizado matemático
-  - Parsear formato LaTeX de Notion
+#### Block Equation (Mathematical formulas)
+- **Status:** Pending
+- **Complexity:** Medium
+- **Description:** Render mathematical formulas using KaTeX or MathJax
+- **Requirements:**
+  - Integrate math rendering library
+  - Parse Notion's LaTeX format
 
-#### Synced Block (Bloques sincronizados)
-- **Estado:** Pendiente
-- **Complejidad:** Media
-- **Descripción:** Renderizar bloques que están sincronizados entre páginas
-- **Requisitos:**
-  - Detectar bloques sincronizados
-  - Obtener contenido del bloque original
+#### Synced Block (Synchronized blocks)
+- **Status:** Pending
+- **Complexity:** Medium
+- **Description:** Render blocks that are synchronized between pages
+- **Requirements:**
+  - Detect synchronized blocks
+  - Get content from the original block
 
-## 📄 Licencia
+## 📄 License
 
-Uso personal - Siéntete libre de modificar y usar como quieras.
-
+Personal use - Feel free to modify and use as you wish.
