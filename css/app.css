@@ -24,7 +24,7 @@
   /* Colores de acento */
   --color-accent-primary: #967ACC;
   --color-accent-primary-hover: #603EA2;
-  --color-accent-link: #603EA2;
+  --color-accent-link: #967ACC;
   
   /* Colores de error */
   --color-error-bg: #4a2d2d;
@@ -250,7 +250,7 @@ body {
 .form__label {
   display: block;
   color: var(--color-text-primary);
-  font-size: var(--font-size-lg);
+  font-size: var(--font-size-md);
   font-weight: var(--font-weight-normal);
 }
 
