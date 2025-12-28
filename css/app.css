@@ -1164,7 +1164,8 @@
 
   @media (max-width: 399px) {
     .category-title,
-    .page-name-text {
+    .page-name-text,
+    #page-title {
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
