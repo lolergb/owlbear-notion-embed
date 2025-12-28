@@ -2068,7 +2068,6 @@ try {
       const defaultCount = countContent(defaultConfig);
       
       // Solo mostrar logs de debug si es GM
-      const isGM = await getUserRole();
       if (isGM) {
         console.log('🔍 Configuración room metadata - elementos:', roomMetadataCount);
         console.log('🔍 Configuración localStorage roomId:', roomId, '- elementos:', currentRoomCount);
@@ -2107,8 +2106,7 @@ try {
       setupRoomMetadataListener(roomId);
 
       // Solo mostrar logs de debug si es GM
-      const isGMForLogs = await getUserRole();
-      if (isGMForLogs) {
+      if (isGM) {
         console.log('📊 Configuración cargada para room:', roomId);
         console.log('📊 Número de carpetas:', pagesConfig?.categories?.length || 0);
       }
