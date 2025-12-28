@@ -297,10 +297,6 @@
     margin-top: var(--spacing-lg);
   }
   
-  .form__actions--single {
-    margin-bottom: var(--spacing-md);
-  }
-  
   .form__actions--double {
     margin-top: 0;
   }
