@@ -982,6 +982,11 @@
     transition: all var(--transition-normal);
     margin-left: var(--spacing-sm);
   }
+
+  #refresh-page-button,
+  #page-visibility-button-header {
+    margin-left: 0;
+  }
   
   #refresh-page-button:hover,
   #page-visibility-button-header:hover {

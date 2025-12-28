@@ -176,6 +176,7 @@ function getFriendlyRoomId(roomId) {
 // Clave para metadata de OBR.room
 const ROOM_METADATA_KEY = 'com.dmscreen/pagesConfig';
 const ROOM_CONTENT_CACHE_KEY = 'com.dmscreen/contentCache';
+const ROOM_HTML_CACHE_KEY = 'com.dmscreen/htmlCache';
 
 // Cache local para evitar lecturas repetidas (se sincroniza con room metadata)
 let pagesConfigCache = null;
@@ -434,6 +435,68 @@ async function saveToSharedCache(pageId, blocks) {
     // Ignorar errores silenciosamente - el caché compartido es opcional
     console.debug('No se pudo guardar en caché compartido:', e);
   }
+}
+
+/**
+ * Guardar HTML renderizado en el caché compartido (room metadata)
+ * @param {string} pageId - ID de la página de Notion
+ * @param {string} html - HTML renderizado
+ */
+async function saveHtmlToSharedCache(pageId, html) {
+  try {
+    // Obtener el caché compartido actual
+    const metadata = await OBR.room.getMetadata();
+    const htmlCache = (metadata && metadata[ROOM_HTML_CACHE_KEY]) || {};
+    
+    // Limitar el tamaño del caché compartido (máximo 10 páginas)
+    const keys = Object.keys(htmlCache);
+    if (keys.length >= 10) {
+      // Eliminar la entrada más antigua
+      let oldestKey = keys[0];
+      let oldestTime = new Date(htmlCache[oldestKey].savedAt || 0).getTime();
+      for (const key of keys) {
+        const time = new Date(htmlCache[key].savedAt || 0).getTime();
+        if (time < oldestTime) {
+          oldestTime = time;
+          oldestKey = key;
+        }
+      }
+      delete htmlCache[oldestKey];
+      console.log('🗑️ Eliminada entrada más antigua del caché HTML:', oldestKey);
+    }
+    
+    // Guardar el nuevo HTML
+    htmlCache[pageId] = {
+      html: html,
+      savedAt: new Date().toISOString()
+    };
+    
+    await OBR.room.setMetadata({
+      [ROOM_HTML_CACHE_KEY]: htmlCache
+    });
+    console.log('💾 HTML renderizado guardado en caché compartido para:', pageId);
+  } catch (e) {
+    console.debug('No se pudo guardar HTML en caché compartido:', e);
+  }
+}
+
+/**
+ * Obtener HTML renderizado del caché compartido
+ * @param {string} pageId - ID de la página de Notion
+ * @returns {Promise<string|null>} - HTML renderizado o null si no existe
+ */
+async function getHtmlFromSharedCache(pageId) {
+  try {
+    const metadata = await OBR.room.getMetadata();
+    const htmlCache = metadata && metadata[ROOM_HTML_CACHE_KEY];
+    if (htmlCache && htmlCache[pageId] && htmlCache[pageId].html) {
+      console.log('✅ HTML encontrado en caché compartido para:', pageId);
+      return htmlCache[pageId].html;
+    }
+  } catch (e) {
+    console.debug('No se pudo leer HTML del caché compartido:', e);
+  }
+  return null;
 }
 
 /**
@@ -1737,6 +1800,22 @@ async function loadNotionContent(url, container, forceRefresh = false, blockType
       throw new Error('No se pudo extraer el ID de la página desde la URL');
     }
     
+    const userToken = getUserToken();
+    const isGM = await getUserRole() === 'GM';
+    
+    // Si el jugador no tiene token, intentar usar el HTML del caché compartido
+    if (!userToken && !isGM) {
+      console.log('👤 Jugador sin token, buscando HTML en caché compartido para:', pageId);
+      const cachedHtml = await getHtmlFromSharedCache(pageId);
+      if (cachedHtml) {
+        console.log('✅ Usando HTML del caché compartido');
+        contentDiv.innerHTML = cachedHtml;
+        attachImageClickHandlers();
+        return;
+      }
+      console.log('⚠️ No hay HTML en caché compartido para esta página');
+    }
+    
     console.log('Obteniendo bloques para página:', pageId, forceRefresh ? '(recarga forzada - sin caché)' : '(con caché)');
     
     // Obtener bloques (usar caché a menos que se fuerce la recarga)
@@ -1757,6 +1836,11 @@ async function loadNotionContent(url, container, forceRefresh = false, blockType
     const useCacheForChildren = !forceRefresh;
     const html = await renderBlocks(blocks, blockTypes, 0, useCacheForChildren);
     contentDiv.innerHTML = html;
+    
+    // Si es GM, guardar el HTML renderizado en el caché compartido para jugadores
+    if (isGM) {
+      saveHtmlToSharedCache(pageId, html);
+    }
     
     // Agregar event listeners a las imágenes para abrirlas en modal
     attachImageClickHandlers();
