@@ -5,9 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "python -m http.server 8000",
-    "serve": "npx http-server -p 8000 -c-1",
-    "build": "node build-config.js",
-    "test": "node test-notion-api.js"
+    "serve": "npx http-server -p 8000 -c-1"
   },
   "keywords": [
     "owlbear",

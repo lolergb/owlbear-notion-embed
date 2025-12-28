@@ -52,12 +52,8 @@ function logWarn(...args) {
   console.warn(...args);
 }
 
-// Importar configuración
-// Si config.js no existe, copia config.example.js a config.js y completa los datos
-import { 
-  NOTION_API_BASE, 
-  NOTION_PAGES 
-} from "../config/config.js";
+// La aplicación funciona con localStorage y default-config.json
+// config.js ya no es necesario - la configuración se gestiona desde la interfaz
 
 // Variables de color CSS (deben coincidir con las del index.html)
 const CSS_VARS = {
@@ -166,7 +162,7 @@ function savePagesJSON(json, roomId) {
   }
 }
 
-// Función para obtener la configuración por defecto (desde archivo público o fallback)
+// Función para obtener la configuración por defecto (desde archivo público)
 async function getDefaultJSON() {
   try {
     // Intentar cargar desde archivo público
@@ -177,30 +173,18 @@ async function getDefaultJSON() {
       return config;
     }
   } catch (e) {
-    log('⚠️ No se pudo cargar default-config.json, usando fallback');
+    log('⚠️ No se pudo cargar default-config.json');
   }
   
-  // Fallback: usar NOTION_PAGES del config.js si está disponible
-  try {
-    return {
-      categories: [
-        {
-          name: "General",
-          pages: NOTION_PAGES ? NOTION_PAGES.filter(p => p.url && !p.url.includes('...') && p.url.startsWith('http')) : []
-        }
-      ]
-    };
-  } catch (e) {
-    // Último fallback: configuración vacía
-    return {
-      categories: [
-        {
-          name: "General",
-          pages: []
-        }
-      ]
-    };
-  }
+  // Fallback: configuración vacía (el usuario puede agregar páginas desde la interfaz)
+  return {
+    categories: [
+      {
+        name: "General",
+        pages: []
+      }
+    ]
+  };
 }
 
 // Función para obtener todas las configuraciones de rooms (para debugging)
@@ -224,19 +208,8 @@ function getAllRoomConfigs() {
   return configs;
 }
 
-// El token ya no se importa directamente - se usa Netlify Function como proxy en producción
-// En desarrollo local, config.js puede tener el token, pero en producción no es necesario
-// porque el token está seguro en el servidor (Netlify Function)
-
-// Verificar que las páginas se cargaron correctamente
-console.log('✅ Config.js cargado');
-console.log('📄 Páginas importadas:', NOTION_PAGES?.length || 0);
-if (NOTION_PAGES && NOTION_PAGES.length > 0) {
-  console.log('📝 Nombres de páginas:', NOTION_PAGES.map(p => p.name));
-  console.log('🔗 URLs:', NOTION_PAGES.map(p => p.url));
-} else {
-  console.warn('⚠️ No se encontraron páginas en config.js');
-}
+// El token se gestiona desde la interfaz (botón 🔑) y se almacena en localStorage
+// Se usa Netlify Function como proxy seguro en producción
 
 // Manejo de errores global para capturar problemas de carga
 window.addEventListener('error', (event) => {
@@ -538,7 +511,7 @@ async function fetchNotionBlocks(pageId, useCache = true) {
       const errorData = await response.json().catch(() => ({}));
       
       if (response.status === 401) {
-        throw new Error('Token inválido o sin permisos. Verifica que el token en config.js sea correcto y que la integración tenga acceso a esta página.');
+        throw new Error('Token inválido o sin permisos. Verifica que el token configurado (botón 🔑) sea correcto y que la integración tenga acceso a esta página.');
       } else if (response.status === 404) {
         throw new Error('Página no encontrada. Verifica que la URL sea correcta y que la integración tenga acceso.');
       } else {

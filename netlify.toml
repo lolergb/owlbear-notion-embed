@@ -41,27 +41,14 @@
     Access-Control-Allow-Headers = "Content-Type"
 
 # Configuración de build
+# No se necesita build step - los archivos son estáticos
 [build]
-  command = "node scripts/build-config.js"
   publish = "."
   functions = "netlify/functions"
 
 # Configuración de Deploy Previews (para Pull Requests)
 [build.processing]
   skip_processing = false
-
-# Configuración de branches
-[context.production]
-  command = "node scripts/build-config.js"
-  publish = "."
-
-[context.deploy-preview]
-  command = "node scripts/build-config.js"
-  publish = "."
-
-[context.branch-deploy]
-  command = "node scripts/build-config.js"
-  publish = "."
 
 # Variables de entorno (configúralas en Netlify Dashboard)
 # OWNER_TOKEN: (Recomendado) Tu token de Notion personal
