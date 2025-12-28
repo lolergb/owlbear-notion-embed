@@ -1946,9 +1946,14 @@ initDebugMode();
 try {
   OBR.onReady(async () => {
     try {
-      console.log('✅ Owlbear SDK listo');
-      console.log('🌐 URL actual:', window.location.href);
-      console.log('🔗 Origen:', window.location.origin);
+      // Verificar rol primero para filtrar logs
+      const isGM = await getUserRole();
+      
+      if (isGM) {
+        console.log('✅ Owlbear SDK listo');
+        console.log('🌐 URL actual:', window.location.href);
+        console.log('🔗 Origen:', window.location.origin);
+      }
       
       // Obtener ID de la room actual
       let roomId = null;
@@ -1972,22 +1977,32 @@ try {
           }
         }
       } catch (e) {
-        console.warn('⚠️ No se pudo obtener el ID de la room:', e);
+        if (isGM) {
+          console.warn('⚠️ No se pudo obtener el ID de la room:', e);
+        }
         // Intentar obtener desde el contexto o la URL
         try {
           const context = await OBR.context.getId();
-          console.log('🏠 Context ID obtenido:', context);
+          if (isGM) {
+            console.log('🏠 Context ID obtenido:', context);
+          }
           roomId = context;
         } catch (e2) {
-          console.warn('⚠️ No se pudo obtener Context ID:', e2);
+          if (isGM) {
+            console.warn('⚠️ No se pudo obtener Context ID:', e2);
+          }
           // Intentar extraer de la URL
           const urlParams = new URLSearchParams(window.location.search);
           const obrref = urlParams.get('obrref');
           if (obrref) {
-            console.log('🏠 Usando obrref de URL:', obrref);
+            if (isGM) {
+              console.log('🏠 Usando obrref de URL:', obrref);
+            }
             roomId = obrref;
           } else {
-            console.warn('⚠️ No se encontró obrref en URL, usando "default"');
+            if (isGM) {
+              console.warn('⚠️ No se encontró obrref en URL, usando "default"');
+            }
             roomId = 'default';
           }
         }
@@ -1995,7 +2010,9 @@ try {
       
       // Verificar que roomId no sea null o undefined
       if (!roomId) {
-        console.warn('⚠️ roomId es null/undefined, usando "default"');
+        if (isGM) {
+          console.warn('⚠️ roomId es null/undefined, usando "default"');
+        }
         roomId = 'default';
       }
       
