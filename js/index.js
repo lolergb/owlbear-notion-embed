@@ -36,9 +36,60 @@ async function initDebugMode() {
 }
 
 // Función wrapper para logs (solo muestra si DEBUG_MODE está activado)
+// Variable para cachear el rol del usuario
+let cachedUserRole = null;
+let roleCheckPromise = null;
+
+// Función para obtener el rol del usuario (con caché)
+async function getUserRole() {
+  if (cachedUserRole !== null) {
+    return cachedUserRole;
+  }
+  
+  if (roleCheckPromise) {
+    return roleCheckPromise;
+  }
+  
+  roleCheckPromise = (async () => {
+    try {
+      if (typeof OBR !== 'undefined' && OBR.player && OBR.player.getRole) {
+        const role = await OBR.player.getRole();
+        cachedUserRole = role === 'GM';
+        return cachedUserRole;
+      }
+    } catch (e) {
+      // Si no se puede obtener el rol, asumir GM para no bloquear logs
+      cachedUserRole = true;
+      return cachedUserRole;
+    }
+    // Fallback: asumir GM
+    cachedUserRole = true;
+    return cachedUserRole;
+  })();
+  
+  return roleCheckPromise;
+}
+
 function log(...args) {
   if (DEBUG_MODE) {
-    console.log(...args);
+    // Si el rol ya está cacheado
+    if (cachedUserRole === true) {
+      // Es GM, mostrar log
+      console.log(...args);
+    } else if (cachedUserRole === false) {
+      // Es jugador, no mostrar log
+      return;
+    } else {
+      // Rol aún no verificado, verificar de forma asíncrona
+      // Pero mostrar el log de todas formas si hay error (fallback para desarrollo)
+      getUserRole().then(isGM => {
+        if (isGM) {
+          console.log(...args);
+        }
+      }).catch(() => {
+        // Si hay error al verificar rol, no mostrar (más seguro)
+      });
+    }
   }
 }
 
@@ -1904,15 +1955,21 @@ try {
       try {
         // Intentar obtener el ID de la room usando la propiedad directa
         roomId = OBR.room.id;
-        console.log('🏠 Room ID obtenido (OBR.room.id):', roomId);
-        console.log('🏠 Tipo de roomId:', typeof roomId);
-        console.log('🏠 Longitud de roomId:', roomId ? roomId.length : 0);
+        if (isGM) {
+          console.log('🏠 Room ID obtenido (OBR.room.id):', roomId);
+          console.log('🏠 Tipo de roomId:', typeof roomId);
+          console.log('🏠 Longitud de roomId:', roomId ? roomId.length : 0);
+        }
         
         // Si no funciona, intentar con el método async
         if (!roomId) {
-          console.log('🔄 Intentando con OBR.room.getId()...');
+          if (isGM) {
+            console.log('🔄 Intentando con OBR.room.getId()...');
+          }
           roomId = await OBR.room.getId();
-          console.log('🏠 Room ID obtenido (OBR.room.getId()):', roomId);
+          if (isGM) {
+            console.log('🏠 Room ID obtenido (OBR.room.getId()):', roomId);
+          }
         }
       } catch (e) {
         console.warn('⚠️ No se pudo obtener el ID de la room:', e);
@@ -1942,7 +1999,9 @@ try {
         roomId = 'default';
       }
       
-      console.log('✅ Room ID final que se usará:', roomId);
+      if (isGM) {
+        console.log('✅ Room ID final que se usará:', roomId);
+      }
       
       // Cargar configuración desde JSON (específica para esta room)
       log('🔍 Intentando cargar configuración para room:', roomId);
@@ -1991,9 +2050,13 @@ try {
       const currentRoomCount = countContent(currentRoomConfig);
       const defaultCount = countContent(defaultConfig);
       
-      console.log('🔍 Configuración room metadata - elementos:', roomMetadataCount);
-      console.log('🔍 Configuración localStorage roomId:', roomId, '- elementos:', currentRoomCount);
-      console.log('🔍 Configuración default - elementos:', defaultCount);
+      // Solo mostrar logs de debug si es GM
+      const isGM = await getUserRole();
+      if (isGM) {
+        console.log('🔍 Configuración room metadata - elementos:', roomMetadataCount);
+        console.log('🔍 Configuración localStorage roomId:', roomId, '- elementos:', currentRoomCount);
+        console.log('🔍 Configuración default - elementos:', defaultCount);
+      }
       
       // Prioridad: room metadata > localStorage > default
       if (roomMetadataCount > 0) {
@@ -2026,8 +2089,12 @@ try {
       // Configurar listener para sincronización en tiempo real
       setupRoomMetadataListener(roomId);
 
-      console.log('📊 Configuración cargada para room:', roomId);
-      console.log('📊 Número de carpetas:', pagesConfig?.categories?.length || 0);
+      // Solo mostrar logs de debug si es GM
+      const isGMForLogs = await getUserRole();
+      if (isGMForLogs) {
+        console.log('📊 Configuración cargada para room:', roomId);
+        console.log('📊 Número de carpetas:', pagesConfig?.categories?.length || 0);
+      }
       
       const pageList = document.getElementById("page-list");
       const header = document.getElementById("header");
