@@ -408,14 +408,16 @@ async function saveToSharedCache(pageId, blocks) {
     const metadata = await OBR.room.getMetadata();
     const sharedCache = (metadata && metadata[ROOM_CONTENT_CACHE_KEY]) || {};
     
-    // Limitar el tamaño del caché compartido (máximo 5 páginas para no sobrecargar)
+    // Limitar el tamaño del caché compartido (máximo 50 entradas para páginas y bloques hijos)
     const cacheKeys = Object.keys(sharedCache);
-    if (cacheKeys.length >= 5 && !sharedCache[pageId]) {
-      // Eliminar la página más antigua
-      const oldest = cacheKeys.reduce((a, b) => 
-        (sharedCache[a].savedAt < sharedCache[b].savedAt) ? a : b
+    if (cacheKeys.length >= 50 && !sharedCache[pageId]) {
+      // Eliminar las 10 entradas más antiguas para hacer espacio
+      const sortedKeys = cacheKeys.sort((a, b) => 
+        new Date(sharedCache[a].savedAt) - new Date(sharedCache[b].savedAt)
       );
-      delete sharedCache[oldest];
+      for (let i = 0; i < 10 && i < sortedKeys.length; i++) {
+        delete sharedCache[sortedKeys[i]];
+      }
     }
     
     // Guardar el contenido
@@ -933,6 +935,17 @@ async function fetchBlockChildren(blockId, useCache = true) {
       // Usar proxy de Netlify Function para evitar CORS
       apiUrl = `/.netlify/functions/notion-api?pageId=${encodeURIComponent(blockId)}&token=${encodeURIComponent(userToken)}`;
     } else {
+      // No hay token del usuario → intentar obtener del caché compartido (room metadata)
+      try {
+        const metadata = await OBR.room.getMetadata();
+        const sharedCache = metadata && metadata[ROOM_CONTENT_CACHE_KEY];
+        if (sharedCache && sharedCache[blockId] && sharedCache[blockId].blocks) {
+          console.log('✅ Usando caché compartido para hijos del bloque:', blockId);
+          return sharedCache[blockId].blocks;
+        }
+      } catch (e) {
+        console.warn('No se pudo obtener caché compartido para hijos:', e);
+      }
       throw new Error('No token configured. Configure your Notion token in the extension (🔑 button).');
     }
     

@@ -624,7 +624,10 @@
     width: 32px;
     height: 32px;
   }
-  .page-visibility-button { z-index: 10; }
+  .page-visibility-button { 
+    z-index: 10;
+    margin-right: var(--spacing-xs);
+  }
   
   /* Mantener visible el botón cuando el menú contextual está activo */
   /* Usar !important para sobreescribir los estilos inline de opacity */
