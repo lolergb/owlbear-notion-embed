@@ -277,8 +277,12 @@
 
 .notion-content .notion-waiting-hint {
   font-size: var(--font-size-sm);
-  margin: 0;
+  margin: 0 0 var(--spacing-md) 0;
   color: var(--color-text-muted);
+}
+
+.notion-content .notion-retry-button {
+  margin-top: var(--spacing-sm);
 }
 
 /* Modo oscuro para el contenedor */

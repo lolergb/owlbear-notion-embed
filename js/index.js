@@ -474,9 +474,10 @@ async function saveHtmlToSharedCache(pageId, html) {
     await OBR.room.setMetadata({
       [ROOM_HTML_CACHE_KEY]: htmlCache
     });
-    console.log('💾 HTML renderizado guardado en caché compartido para:', pageId);
+    console.log('💾 HTML renderizado guardado en caché compartido para:', pageId, '- tamaño:', html.length, 'caracteres');
+    console.log('📦 Claves en caché HTML:', Object.keys(htmlCache));
   } catch (e) {
-    console.debug('No se pudo guardar HTML en caché compartido:', e);
+    console.error('❌ Error al guardar HTML en caché compartido:', e);
   }
 }
 
@@ -489,10 +490,12 @@ async function getHtmlFromSharedCache(pageId) {
   try {
     const metadata = await OBR.room.getMetadata();
     const htmlCache = metadata && metadata[ROOM_HTML_CACHE_KEY];
+    console.log('🔍 Buscando HTML en caché. Claves disponibles:', htmlCache ? Object.keys(htmlCache) : 'ninguna');
     if (htmlCache && htmlCache[pageId] && htmlCache[pageId].html) {
-      console.log('✅ HTML encontrado en caché compartido para:', pageId);
+      console.log('✅ HTML encontrado en caché compartido para:', pageId, '- tamaño:', htmlCache[pageId].html.length, 'caracteres');
       return htmlCache[pageId].html;
     }
+    console.log('❌ No se encontró HTML para pageId:', pageId);
   } catch (e) {
     console.debug('No se pudo leer HTML del caché compartido:', e);
   }
@@ -1801,7 +1804,7 @@ async function loadNotionContent(url, container, forceRefresh = false, blockType
     }
     
     const userToken = getUserToken();
-    const isGM = await getUserRole() === 'GM';
+    const isGM = await getUserRole();
     
     // Si el jugador no tiene token, intentar usar el HTML del caché compartido
     if (!userToken && !isGM) {
@@ -1814,14 +1817,37 @@ async function loadNotionContent(url, container, forceRefresh = false, blockType
         return;
       }
       console.log('⚠️ No hay HTML en caché compartido para esta página');
-      // Sin token y sin HTML cacheado, mostrar mensaje de espera
+      // Sin token y sin HTML cacheado, mostrar mensaje de espera con botón de reintentar
       contentDiv.innerHTML = `
         <div class="notion-waiting">
           <div class="notion-waiting-icon">⏳</div>
           <p class="notion-waiting-text">Waiting for the GM to load this content...</p>
           <p class="notion-waiting-hint">The GM needs to view this page first to make it available.</p>
+          <button class="btn btn--sm btn--secondary notion-retry-button">Retry</button>
         </div>
       `;
+      
+      // Agregar event listener al botón de reintentar
+      const retryButton = contentDiv.querySelector('.notion-retry-button');
+      if (retryButton) {
+        retryButton.addEventListener('click', async () => {
+          retryButton.disabled = true;
+          retryButton.textContent = 'Checking...';
+          // Reintentar carga
+          await loadNotionContent(url, container, false, blockTypes);
+        });
+      }
+      
+      // Suscribirse a cambios en room metadata para auto-refrescar
+      const unsubscribe = OBR.room.onMetadataChange(async (metadata) => {
+        const htmlCache = metadata && metadata[ROOM_HTML_CACHE_KEY];
+        if (htmlCache && htmlCache[pageId] && htmlCache[pageId].html) {
+          console.log('🔄 Detectado nuevo contenido en caché, recargando...');
+          unsubscribe(); // Dejar de escuchar
+          await loadNotionContent(url, container, false, blockTypes);
+        }
+      });
+      
       return;
     }
     
