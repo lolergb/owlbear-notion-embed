@@ -2219,10 +2219,13 @@ try {
         });
       });
       
-      buttonContainer.appendChild(settingsButton);
-      buttonContainer.appendChild(collapseAllButton);
-      buttonContainer.appendChild(addButton);
-      header.appendChild(buttonContainer);
+      // Solo mostrar botones de administración para GMs
+      if (isGM) {
+        buttonContainer.appendChild(settingsButton);
+        buttonContainer.appendChild(collapseAllButton);
+        buttonContainer.appendChild(addButton);
+        header.appendChild(buttonContainer);
+      }
 
       // Renderizar páginas agrupadas por carpetas
       await renderPagesByCategories(pagesConfig, pageList, roomId);
@@ -2387,29 +2390,32 @@ function renderCategory(category, parentElement, level = 0, roomId = null, categ
   contextMenuButton.appendChild(contextMenuIcon);
   contextMenuButton.title = 'Menú';
   
-  // Mostrar botones al hover
-  titleContainer.addEventListener('mouseenter', () => {
-    if (!contextMenuButton.classList.contains('context-menu-active')) {
-      contextMenuButton.style.opacity = '1';
-      categoryVisibilityButton.style.opacity = '1';
-    }
-  });
-  titleContainer.addEventListener('mouseleave', (e) => {
-    // No ocultar si el menú contextual está activo
-    if (contextMenuButton.classList.contains('context-menu-active')) {
-      return;
-    }
-    // No ocultar si el mouse está sobre los botones
-    if (!e.relatedTarget || (!e.relatedTarget.closest('.category-context-menu-button') && !e.relatedTarget.closest('.category-visibility-button') && !e.relatedTarget.closest('#context-menu'))) {
-      contextMenuButton.style.opacity = '0';
-      // Solo ocultar el botón de visibilidad si la categoría no tiene contenido visible
-      if (!isCategoryVisible) {
-        categoryVisibilityButton.style.opacity = '0';
+  // Mostrar botones al hover (solo para GMs)
+  if (isGM) {
+    titleContainer.addEventListener('mouseenter', () => {
+      if (!contextMenuButton.classList.contains('context-menu-active')) {
+        contextMenuButton.style.opacity = '1';
+        categoryVisibilityButton.style.opacity = '1';
       }
-    }
-  });
+    });
+    titleContainer.addEventListener('mouseleave', (e) => {
+      // No ocultar si el menú contextual está activo
+      if (contextMenuButton.classList.contains('context-menu-active')) {
+        return;
+      }
+      // No ocultar si el mouse está sobre los botones
+      if (!e.relatedTarget || (!e.relatedTarget.closest('.category-context-menu-button') && !e.relatedTarget.closest('.category-visibility-button') && !e.relatedTarget.closest('#context-menu'))) {
+        contextMenuButton.style.opacity = '0';
+        // Solo ocultar el botón de visibilidad si la categoría no tiene contenido visible
+        if (!isCategoryVisible) {
+          categoryVisibilityButton.style.opacity = '0';
+        }
+      }
+    });
+  }
   
-  // Menú contextual para carpetas
+  // Menú contextual para carpetas (solo para GMs)
+  if (isGM) {
   contextMenuButton.addEventListener('click', async (e) => {
     e.stopPropagation();
     const rect = contextMenuButton.getBoundingClientRect();
@@ -2494,11 +2500,15 @@ function renderCategory(category, parentElement, level = 0, roomId = null, categ
       contextMenuButton.style.opacity = '0';
     });
   });
+  } // fin de if (isGM) para menú contextual de carpetas
   
   titleContainer.appendChild(collapseButton);
   titleContainer.appendChild(categoryTitle);
-  titleContainer.appendChild(categoryVisibilityButton);
-  titleContainer.appendChild(contextMenuButton);
+  // Solo mostrar botones de administración para GMs
+  if (isGM) {
+    titleContainer.appendChild(categoryVisibilityButton);
+    titleContainer.appendChild(contextMenuButton);
+  }
   categoryDiv.appendChild(titleContainer);
   
   // Contenedor de contenido (páginas y subcarpetas)
@@ -2583,29 +2593,32 @@ function renderCategory(category, parentElement, level = 0, roomId = null, categ
       pageContextMenuButton.appendChild(pageContextMenuIcon);
       pageContextMenuButton.title = 'Menú';
       
-      // Mostrar botones al hover
-      button.addEventListener('mouseenter', () => {
-        if (!pageContextMenuButton.classList.contains('context-menu-active')) {
-          pageContextMenuButton.style.opacity = '1';
-          pageVisibilityButton.style.opacity = '1';
-        }
-      });
-      button.addEventListener('mouseleave', (e) => {
-        // No ocultar si el menú contextual está activo
-        if (pageContextMenuButton.classList.contains('context-menu-active')) {
-          return;
-        }
-        // No ocultar si el mouse está sobre los botones
-        if (!e.relatedTarget || (!e.relatedTarget.closest('.page-context-menu-button') && !e.relatedTarget.closest('.page-visibility-button') && !e.relatedTarget.closest('#context-menu'))) {
-          pageContextMenuButton.style.opacity = '0';
-          // Solo ocultar el botón de visibilidad si la página no está visible para jugadores
-          if (!isPageVisible) {
-            pageVisibilityButton.style.opacity = '0';
+      // Mostrar botones al hover (solo para GMs)
+      if (isGM) {
+        button.addEventListener('mouseenter', () => {
+          if (!pageContextMenuButton.classList.contains('context-menu-active')) {
+            pageContextMenuButton.style.opacity = '1';
+            pageVisibilityButton.style.opacity = '1';
           }
-        }
-      });
+        });
+        button.addEventListener('mouseleave', (e) => {
+          // No ocultar si el menú contextual está activo
+          if (pageContextMenuButton.classList.contains('context-menu-active')) {
+            return;
+          }
+          // No ocultar si el mouse está sobre los botones
+          if (!e.relatedTarget || (!e.relatedTarget.closest('.page-context-menu-button') && !e.relatedTarget.closest('.page-visibility-button') && !e.relatedTarget.closest('#context-menu'))) {
+            pageContextMenuButton.style.opacity = '0';
+            // Solo ocultar el botón de visibilidad si la página no está visible para jugadores
+            if (!isPageVisible) {
+              pageVisibilityButton.style.opacity = '0';
+            }
+          }
+        });
+      }
       
-      // Menú contextual para páginas
+      // Menú contextual para páginas (solo para GMs)
+      if (isGM) {
       pageContextMenuButton.addEventListener('click', async (e) => {
         e.stopPropagation();
         const rect = pageContextMenuButton.getBoundingClientRect();
@@ -2675,6 +2688,7 @@ function renderCategory(category, parentElement, level = 0, roomId = null, categ
           pageContextMenuButton.style.opacity = '0';
         });
       });
+      } // fin de if (isGM) para menú contextual de páginas
       
       button.innerHTML = `
         <div class="page-button-inner">
@@ -2683,8 +2697,11 @@ function renderCategory(category, parentElement, level = 0, roomId = null, categ
           ${linkIconHtml}
         </div>
       `;
-      button.appendChild(pageVisibilityButton);
-      button.appendChild(pageContextMenuButton);
+      // Solo mostrar botones de administración para GMs
+      if (isGM) {
+        button.appendChild(pageVisibilityButton);
+        button.appendChild(pageContextMenuButton);
+      }
       
       // Hover effect
       button.addEventListener('mouseenter', () => {
