@@ -1814,6 +1814,15 @@ async function loadNotionContent(url, container, forceRefresh = false, blockType
         return;
       }
       console.log('⚠️ No hay HTML en caché compartido para esta página');
+      // Sin token y sin HTML cacheado, mostrar mensaje de espera
+      contentDiv.innerHTML = `
+        <div class="notion-waiting">
+          <div class="notion-waiting-icon">⏳</div>
+          <p class="notion-waiting-text">Waiting for the GM to load this content...</p>
+          <p class="notion-waiting-hint">The GM needs to view this page first to make it available.</p>
+        </div>
+      `;
+      return;
     }
     
     console.log('Obteniendo bloques para página:', pageId, forceRefresh ? '(recarga forzada - sin caché)' : '(con caché)');
