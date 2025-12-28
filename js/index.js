@@ -3297,6 +3297,38 @@ async function deletePageFromPageList(page, pageCategoryPath, roomId) {
   }
 }
 
+// Función para encontrar una página en la configuración y devolver su path
+function findPageInConfig(config, pageUrl, pageName) {
+  function searchRecursive(categories, currentPath = []) {
+    for (let i = 0; i < categories.length; i++) {
+      const category = categories[i];
+      const categoryPath = [...currentPath, 'categories', i];
+      
+      // Buscar en las páginas de esta categoría
+      if (category.pages && Array.isArray(category.pages)) {
+        for (let j = 0; j < category.pages.length; j++) {
+          const page = category.pages[j];
+          if (page.url === pageUrl && page.name === pageName) {
+            return { page, pageCategoryPath: categoryPath };
+          }
+        }
+      }
+      
+      // Buscar recursivamente en subcategorías
+      if (category.categories && Array.isArray(category.categories)) {
+        const result = searchRecursive(category.categories, categoryPath);
+        if (result) return result;
+      }
+    }
+    return null;
+  }
+  
+  if (config && config.categories && Array.isArray(config.categories)) {
+    return searchRecursive(config.categories);
+  }
+  return null;
+}
+
 // Función para alternar la visibilidad de una página para jugadores
 async function togglePageVisibility(page, pageCategoryPath, roomId) {
   try {
@@ -4207,6 +4239,83 @@ async function loadPageContent(url, name, selector = null, blockTypes = null) {
     backButton.classList.remove("hidden");
     pageTitle.textContent = name;
     
+    // Agregar botón de visibilidad para GMs
+    let visibilityButton = document.getElementById("page-visibility-button-header");
+    let isGM = true;
+    try {
+      const role = await OBR.player.getRole();
+      isGM = role === 'GM';
+    } catch (e) {
+      console.warn('No se pudo verificar el rol, asumiendo GM:', e);
+    }
+    
+    if (isGM) {
+      // Buscar la página en la configuración
+      let roomId = null;
+      try {
+        roomId = OBR.room.id || await OBR.room.getId();
+      } catch (e) {
+        console.warn('No se pudo obtener roomId:', e);
+      }
+      
+      const config = getPagesJSON(roomId) || await getDefaultJSON();
+      const pageInfo = findPageInConfig(config, url, name);
+      
+      if (pageInfo) {
+        if (!visibilityButton) {
+          visibilityButton = document.createElement("button");
+          visibilityButton.id = "page-visibility-button-header";
+          visibilityButton.className = "page-visibility-button icon-button";
+          header.appendChild(visibilityButton);
+        }
+        
+        const isPageVisible = pageInfo.page.visibleToPlayers === true;
+        visibilityButton.innerHTML = "";
+        const visibilityIcon = document.createElement("img");
+        visibilityIcon.src = isPageVisible ? 'img/icon-eye-open.svg' : 'img/icon-eye-close.svg';
+        visibilityIcon.className = 'icon-button-icon';
+        visibilityButton.appendChild(visibilityIcon);
+        visibilityButton.title = isPageVisible ? 'Visible to players (click to hide)' : 'Hidden from players (click to show)';
+        
+        // Remover listeners anteriores
+        const newVisibilityButton = visibilityButton.cloneNode(true);
+        visibilityButton.parentNode.replaceChild(newVisibilityButton, visibilityButton);
+        visibilityButton = newVisibilityButton;
+        visibilityButton.id = "page-visibility-button-header";
+        visibilityButton.className = "page-visibility-button icon-button";
+        
+        // Agregar listener
+        visibilityButton.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          await togglePageVisibility(pageInfo.page, pageInfo.pageCategoryPath, roomId);
+          
+          // Actualizar el botón después del toggle
+          const updatedConfig = getPagesJSON(roomId) || await getDefaultJSON();
+          const updatedPageInfo = findPageInConfig(updatedConfig, url, name);
+          if (updatedPageInfo) {
+            const isNowVisible = updatedPageInfo.page.visibleToPlayers === true;
+            const icon = visibilityButton.querySelector('img');
+            if (icon) {
+              icon.src = isNowVisible ? 'img/icon-eye-open.svg' : 'img/icon-eye-close.svg';
+            }
+            visibilityButton.title = isNowVisible ? 'Visible to players (click to hide)' : 'Hidden from players (click to show)';
+          }
+        });
+        
+        visibilityButton.classList.remove("hidden");
+      } else {
+        // Si no se encuentra la página, ocultar el botón
+        if (visibilityButton) {
+          visibilityButton.classList.add("hidden");
+        }
+      }
+    } else {
+      // Si no es GM, ocultar el botón
+      if (visibilityButton) {
+        visibilityButton.classList.add("hidden");
+      }
+    }
+    
     // Detectar si es una URL de Notion o una URL genérica
     if (isNotionUrl(url)) {
       // Es una URL de Notion → usar la API
@@ -4363,6 +4472,11 @@ async function loadPageContent(url, name, selector = null, blockTypes = null) {
         if (refreshButton) {
           refreshButton.classList.add("hidden");
           }
+        // Ocultar botón de visibilidad
+        const visibilityButton = document.getElementById("page-visibility-button-header");
+        if (visibilityButton) {
+          visibilityButton.classList.add("hidden");
+        }
         }
         
         // Restaurar vista principal

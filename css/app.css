@@ -964,7 +964,8 @@
   /* ==========================================================================
       Refresh Button
       ========================================================================== */
-  #refresh-page-button {
+  #refresh-page-button,
+  #page-visibility-button-header {
     background: transparent;
     border: none;
     border-radius: var(--radius-full);
@@ -979,11 +980,13 @@
     margin-left: var(--spacing-sm);
   }
   
-  #refresh-page-button:hover {
+  #refresh-page-button:hover,
+  #page-visibility-button-header:hover {
     background: var(--color-bg-hover);
   }
   
-  #refresh-page-button:active {
+  #refresh-page-button:active,
+  #page-visibility-button-header:active {
     background: var(--color-bg-active);
   }
   
