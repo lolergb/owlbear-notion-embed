@@ -1,9 +1,9 @@
 {
   "name": "DM screen",
-  "version": "2.0.1",
+  "version": "1.0.0",
   "manifest_version": 1,
-  "author": "Lole",
-  "description": "DM screen para organizar tu homebrew en Owlbear Rodeo",
+  "author": "@lolergb",
+  "description": "A digital DM screen for Owlbear Rodeo. Keep your notes, NPCs, and references inside the VTT and reveal information when it matters.",
   "homepage_url": "https://github.com/lolergb/owlbear-notion-embed",
   "icon": "/icon.svg",
   "action": {
