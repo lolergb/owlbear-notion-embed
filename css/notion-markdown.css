@@ -16,6 +16,35 @@
   font-family: var(--font-family-base);
 }
 
+/* Cover de página de Notion */
+.notion-page-cover {
+  width: 100%;
+  max-width: 100%;
+  margin: calc(var(--spacing-xl) * -1) calc(var(--spacing-xl) * -1) var(--spacing-xl);
+  margin-top: calc(var(--spacing-xl) * -1);
+  overflow: hidden;
+  border-radius: 0;
+}
+
+.notion-cover-image {
+  width: 100%;
+  height: auto;
+  display: block;
+  object-fit: cover;
+  max-height: 400px;
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+}
+
+.notion-cover-image:hover {
+  opacity: 0.9;
+}
+
+/* Ajustar padding del contenido cuando hay cover */
+.notion-content:has(.notion-page-cover) {
+  padding-top: var(--spacing-xl);
+}
+
 .notion-content h1 {
   font-size: calc(var(--font-size-xl) * 1.4);
   font-weight: var(--font-weight-bold);

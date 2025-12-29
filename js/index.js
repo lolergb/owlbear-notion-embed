@@ -709,6 +709,67 @@ function renderPageIcon(icon, pageName, pageId) {
 }
 
 // Función para obtener bloques de una página de Notion (con caché persistente)
+/**
+ * Obtener información de la página de Notion (incluyendo cover)
+ */
+async function fetchNotionPageInfo(pageId) {
+  try {
+    const userToken = getUserToken();
+    if (!userToken) {
+      return null;
+    }
+    
+    const apiUrl = `/.netlify/functions/notion-api?pageId=${encodeURIComponent(pageId)}&type=page&token=${encodeURIComponent(userToken)}`;
+    
+    const response = await fetch(apiUrl, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    if (!response.ok) {
+      console.warn('No se pudo obtener información de la página:', response.status);
+      return null;
+    }
+    
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.warn('Error al obtener información de la página:', error);
+    return null;
+  }
+}
+
+/**
+ * Renderizar el cover de una página de Notion
+ */
+function renderPageCover(cover) {
+  if (!cover) return '';
+  
+  let coverUrl = '';
+  
+  // El cover puede ser external (URL) o file (archivo de Notion)
+  if (cover.type === 'external' && cover.external && cover.external.url) {
+    coverUrl = cover.external.url;
+  } else if (cover.type === 'file' && cover.file && cover.file.url) {
+    coverUrl = cover.file.url;
+  }
+  
+  if (!coverUrl) return '';
+  
+  // Hacer la URL absoluta si es relativa
+  if (coverUrl.startsWith('/')) {
+    coverUrl = 'https://www.notion.so' + coverUrl;
+  }
+  
+  return `
+    <div class="notion-page-cover">
+      <img src="${coverUrl}" alt="Page cover" class="notion-cover-image" data-image-url="${coverUrl}" />
+    </div>
+  `;
+}
+
 async function fetchNotionBlocks(pageId, useCache = true) {
   // Estado 2: Si tengo info en caché y se permite usar caché, devolverla sin pedir a la API
   if (useCache) {
@@ -1760,7 +1821,8 @@ window.refreshImage = function(button) {
 
 // Agregar event listeners a las imágenes después de renderizar
 function attachImageClickHandlers() {
-  const images = document.querySelectorAll('.notion-image-clickable');
+  // Manejar imágenes normales y cover
+  const images = document.querySelectorAll('.notion-image-clickable, .notion-cover-image');
   images.forEach(img => {
     // Click handler para abrir modal
     img.addEventListener('click', () => {
@@ -1882,11 +1944,25 @@ async function loadNotionContent(url, container, forceRefresh = false, blockType
       return;
     }
     
+    // Obtener información de la página (incluyendo cover) si es una URL de Notion
+    let pageCover = null;
+    if (url.includes('notion.so') || url.includes('notion.site')) {
+      const pageInfo = await fetchNotionPageInfo(pageId);
+      if (pageInfo && pageInfo.cover) {
+        pageCover = pageInfo.cover;
+      }
+    }
+    
     // Renderizar bloques (ahora es async)
     // El filtrado por blockTypes se hace dentro de renderBlocks para mantener bloques con hijos
     // Si es recarga forzada, no usar caché para los hijos
     const useCacheForChildren = !forceRefresh;
-    const html = await renderBlocks(blocks, blockTypes, 0, useCacheForChildren);
+    const blocksHtml = await renderBlocks(blocks, blockTypes, 0, useCacheForChildren);
+    
+    // Agregar el cover al inicio si existe
+    const coverHtml = renderPageCover(pageCover);
+    const html = coverHtml + blocksHtml;
+    
     contentDiv.innerHTML = html;
     
     // Si es GM, guardar el HTML renderizado en caché local para responder a jugadores
