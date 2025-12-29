@@ -1479,6 +1479,7 @@ async function renderToggleHeading(toggleHeadingBlock, headingLevel, blockTypes 
 }
 
 // Función para renderizar todas las columnas de una column_list
+// Devuelve un objeto con { html, siblingColumnsCount }
 async function renderColumnList(columnListBlock, allBlocks, currentIndex, blockTypes = null, headingLevelOffset = 0, useCache = true) {
   console.log('📐 Renderizando column_list:', columnListBlock.id, {
     hasChildren: columnListBlock.has_children,
@@ -1487,6 +1488,7 @@ async function renderColumnList(columnListBlock, allBlocks, currentIndex, blockT
   });
   
   let columns = [];
+  let columnsFoundAsSiblings = false;
   
   // Opción 1: Las columnas son hijos del column_list (más común)
   if (columnListBlock.has_children) {
@@ -1511,12 +1513,13 @@ async function renderColumnList(columnListBlock, allBlocks, currentIndex, blockT
         break;
       }
     }
+    columnsFoundAsSiblings = true;
     console.log(`  📐 Columnas encontradas como hermanos: ${columns.length}`);
   }
   
   if (columns.length === 0) {
     console.warn('  ⚠️ No se encontraron columnas para el column_list');
-    return '<div class="notion-column-list">[Sin columnas]</div>';
+    return { html: '<div class="notion-column-list">[Sin columnas]</div>', siblingColumnsCount: 0 };
   }
   
   console.log(`  ✅ Total de columnas encontradas: ${columns.length}`);
@@ -1557,10 +1560,13 @@ async function renderColumnList(columnListBlock, allBlocks, currentIndex, blockT
   
   // Si hay un filtro activo y no hay columnas con contenido, no mostrar el column_list
   if (blockTypes && validColumnHtmls.length === 0) {
-    return '';
+    return { html: '', siblingColumnsCount: columnsFoundAsSiblings ? columns.length : 0 };
   }
   
-  return `<div class="notion-column-list">${validColumnHtmls.join('')}</div>`;
+  return {
+    html: `<div class="notion-column-list">${validColumnHtmls.join('')}</div>`,
+    siblingColumnsCount: columnsFoundAsSiblings ? columns.length : 0
+  };
 }
 
 // Función para renderizar todos los bloques
@@ -1605,33 +1611,30 @@ async function renderBlocks(blocks, blockTypes = null, headingLevelOffset = 0, u
     // Manejar column_list de forma especial (debe procesarse antes que otros bloques)
     if (type === 'column_list') {
       try {
-        const columnListHtml = await renderColumnList(block, filteredBlocks, index, blockTypes, headingLevelOffset, useCache);
-        // Solo agregar al HTML si hay contenido (renderColumnList devuelve '' si no hay contenido filtrado)
-        if (columnListHtml.trim()) {
-          html += columnListHtml;
-          // Saltar las columnas que ya procesamos
-          let skipCount = 0;
-          for (let j = index + 1; j < filteredBlocks.length; j++) {
-            if (filteredBlocks[j].type === 'column') {
-              skipCount++;
-            } else {
-              break;
-            }
-          }
-          index += skipCount; // El for loop incrementará index después, así que esto está bien
-          console.log(`    ✅ Column_list renderizado (${skipCount} columnas)`);
+        const result = await renderColumnList(block, filteredBlocks, index, blockTypes, headingLevelOffset, useCache);
+        // Solo agregar al HTML si hay contenido
+        if (result.html.trim()) {
+          html += result.html;
+          console.log(`    ✅ Column_list renderizado`);
         } else {
           console.log(`    ⏭️ Column_list filtrado, sin contenido que mostrar`);
-          // Saltar las columnas de todas formas
+        }
+        
+        // Saltar las columnas hermanas que ya procesamos (solo si fueron encontradas como hermanas)
+        if (result.siblingColumnsCount > 0) {
+          // Verificar que las columnas hermanas estén realmente en filteredBlocks
           let skipCount = 0;
-          for (let j = index + 1; j < filteredBlocks.length; j++) {
+          for (let j = index + 1; j < filteredBlocks.length && skipCount < result.siblingColumnsCount; j++) {
             if (filteredBlocks[j].type === 'column') {
               skipCount++;
             } else {
               break;
             }
           }
-          index += skipCount;
+          if (skipCount > 0) {
+            index += skipCount; // El for loop incrementará index después, así que esto está bien
+            console.log(`    ⏭️ Saltadas ${skipCount} columnas hermanas`);
+          }
         }
         continue;
       } catch (error) {
@@ -2259,7 +2262,7 @@ async function attachImageClickHandlers() {
         
         // Feedback visual
         const originalContent = button.innerHTML;
-        button.innerHTML = '<img src="img/icon-users.svg" alt="Shared" style="opacity: 0.5;" />';
+        button.innerHTML = '<img src="img/icon-players.svg" alt="Shared" style="opacity: 0.5;" />';
         button.disabled = true;
         setTimeout(() => {
           button.innerHTML = originalContent;
