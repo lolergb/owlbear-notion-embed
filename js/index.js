@@ -1938,7 +1938,7 @@ async function attachImageClickHandlers() {
     img.addEventListener('error', function() {
       this.style.display = 'none';
       const errorDiv = document.createElement('div');
-      errorDiv.className = 'empty-state';
+      errorDiv.className = 'empty-state notion-image-error';
       errorDiv.innerHTML = `
         <div class="empty-state-icon">⚠️</div>
         <p class="empty-state-text">Could not load image</p>

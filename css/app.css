@@ -910,12 +910,10 @@
   }
   
   .notion-image-error {
-    padding: 20px;
+    padding: var(--spacing-lg);
     text-align: center;
-    color: var(--color-text-muted);
-    background: #f5f5f5;
+    background: var(--color-bg-overlay);
     border-radius: var(--radius-sm);
-    margin: 10px 0;
   }
   
   /* .notion-image-error-button eliminado - usa .btn .btn--sm .btn--primary */
