@@ -2992,14 +2992,16 @@ function renderCategory(category, parentElement, level = 0, roomId = null, categ
       const isNotion = isNotionUrl(page.url);
       const isDndbeyondUrl = isDndbeyond(page.url);
       
-      // Determinar icono de tipo de link
+      // Determinar icono de tipo de link usando getPageIcon para detectar PDFs y otros tipos
       let linkIconHtml = '';
       if (isNotion) {
         linkIconHtml = '<img src="img/icon-notion.svg" alt="Notion" class="page-link-icon">';
       } else if (isDndbeyondUrl) {
         linkIconHtml = '<img src="img/icon-dnd.svg" alt="D&D Beyond" class="page-link-icon">';
       } else {
-        linkIconHtml = '<img src="img/icon-link.svg" alt="Link" class="page-link-icon">';
+        // Usar getPageIcon para detectar PDFs, imágenes, etc.
+        const pageIconInfo = getPageIcon(page.url);
+        linkIconHtml = `<img src="img/${pageIconInfo.icon}" alt="${pageIconInfo.type}" class="page-link-icon">`;
       }
       
       const button = document.createElement('button');
