@@ -161,21 +161,29 @@
   position: absolute;
   top: var(--spacing-sm);
   right: var(--spacing-sm);
-  background: rgba(0, 0, 0, 0.7);
-  border: none;
+  background: rgba(0, 0, 0, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: var(--radius-sm);
   padding: var(--spacing-xs);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  opacity: 0;
-  transition: opacity var(--transition-normal);
+  opacity: 0.6;
+  transition: opacity var(--transition-normal), background var(--transition-normal);
   z-index: 10;
+  min-width: 32px;
+  min-height: 32px;
 }
 
-.notion-content .notion-image-container:hover .notion-image-share-button {
+.notion-content .notion-image-container:hover .notion-image-share-button,
+.notion-content .notion-image-share-button:hover {
   opacity: 1;
+}
+
+.notion-content .notion-image-share-button:hover {
+  background: rgba(0, 0, 0, 0.95);
+  border-color: rgba(255, 255, 255, 0.4);
 }
 
 .notion-content .notion-image-share-button:hover {

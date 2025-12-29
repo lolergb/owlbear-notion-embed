@@ -1962,12 +1962,16 @@ async function attachImageClickHandlers() {
   // Manejar botones de compartir imágenes (solo para GMs)
   const isGM = await getUserRole();
   const shareButtons = document.querySelectorAll('.notion-image-share-button');
+  console.log('🔍 Botones de compartir encontrados:', shareButtons.length, 'isGM:', isGM);
   shareButtons.forEach(button => {
     // Ocultar botón para jugadores
     if (!isGM) {
       button.style.display = 'none';
       return;
     }
+    
+    // Asegurarse de que el botón sea visible para GMs (aunque con opacity 0 hasta hover)
+    button.style.display = 'flex';
     
     // Click handler para compartir imagen
     button.addEventListener('click', async (e) => {
@@ -2825,7 +2829,7 @@ function renderCategory(category, parentElement, level = 0, roomId = null, categ
     titleContainer.addEventListener('mouseenter', () => {
       if (!contextMenuButton.classList.contains('context-menu-active')) {
         contextMenuButton.style.opacity = '1';
-        categoryVisibilityButton.style.opacity = '1';
+        // categoryVisibilityButton.style.opacity = '1'; // Temporalmente oculto
       }
     });
     titleContainer.addEventListener('mouseleave', (e) => {
@@ -2837,9 +2841,10 @@ function renderCategory(category, parentElement, level = 0, roomId = null, categ
       if (!e.relatedTarget || (!e.relatedTarget.closest('.category-context-menu-button') && !e.relatedTarget.closest('.category-visibility-button') && !e.relatedTarget.closest('#context-menu'))) {
         contextMenuButton.style.opacity = '0';
         // Solo ocultar el botón de visibilidad si la categoría no tiene contenido visible
-        if (!isCategoryVisible) {
-          categoryVisibilityButton.style.opacity = '0';
-        }
+        // Temporalmente oculto
+        // if (!isCategoryVisible) {
+        //   categoryVisibilityButton.style.opacity = '0';
+        // }
       }
     });
   }
@@ -2943,7 +2948,8 @@ function renderCategory(category, parentElement, level = 0, roomId = null, categ
   titleContainer.appendChild(categoryTitle);
   // Solo mostrar botones de administración para GMs
   if (isGM) {
-    titleContainer.appendChild(categoryVisibilityButton);
+    // Botón de visibilidad temporalmente oculto
+    // titleContainer.appendChild(categoryVisibilityButton);
     titleContainer.appendChild(contextMenuButton);
   }
   categoryDiv.appendChild(titleContainer);
