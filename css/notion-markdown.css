@@ -65,7 +65,7 @@
 .notion-content h1 {
   font-size: calc(var(--font-size-xl) * 1.4);
   font-weight: var(--font-weight-bold);
-  margin-top: calc(var(--spacing-xl) * 2);
+  margin-top: var(--spacing-xl);
   margin-bottom: var(--spacing-md);
   line-height: 1.2;
 }

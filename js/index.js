@@ -849,7 +849,7 @@ function renderPageCoverAndTitle(cover, pageTitle) {
                     data-image-url="${coverUrl}" 
                     data-image-caption=""
                     title="Show to players">
-              <img src="img/icon-eye-open.svg" alt="Share" />
+              <img src="img/icon-players.svg" alt="Share" />
             </button>
           </div>
         </div>
