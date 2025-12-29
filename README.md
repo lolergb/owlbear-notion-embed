@@ -324,7 +324,3 @@ When reporting a bug, please include:
 - **Browser/OS:** Your browser and operating system
 - **Console errors:** Any errors visible in the browser console (F12)
 - **Extension version:** Check the version in manifest.json
-
-## 📄 License
-
-Personal use - Feel free to modify and use as you wish.
