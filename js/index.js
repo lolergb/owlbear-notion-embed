@@ -3778,7 +3778,7 @@ async function editPageFromPageList(page, pageCategoryPath, roomId) {
   }
   
   fields.push(
-    { name: 'selector', label: 'Selector (optional)', type: 'text', value: page.selector || '', placeholder: '#main-content', help: 'Only for external URLs' },
+    // { name: 'selector', label: 'Selector (optional)', type: 'text', value: page.selector || '', placeholder: '#main-content', help: 'Only for external URLs' }, // Temporalmente oculto
     { name: 'blockTypes', label: 'Block types (optional)', type: 'text', value: Array.isArray(page.blockTypes) ? page.blockTypes.join(', ') : (page.blockTypes || ''), placeholder: 'quote, callout', help: 'Only for Notion URLs. E.g: "quote" or "quote,callout"' },
     { name: 'visibleToPlayers', label: 'Visible to all players', type: 'checkbox', value: page.visibleToPlayers === true, help: 'Allow all players to see this page' }
   );
@@ -4242,7 +4242,7 @@ async function addPageToPageListWithCategorySelector(defaultCategoryPath, roomId
   }
   
   fields.push(
-    { name: 'selector', label: 'Selector (optional)', type: 'text', placeholder: '#main-content', help: 'Only for external URLs' },
+    // { name: 'selector', label: 'Selector (optional)', type: 'text', placeholder: '#main-content', help: 'Only for external URLs' }, // Temporalmente oculto
     { name: 'blockTypes', label: 'Block types (optional)', type: 'text', placeholder: 'quote, callout', help: 'Only for Notion URLs. E.g: "quote" or "quote,callout"' },
     { name: 'visibleToPlayers', label: 'Visible to all players', type: 'checkbox', value: false, help: 'Allow all players to see this page' }
   );
@@ -4325,7 +4325,7 @@ async function addPageToPageListSimple(categoryPath, roomId) {
     [
       { name: 'name', label: 'Name', type: 'text', required: true, placeholder: 'Page name' },
       { name: 'url', label: 'URL', type: 'url', required: true, placeholder: 'https://...' },
-      { name: 'selector', label: 'Selector (opcional)', type: 'text', placeholder: '#main-content', help: 'Solo para URLs externas' },
+      // { name: 'selector', label: 'Selector (opcional)', type: 'text', placeholder: '#main-content', help: 'Solo para URLs externas' }, // Temporalmente oculto
       { name: 'blockTypes', label: 'Tipos de bloques (opcional)', type: 'text', placeholder: 'quote, callout', help: 'Solo para URLs de Notion. Ej: "quote" o "quote,callout"' },
       { name: 'visibleToPlayers', label: 'Visible to all players', type: 'checkbox', value: false, help: 'Allow all players to see this page' }
     ],
@@ -6403,7 +6403,7 @@ async function showVisualEditor(pagesConfig, roomId = null) {
       [
         { name: 'name', label: 'Name', type: 'text', required: true, placeholder: 'Page name' },
         { name: 'url', label: 'URL', type: 'url', required: true, placeholder: 'https://...' },
-        { name: 'selector', label: 'Selector (opcional)', type: 'text', placeholder: '#main-content', help: 'Solo para URLs externas' },
+        // { name: 'selector', label: 'Selector (opcional)', type: 'text', placeholder: '#main-content', help: 'Solo para URLs externas' }, // Temporalmente oculto
         { name: 'blockTypes', label: 'Tipos de bloques (opcional)', type: 'text', placeholder: 'quote, callout', help: 'Solo para URLs de Notion. Ej: "quote" o "quote,callout"' },
         { name: 'visibleToPlayers', label: 'Visible to all players', type: 'checkbox', value: false, help: 'Allow all players to see this page' }
       ],
@@ -6470,7 +6470,7 @@ async function showVisualEditor(pagesConfig, roomId = null) {
       [
         { name: 'name', label: 'Nombre', type: 'text', required: true, value: page.name },
         { name: 'url', label: 'URL', type: 'url', required: true, value: page.url },
-        { name: 'selector', label: 'Selector (optional)', type: 'text', value: page.selector || '', help: 'Only for external URLs' },
+        // { name: 'selector', label: 'Selector (optional)', type: 'text', value: page.selector || '', help: 'Only for external URLs' }, // Temporalmente oculto
         { name: 'blockTypes', label: 'Block types (optional)', type: 'text', value: Array.isArray(page.blockTypes) ? page.blockTypes.join(', ') : (page.blockTypes || ''), help: 'Only for Notion URLs' },
         { name: 'visibleToPlayers', label: 'Visible to all players', type: 'checkbox', value: page.visibleToPlayers === true, help: 'Allow all players to see this page' }
       ],
