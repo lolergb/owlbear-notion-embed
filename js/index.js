@@ -5241,6 +5241,32 @@ function isDemoHtmlFile(url) {
   return url.includes('/content-demo/') && url.endsWith('.html');
 }
 
+// Función para obtener la URL base de la app (para resolver URLs relativas correctamente)
+function getAppBaseUrl() {
+  // Usar el origen de la ventana actual, o la URL de Netlify como fallback
+  const currentOrigin = window.location.origin;
+  // Si estamos en localhost, usar el origen actual
+  if (currentOrigin.includes('localhost') || currentOrigin.includes('127.0.0.1')) {
+    return currentOrigin;
+  }
+  // Si estamos en Netlify o cualquier otro dominio de la app
+  if (currentOrigin.includes('owlbear-gm-vault.netlify.app')) {
+    return currentOrigin;
+  }
+  // Si estamos en un iframe (como dentro de Owlbear), usar la URL de Netlify
+  return 'https://owlbear-gm-vault.netlify.app';
+}
+
+// Función para resolver una URL relativa a una URL absoluta de la app
+function resolveAppUrl(url) {
+  if (!url || typeof url !== 'string') return url;
+  // Si ya es una URL absoluta, retornarla tal cual
+  if (url.match(/^https?:\/\//i)) return url;
+  // Si es una URL relativa, resolverla con la base de la app
+  const baseUrl = getAppBaseUrl();
+  return new URL(url, baseUrl).toString();
+}
+
 // Función para cargar contenido HTML de demo directamente en el contenedor de Notion
 async function loadDemoHtmlContent(url, container) {
   const contentDiv = container.querySelector('#notion-content');
@@ -5267,8 +5293,12 @@ async function loadDemoHtmlContent(url, container) {
   container.classList.add('show-content');
   
   try {
+    // Resolver la URL relativa a absoluta
+    const absoluteUrl = resolveAppUrl(url);
+    console.log('📄 Cargando demo HTML desde:', absoluteUrl);
+    
     // Obtener el HTML del archivo
-    const response = await fetch(url);
+    const response = await fetch(absoluteUrl);
     if (!response.ok) {
       throw new Error(`Error loading demo HTML: ${response.status}`);
     }
