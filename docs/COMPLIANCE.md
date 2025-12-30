@@ -258,7 +258,7 @@ This document verifies that the extension meets all Owlbear Rodeo extension requ
 **Status:** ⚠️ **REQUIRES VERIFICATION**
 
 **Current Setup:**
-- Manifest URL example: `https://owlbear-dm-panel.netlify.app/manifest.json`
+- Manifest URL example: `https://owlbear-gm-vault.netlify.app/manifest.json`
 - Hosted on Netlify (custom domain possible)
 - Developer controls the domain and hosting
 

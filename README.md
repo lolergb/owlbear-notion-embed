@@ -1,4 +1,4 @@
-# 📚 DM panel for Owlbear Rodeo
+# 📚 GM vault for Owlbear Rodeo
 
 This is an [Owlbear Rodeo](https://www.owlbear.rodeo/) extension that allows you to embed Notion pages and external content directly in Owlbear Rodeo. It lets you share character sheets, additional documentation, and more with players, providing quick access to vital information and resources for everyone involved.
 
@@ -30,14 +30,14 @@ This is an [Owlbear Rodeo](https://www.owlbear.rodeo/) extension that allows you
 The extension can be installed manually by pasting the manifest URL below in the "Add Extension" dialog.
 
 ```
-https://owlbear-dm-panel.netlify.app/manifest.json
+https://owlbear-gm-vault.netlify.app/manifest.json
 ```
 
 Or use the URL provided by the extension developer.
 
-> **Official builds:** Only manifests served from `owlbear-dm-panel.netlify.app` are official.
+> **Official builds:** Only manifests served from `owlbear-gm-vault.netlify.app` are official.
 
-## 📖 How to use DM panel
+## 📖 How to use GM vault
 
 > 💡 **New to the extension?** Check out the [complete UI features guide](docs/USER_FEATURES.md) for a detailed explanation of all buttons, menus, and functionality.
 
@@ -244,7 +244,7 @@ You can link pages directly to tokens/characters in the scene:
 - View pages that the GM hasn't marked as visible
 
 **Empty state:**
-- If the GM hasn't shared any content, you'll see: "No shared pages - The DM hasn't shared any pages with you yet"
+- If the GM hasn't shared any content, you'll see: "No shared pages - The GM hasn't shared any pages with you yet"
 
 ### Supported content
 

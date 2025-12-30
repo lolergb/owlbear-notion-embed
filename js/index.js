@@ -366,7 +366,7 @@ function setupRoomMetadataListener(roomId) {
 async function getDefaultJSON() {
   try {
     // Intentar cargar desde URL pública de Netlify
-    const response = await fetch('https://owlbear-dm-panel.netlify.app/public/default-config.json');
+    const response = await fetch('https://owlbear-gm-vault.netlify.app/public/default-config.json');
     if (response.ok) {
       const config = await response.json();
       log('✅ Configuración por defecto cargada desde default-config.json');
@@ -4610,7 +4610,7 @@ async function renderPagesByCategories(pagesConfig, pageList, roomId = null) {
         emptyState.innerHTML = `
           <div class="empty-state-icon">📄</div>
           <p class="empty-state-text">No shared pages</p>
-          <p class="empty-state-hint">The DM hasn't shared any pages with you yet</p>
+          <p class="empty-state-hint">The GM hasn't shared any pages with you yet</p>
         `;
         pageList.appendChild(emptyState);
       }
@@ -5628,7 +5628,7 @@ async function loadPageContent(url, name, selector = null, blockTypes = null) {
         // Restaurar vista principal
         pageList.classList.remove("hidden");
         backButton.classList.add("hidden");
-        pageTitle.textContent = "DM panel";
+        pageTitle.textContent = "GM vault";
         // Mostrar el button-container cuando se vuelve a la vista principal
         const buttonContainer = document.querySelector('.button-container');
         if (buttonContainer) {
@@ -5710,7 +5710,7 @@ async function showSettings() {
       // Restaurar vista principal
       if (pageList) pageList.classList.remove("hidden");
       if (backButton) backButton.classList.add("hidden");
-      if (pageTitle) pageTitle.textContent = "DM panel";
+      if (pageTitle) pageTitle.textContent = "GM vault";
       // Mostrar el button-container cuando se vuelve a la vista principal
       const buttonContainer = document.querySelector('.button-container');
       if (buttonContainer) {
@@ -5767,7 +5767,7 @@ async function showSettings() {
     if (settingsContainer) settingsContainer.classList.add('hidden');
     if (pageList) pageList.classList.remove('hidden');
     if (backButton) backButton.classList.add('hidden');
-    if (pageTitle) pageTitle.textContent = 'DM panel';
+    if (pageTitle) pageTitle.textContent = 'GM vault';
     // Mostrar el button-container cuando se vuelve a la vista principal
     const buttonContainer = document.querySelector('.button-container');
     if (buttonContainer) {

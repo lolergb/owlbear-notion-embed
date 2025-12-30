@@ -5,7 +5,7 @@ This guide is for developers who want to contribute, fork, or deploy their own v
 ## 📦 Project Structure
 
 ```
-owlbear-dm-panel/
+owlbear-gm-vault/
 ├── manifest.json              # Extension configuration
 ├── index.html                 # User interface
 ├── js/
