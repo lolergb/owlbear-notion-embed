@@ -2,7 +2,7 @@
 title: DM Panel
 description: Bring your Notion notes, PDFs, and handouts into Owlbear Rodeo — share with players when it matters
 author: Lole Román - lolergb
-image: https://owlbear-dm-panel.netlify.app/img/cover-dmscreen.jpg
+image: https://owlbear-dm-panel.netlify.app/img/cover-dmpanel.jpg
 icon: https://owlbear-dm-panel.netlify.app/icon.svg
 tags:
   - dm-tools
@@ -16,7 +16,11 @@ learn-more: https://github.com/lolergb/owlbear-dm-panel
 # DM Panel
 
 DM Panel is a lightweight DM panel for Owlbear Rodeo.  
-Open **Notion pages**, **PDFs**, and **links** inside your room — keep notes **DM-only by default** and share selected content with players when the story needs it.
+Open **Notion pages**, **PDFs**, and **links** inside your room — keep content **DM-only by default** and share selected notes and handouts with players when it matters.
+
+> **Official builds:** Only manifests served from `owlbear-dm-panel.netlify.app` are official. See [TRADEMARK.md](https://github.com/lolergb/owlbear-dm-panel/blob/main/TRADEMARK.md) for branding policy.
+
+![Highlights](https://owlbear-dm-panel.netlify.app/img/share-with-players-using-the-eye-toggle.jpg)
 
 ## Highlights
 
@@ -27,25 +31,63 @@ Open **Notion pages**, **PDFs**, and **links** inside your room — keep notes *
 - **Token links:** right-click a token to link a page and open it instantly later
 - **Reload when needed:** use **🔄** to pull the latest changes
 
+---
+
+![Start Here](https://owlbear-dm-panel.netlify.app/img/add-your-first-folder-and-page.jpg)
+
+## Start Here (built-in onboarding)
+
+DM Panel includes a small “Start Here” structure in every room so you can learn by using it:
+
+- **⭐ Quick Start** (what buttons do)
+- **Handout — Mysterious Map** (try full screen + show to players)
+- **Enemy — Goblin** (link to a token)
+- **Notes — Session Notes** (a ready-to-use Notion template)
+
+> You can edit, rename, or delete everything. Nothing is shared unless you choose to.
+
+---
+
+![Quick start](https://owlbear-dm-panel.netlify.app/img/open-notes-instantly-during-play.jpg)
+
 ## Quick start
 
-1) Add the extension in Owlbear using the manifest URL below  
-2) Click **➕** to add folders or pages  
-3) Add a Notion page / PDF / link  
-4) Share anything with **👁️** when you’re ready
-
-Manifest:
+1) Add DM Panel using this manifest URL:  
 https://owlbear-dm-panel.netlify.app/manifest.json
 
-livecodeserver
-Copy code
+2) Open the extension inside your room
+
+3) Try the **⭐ Start Here** folder:
+- Click an item to open it
+- Toggle **👁️** to share/hide
+- Click the image to show it full screen
+
+4) Build your own structure with **➕** (folders + pages)
+
+---
+
+![What you can add](https://owlbear-dm-panel.netlify.app/img/bring-notion-pdf-and-web-pages.jpg)
+
+## What you can add
+
+- **Notion pages** (private or public — shared with your integration)
+- **PDFs** (public URLs)
+- **External links** (optional CSS selector to show only a section)
+
+---
+
+![Notion setup](https://owlbear-dm-panel.netlify.app/img/players-dont-need-notion-access.jpg)
 
 ## Notion setup (optional)
 
 If you want to use private Notion pages, paste your Notion token in **Settings**.  
 Players don’t need a token.
 
+---
+
+![Support](https://owlbear-dm-panel.netlify.app/img/update-content-when-you-change-notes.jpg)
+
 ## Support
 
-If you need help, have suggestions, or want to report a bug, please visit this Notion page:  
-https://solid-jingle-6ee.notion.site/DM-Screen-Roadmap-2d8d4856c90e8088825df40c3be24393?source=copy_link
+If you need help, have suggestions, or want to report a bug, please visit:  
+https://solid-jingle-6ee.notion.site/DM-Panel-Roadmap-2d8d4856c90e8088825df40c3be24393?source=copy_link

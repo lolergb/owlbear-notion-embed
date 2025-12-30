@@ -35,6 +35,8 @@ https://owlbear-dm-panel.netlify.app/manifest.json
 
 Or use the URL provided by the extension developer.
 
+> **Official builds:** Only manifests served from `owlbear-dm-panel.netlify.app` are official.
+
 ## 📖 How to use DM panel
 
 > 💡 **New to the extension?** Check out the [complete UI features guide](docs/USER_FEATURES.md) for a detailed explanation of all buttons, menus, and functionality.
