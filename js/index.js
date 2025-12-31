@@ -5478,6 +5478,7 @@ async function loadPageContent(url, name, selector = null, blockTypes = null) {
     if (!refreshButton) {
       refreshButton = document.createElement("button");
       refreshButton.id = "refresh-page-button";
+      refreshButton.className = "hidden";
       header.appendChild(refreshButton);
     }
     
@@ -5619,7 +5620,7 @@ async function loadPageContent(url, name, selector = null, blockTypes = null) {
         if (!contextMenuButton) {
           contextMenuButton = document.createElement("button");
           contextMenuButton.id = "page-context-menu-button-header";
-          contextMenuButton.className = "icon-button";
+          contextMenuButton.className = "icon-button hidden";
           header.appendChild(contextMenuButton);
         }
         
@@ -5630,12 +5631,12 @@ async function loadPageContent(url, name, selector = null, blockTypes = null) {
         contextMenuButton.appendChild(contextMenuIcon);
         contextMenuButton.title = "Menú";
         
-        // Remover listeners anteriores
+        // Remover listeners anteriores (mantener clase hidden hasta que se quite explícitamente)
         const newContextMenuButton = contextMenuButton.cloneNode(true);
         contextMenuButton.parentNode.replaceChild(newContextMenuButton, contextMenuButton);
         contextMenuButton = newContextMenuButton;
         contextMenuButton.id = "page-context-menu-button-header";
-        contextMenuButton.className = "icon-button";
+        contextMenuButton.className = "icon-button hidden";
         
         // Configurar menú contextual
         contextMenuButton.addEventListener('click', async (e) => {
@@ -5752,7 +5753,7 @@ async function loadPageContent(url, name, selector = null, blockTypes = null) {
         if (!visibilityButton) {
           visibilityButton = document.createElement("button");
           visibilityButton.id = "page-visibility-button-header";
-          visibilityButton.className = "icon-button";
+          visibilityButton.className = "icon-button hidden";
           header.appendChild(visibilityButton);
         }
         
@@ -5764,12 +5765,12 @@ async function loadPageContent(url, name, selector = null, blockTypes = null) {
         visibilityButton.appendChild(visibilityIcon);
         visibilityButton.title = isPageVisible ? 'Visible to players (click to hide)' : 'Hidden from players (click to show)';
         
-        // Remover listeners anteriores
+        // Remover listeners anteriores (mantener clase hidden hasta que se quite explícitamente)
         const newVisibilityButton = visibilityButton.cloneNode(true);
         visibilityButton.parentNode.replaceChild(newVisibilityButton, visibilityButton);
         visibilityButton = newVisibilityButton;
         visibilityButton.id = "page-visibility-button-header";
-        visibilityButton.className = "icon-button";
+        visibilityButton.className = "icon-button hidden";
         
         visibilityButton.addEventListener('click', async (e) => {
           e.stopPropagation();
