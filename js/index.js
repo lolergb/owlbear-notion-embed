@@ -242,6 +242,30 @@ function validateMetadataSize(obj, compressed = true) {
   };
 }
 
+/**
+ * Valida si un nuevo objeto cabe en room metadata considerando TODOS los metadatos existentes
+ * @param {string} metadataKey - La clave del metadata a actualizar
+ * @param {any} newValue - El nuevo valor a guardar
+ * @param {object} currentMetadata - Los metadatos actuales de la room
+ * @returns {object} - { fits, size, limit, percentage }
+ */
+function validateTotalMetadataSize(metadataKey, newValue, currentMetadata = {}) {
+  // Crear una copia de los metadatos con el nuevo valor
+  const testMetadata = { ...currentMetadata };
+  testMetadata[metadataKey] = compressJson(newValue);
+  
+  // Calcular el tamaño total
+  const totalSize = getJsonSize(testMetadata);
+  const fits = totalSize <= ROOM_METADATA_SAFE_LIMIT;
+  
+  return {
+    fits,
+    size: totalSize,
+    limit: ROOM_METADATA_SAFE_LIMIT,
+    percentage: (totalSize / ROOM_METADATA_SAFE_LIMIT * 100).toFixed(1)
+  };
+}
+
 // Caché local de HTML renderizado (solo en memoria del GM)
 let localHtmlCache = {};
 
@@ -283,8 +307,16 @@ async function savePagesJSON(json, roomId) {
     log('💾 Guardando configuración con clave:', storageKey, 'para roomId:', roomId);
     localStorage.setItem(storageKey, JSON.stringify(json, null, 2));
     
-    // Validar tamaño antes de guardar en room metadata
-    const validation = validateMetadataSize(json);
+    // Obtener metadatos actuales para validar tamaño TOTAL
+    let currentMetadata = {};
+    try {
+      currentMetadata = await OBR.room.getMetadata() || {};
+    } catch (e) {
+      console.warn('No se pudo obtener metadatos actuales:', e);
+    }
+    
+    // Validar tamaño TOTAL considerando todos los metadatos
+    const validation = validateTotalMetadataSize(ROOM_METADATA_KEY, json, currentMetadata);
     
     if (validation.fits) {
       // Guardar en OBR.room.metadata para compartir con todos los usuarios
@@ -293,21 +325,46 @@ async function savePagesJSON(json, roomId) {
         await OBR.room.setMetadata({
           [ROOM_METADATA_KEY]: compressed
         });
-        log(`✅ Configuración sincronizada con room metadata (${validation.percentage}% del límite)`);
+        log(`✅ Configuración sincronizada con room metadata (${validation.percentage}% del límite total)`);
       } catch (e) {
         // Si falla, puede ser por tamaño o por otro error
         if (e.message && (e.message.includes('size') || e.message.includes('limit') || e.message.includes('16'))) {
-          logWarn('⚠️ La configuración es demasiado grande para room metadata (>16KB). Se guardó solo en localStorage.');
-          logWarn(`   Tamaño: ${(validation.size / 1024).toFixed(2)}KB / ${(ROOM_METADATA_SAFE_LIMIT / 1024).toFixed(2)}KB`);
+          // Limpiar el caché de contenido para hacer espacio
+          logWarn('⚠️ Room metadata lleno. Limpiando caché de contenido...');
+          try {
+            await OBR.room.setMetadata({
+              [ROOM_CONTENT_CACHE_KEY]: {}
+            });
+            // Intentar guardar de nuevo
+            await OBR.room.setMetadata({
+              [ROOM_METADATA_KEY]: compressed
+            });
+            log('✅ Configuración guardada después de limpiar caché');
+          } catch (e2) {
+            logWarn('⚠️ La configuración es demasiado grande para room metadata (>16KB). Se guardó solo en localStorage.');
+          }
         } else {
           console.warn('⚠️ No se pudo sincronizar con room metadata:', e);
         }
       }
     } else {
-      // El tamaño excede el límite, solo guardar en localStorage
-      logWarn('⚠️ La configuración es demasiado grande para room metadata (>16KB). Se guardó solo en localStorage.');
-      logWarn(`   Tamaño: ${(validation.size / 1024).toFixed(2)}KB / ${(ROOM_METADATA_SAFE_LIMIT / 1024).toFixed(2)}KB`);
-      logWarn('   Sugerencia: Reduce el número de páginas configuradas o usa menos contenido por página.');
+      // El tamaño excede el límite, intentar limpiar el caché de contenido
+      logWarn('⚠️ Room metadata casi lleno. Limpiando caché de contenido...');
+      try {
+        await OBR.room.setMetadata({
+          [ROOM_CONTENT_CACHE_KEY]: {}
+        });
+        // Intentar guardar después de limpiar
+        const compressed = compressJson(json);
+        await OBR.room.setMetadata({
+          [ROOM_METADATA_KEY]: compressed
+        });
+        log('✅ Configuración guardada después de limpiar caché');
+      } catch (e) {
+        logWarn('⚠️ La configuración es demasiado grande para room metadata (>16KB). Se guardó solo en localStorage.');
+        logWarn(`   Tamaño total: ${(validation.size / 1024).toFixed(2)}KB / ${(ROOM_METADATA_SAFE_LIMIT / 1024).toFixed(2)}KB`);
+        logWarn('   Sugerencia: Reduce el número de páginas configuradas.');
+      }
     }
     
     log('✅ Configuración guardada exitosamente para room:', roomId);
@@ -501,9 +558,9 @@ async function saveToSharedCache(pageId, blocks) {
     const isGM = await getUserRole();
     if (!isGM) return;
     
-    // Obtener el caché compartido actual
-    const metadata = await OBR.room.getMetadata();
-    let sharedCache = (metadata && metadata[ROOM_CONTENT_CACHE_KEY]) || {};
+    // Obtener todos los metadatos actuales
+    const metadata = await OBR.room.getMetadata() || {};
+    let sharedCache = (metadata[ROOM_CONTENT_CACHE_KEY]) || {};
     
     // Crear la nueva entrada
     const newEntry = {
@@ -511,9 +568,9 @@ async function saveToSharedCache(pageId, blocks) {
       savedAt: new Date().toISOString()
     };
     
-    // Probar si cabe agregando la nueva entrada
+    // Probar si cabe considerando el tamaño TOTAL de todos los metadatos
     const testCache = { ...sharedCache, [pageId]: newEntry };
-    const validation = validateMetadataSize(testCache);
+    const validation = validateTotalMetadataSize(ROOM_CONTENT_CACHE_KEY, testCache, metadata);
     
     // Si no cabe, limpiar entradas antiguas hasta que quepa
     if (!validation.fits) {
@@ -533,7 +590,7 @@ async function saveToSharedCache(pageId, blocks) {
           delete reducedCache[key];
           entriesRemoved++;
           const testReduced = { ...reducedCache, [pageId]: newEntry };
-          const reducedValidation = validateMetadataSize(testReduced);
+          const reducedValidation = validateTotalMetadataSize(ROOM_CONTENT_CACHE_KEY, testReduced, metadata);
           if (reducedValidation.fits) {
             sharedCache = reducedCache;
             log(`🗑️ Eliminadas ${entriesRemoved} entradas antiguas del caché para hacer espacio`);
@@ -544,28 +601,24 @@ async function saveToSharedCache(pageId, blocks) {
       
       // Verificar si ahora cabe después de limpiar
       const finalTestCache = { ...sharedCache, [pageId]: newEntry };
-      const finalTestValidation = validateMetadataSize(finalTestCache);
+      const finalTestValidation = validateTotalMetadataSize(ROOM_CONTENT_CACHE_KEY, finalTestCache, metadata);
       if (!finalTestValidation.fits) {
-        // Si aún no cabe después de limpiar, verificar tamaño de la entrada individual
-        const entryValidation = validateMetadataSize(newEntry);
-        if (!entryValidation.fits) {
-          logWarn(`⚠️ La página ${pageId} es demasiado grande (${(entryValidation.size / 1024).toFixed(2)}KB) para el caché compartido.`);
-          logWarn('   El contenido se compartirá vía broadcast cuando los jugadores lo soliciten.');
-          return; // No guardar esta entrada, se usará broadcast
-        }
+        // Si aún no cabe después de limpiar todo el caché, no guardar
+        log('ℹ️ No hay espacio en room metadata. El contenido se compartirá vía broadcast.');
+        return; // No guardar esta entrada, se usará broadcast
       }
     }
     
-    // Limitar el número de entradas (máximo 30 para dejar más margen de tamaño)
+    // Limitar el número de entradas (máximo 10 para priorizar configuración)
     const cacheKeys = Object.keys(sharedCache);
-    if (cacheKeys.length >= 30 && !sharedCache[pageId]) {
-      // Eliminar las 5 entradas más antiguas para hacer espacio
+    if (cacheKeys.length >= 10 && !sharedCache[pageId]) {
+      // Eliminar las 3 entradas más antiguas para hacer espacio
       const sortedKeys = cacheKeys.sort((a, b) => {
         const dateA = sharedCache[a]?.savedAt ? new Date(sharedCache[a].savedAt) : new Date(0);
         const dateB = sharedCache[b]?.savedAt ? new Date(sharedCache[b].savedAt) : new Date(0);
         return dateA - dateB;
       });
-      for (let i = 0; i < 5 && i < sortedKeys.length; i++) {
+      for (let i = 0; i < 3 && i < sortedKeys.length; i++) {
         delete sharedCache[sortedKeys[i]];
       }
     }
@@ -574,14 +627,14 @@ async function saveToSharedCache(pageId, blocks) {
     sharedCache[pageId] = newEntry;
     
     // Validar tamaño final antes de guardar
-    const finalValidation = validateMetadataSize(sharedCache);
+    const finalValidation = validateTotalMetadataSize(ROOM_CONTENT_CACHE_KEY, sharedCache, metadata);
     if (finalValidation.fits) {
       await OBR.room.setMetadata({
         [ROOM_CONTENT_CACHE_KEY]: compressJson(sharedCache)
       });
-      log(`💾 Contenido guardado en caché compartido para: ${pageId} (${finalValidation.percentage}% del límite)`);
+      log(`💾 Contenido guardado en caché compartido para: ${pageId} (${finalValidation.percentage}% del límite total)`);
     } else {
-      logWarn('⚠️ El caché compartido completo excede el límite. Algunas entradas no se guardaron.');
+      log('ℹ️ No hay espacio en room metadata. El contenido se compartirá vía broadcast.');
     }
   } catch (e) {
     // Si el error es por tamaño, es esperado
@@ -682,7 +735,7 @@ function setupGMContentBroadcast() {
 }
 
 /**
- * Limpiar todo el caché manualmente
+ * Limpiar todo el caché manualmente (localStorage)
  */
 function clearAllCache() {
   try {
@@ -699,6 +752,41 @@ function clearAllCache() {
   } catch (e) {
     console.error('Error al limpiar caché:', e);
     return 0;
+  }
+}
+
+/**
+ * Limpiar el caché de contenido compartido en room metadata
+ * Esto libera espacio para la configuración de páginas
+ */
+async function clearSharedContentCache() {
+  try {
+    await OBR.room.setMetadata({
+      [ROOM_CONTENT_CACHE_KEY]: {}
+    });
+    console.log('🗑️ Caché compartido (room metadata) limpiado');
+    return true;
+  } catch (e) {
+    console.error('Error al limpiar caché compartido:', e);
+    return false;
+  }
+}
+
+/**
+ * Limpiar TODOS los metadatos de la room (configuración y caché)
+ * ⚠️ Esto reiniciará la extensión a su estado inicial
+ */
+async function clearAllRoomMetadata() {
+  try {
+    await OBR.room.setMetadata({
+      [ROOM_METADATA_KEY]: null,
+      [ROOM_CONTENT_CACHE_KEY]: null
+    });
+    console.log('🗑️ Todos los metadatos de room limpiados');
+    return true;
+  } catch (e) {
+    console.error('Error al limpiar metadatos de room:', e);
+    return false;
   }
 }
 

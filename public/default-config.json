@@ -1,126 +1,318 @@
 {
-  "order": [
-    {
-      "type": "category",
-      "index": 4
-    },
-    {
-      "type": "category",
-      "index": 0
-    },
-    {
-      "type": "category",
-      "index": 1
-    },
-    {
-      "type": "category",
-      "index": 2
-    },
-    {
-      "type": "category",
-      "index": 3
-    }
-  ],
   "categories": [
     {
       "name": "⭐ Start Here",
-      "order": [
-        {
-          "type": "page",
-          "index": 0
-        },
-        {
-          "type": "page",
-          "index": 2
-        },
-        {
-          "type": "page",
-          "index": 3
-        },
-        {
-          "type": "page",
-          "index": 1
-        }
-      ],
       "pages": [
         {
-          "url": "/content-demo/opening-scene.html",
-          "name": "Opening scene"
+          "name": "⭐ Quick Start",
+          "url": "https://www.notion.so/Ganar-Tiempo-2ccd4856c90e80febdfcd5fdfc08d0fd",
+          "visibleToPlayers": false
         },
         {
-          "url": "https://media.wizards.com/2018/dnd/downloads/DnD_BasicRules_2018.pdf",
-          "name": "Basic Rules DnD"
+          "name": "Story — Opening Scene (Ganar Tiempo)",
+          "url": "https://www.notion.so/Ganar-Tiempo-2ccd4856c90e80febdfcd5fdfc08d0fd",
+          "visibleToPlayers": false
         },
         {
-          "url": "https://5e.tools/img/adventure/LMoP/The%20Sword%20Coast.webp",
-          "name": "Handout — Mysterious Map (Player)"
-        },
-        {
+          "name": "Enemy — Goblin (Link to token)",
           "url": "https://5e.tools/bestiary.html#goblin_mm,bookview:true",
-          "name": "Enemy — Goblin (Link to token)"
+          "visibleToPlayers": false
         }
       ],
       "categories": []
     },
     {
-      "name": "Session",
-      "pages": [
-        {
-          "name": "Session Notes (Template)",
-          "url": "/content-demo/session-notes.html"
-        }
-      ],
-      "categories": [],
-      "order": [
-        {
-          "type": "page",
-          "index": 0
-        },
-        {
-          "type": "category",
-          "index": 0
-        }
-      ]
-    },
-    {
-      "name": "Act I",
+      "name": "Act I — Ganar Tiempo",
       "pages": [],
       "categories": [
         {
-          "name": "Encounter - The Watched Crossroads",
+          "name": "Encounter 01 — El Cruce Vigilado",
           "pages": [
             {
-              "name": "Map – Sword Coast (Player)",
-              "url": "https://5e.tools/img/adventure/LMoP/The%20Sword%20Coast%20(Player).webp"
+              "name": "Story — Read Aloud",
+              "url": "https://www.notion.so/El-Cruce-Vigilado-2ccd4856c90e81f58f8dedf4ff0fe988",
+              "visibleToPlayers": false
             },
             {
-              "name": "Scene — The Watched Crossroads",
-              "url": "/content-demo/scene-the-watched-crossroads.html"
+              "name": "Notes — GM Checklist",
+              "url": "https://www.notion.so/El-Cruce-Vigilado-2ccd4856c90e81f58f8dedf4ff0fe988",
+              "visibleToPlayers": false
             }
           ],
-          "categories": [],
-          "order": [
+          "categories": [
             {
-              "type": "page",
-              "index": 1
-            },
-            {
-              "type": "page",
-              "index": 0
+              "name": "Enemies (E1)",
+              "pages": [
+                {
+                  "name": "Enemy — Scout (SRD Bandit)",
+                  "url": "https://5e.tools/bestiary.html#bandit_mm,bookview:true",
+                  "visibleToPlayers": false
+                },
+                {
+                  "name": "Enemy — Thug (optional)",
+                  "url": "https://5e.tools/bestiary.html#thug_mm,bookview:true",
+                  "visibleToPlayers": false
+                },
+                {
+                  "name": "Enemy — Hobgoblin (Dragonlance vibe alt)",
+                  "url": "https://5e.tools/bestiary.html#hobgoblin_mm,bookview:true",
+                  "visibleToPlayers": false
+                },
+                {
+                  "name": "Enemy — Kobold (trace/seed only)",
+                  "url": "https://5e.tools/bestiary.html#kobold_mm,bookview:true",
+                  "visibleToPlayers": false
+                }
+              ],
+              "categories": []
             }
           ]
         },
         {
-          "name": "NPC",
+          "name": "Encounter 02 — La Granja en Llamas",
           "pages": [
             {
-              "name": "Maera",
-              "url": "/content-demo/maera-manos-secas.html"
+              "name": "Story — Read Aloud",
+              "url": "https://www.notion.so/La-Granja-en-Llamas-2ccd4856c90e811197e2f65fdaa3cd76",
+              "visibleToPlayers": false
+            },
+            {
+              "name": "Notes — Rescue Priorities",
+              "url": "https://www.notion.so/La-Granja-en-Llamas-2ccd4856c90e811197e2f65fdaa3cd76",
+              "visibleToPlayers": false
+            }
+          ],
+          "categories": [
+            {
+              "name": "Enemies (E2)",
+              "pages": [
+                {
+                  "name": "Enemy Pack A — Hobgoblin Leader",
+                  "url": "https://5e.tools/bestiary.html#hobgoblin_mm,bookview:true",
+                  "visibleToPlayers": false
+                },
+                {
+                  "name": "Enemy Pack A — Goblins (x2)",
+                  "url": "https://5e.tools/bestiary.html#goblin_mm,bookview:true",
+                  "visibleToPlayers": false
+                },
+                {
+                  "name": "Enemy Pack B — Thug (leader)",
+                  "url": "https://5e.tools/bestiary.html#thug_mm,bookview:true",
+                  "visibleToPlayers": false
+                },
+                {
+                  "name": "Enemy Pack B — Bandits (x3)",
+                  "url": "https://5e.tools/bestiary.html#bandit_mm,bookview:true",
+                  "visibleToPlayers": false
+                },
+                {
+                  "name": "Enemy Pack C — Cultist (optional)",
+                  "url": "https://5e.tools/bestiary.html#cultist_mm,bookview:true",
+                  "visibleToPlayers": false
+                }
+              ],
+              "categories": []
+            }
+          ]
+        },
+        {
+          "name": "Encounter 03 — El Cementerio del Bosque",
+          "pages": [
+            {
+              "name": "Story — Read Aloud",
+              "url": "https://www.notion.so/El-Cementerio-del-Bosque-2ccd4856c90e81c39316e21e5d5f4b38",
+              "visibleToPlayers": false
+            },
+            {
+              "name": "Notes — The Revelation",
+              "url": "https://www.notion.so/El-Cementerio-del-Bosque-2ccd4856c90e81c39316e21e5d5f4b38",
+              "visibleToPlayers": false
+            }
+          ],
+          "categories": [
+            {
+              "name": "Enemies (E3 optional)",
+              "pages": [
+                {
+                  "name": "Enemy — Specter (optional tension)",
+                  "url": "https://5e.tools/bestiary.html#specter_mm,bookview:true",
+                  "visibleToPlayers": false
+                },
+                {
+                  "name": "Enemy — Cultist / Acolyte (optional)",
+                  "url": "https://5e.tools/bestiary.html#acolyte_mm,bookview:true",
+                  "visibleToPlayers": false
+                },
+                {
+                  "name": "Enemy — Kobold (draconic trace)",
+                  "url": "https://5e.tools/bestiary.html#kobold_mm,bookview:true",
+                  "visibleToPlayers": false
+                }
+              ],
+              "categories": []
+            }
+          ]
+        },
+        {
+          "name": "Encounter 04 — Clímax: El Paso de Montaña",
+          "pages": [
+            {
+              "name": "Story — Read Aloud",
+              "url": "https://www.notion.so/CL-MAX-El-Paso-de-Monta-a-2ccd4856c90e81eea942f7e0c366457f",
+              "visibleToPlayers": false
+            },
+            {
+              "name": "Notes — The Clock (2/6/8 rounds)",
+              "url": "https://www.notion.so/CL-MAX-El-Paso-de-Monta-a-2ccd4856c90e81eea942f7e0c366457f",
+              "visibleToPlayers": false
+            }
+          ],
+          "categories": [
+            {
+              "name": "Enemies (E4)",
+              "pages": [
+                {
+                  "name": "Enemy — Hobgoblin Captain (leader)",
+                  "url": "https://5e.tools/bestiary.html#hobgoblin%20captain_mm,bookview:true",
+                  "visibleToPlayers": false
+                },
+                {
+                  "name": "Enemy — Hobgoblins (x2)",
+                  "url": "https://5e.tools/bestiary.html#hobgoblin_mm,bookview:true",
+                  "visibleToPlayers": false
+                },
+                {
+                  "name": "Enemy — Goblins (x2)",
+                  "url": "https://5e.tools/bestiary.html#goblin_mm,bookview:true",
+                  "visibleToPlayers": false
+                },
+                {
+                  "name": "Enemy — Guard Drake (optional, if you use it)",
+                  "url": "https://5e.tools/bestiary.html#guard%20drake_vgm,bookview:true",
+                  "visibleToPlayers": false
+                }
+              ],
+              "categories": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "NPCs",
+      "pages": [],
+      "categories": [
+        {
+          "name": "Civilians (Ganar Tiempo)",
+          "pages": [
+            {
+              "name": "NPC — Maera \"Manos-Secas\"",
+              "url": "https://www.notion.so/ANEXOS-Ganar-Tiempo-2cdd4856c90e8049b9e5c2ff59033f91",
+              "visibleToPlayers": false
+            },
+            {
+              "name": "NPC — Toman Vinga",
+              "url": "https://www.notion.so/ANEXOS-Ganar-Tiempo-2cdd4856c90e8049b9e5c2ff59033f91",
+              "visibleToPlayers": false
+            },
+            {
+              "name": "NPC — Linn (12)",
+              "url": "https://www.notion.so/ANEXOS-Ganar-Tiempo-2cdd4856c90e8049b9e5c2ff59033f91",
+              "visibleToPlayers": false
+            },
+            {
+              "name": "NPC — Hessa",
+              "url": "https://www.notion.so/ANEXOS-Ganar-Tiempo-2cdd4856c90e8049b9e5c2ff59033f91",
+              "visibleToPlayers": false
+            },
+            {
+              "name": "NPC — Orren (Messenger)",
+              "url": "https://www.notion.so/ANEXOS-Ganar-Tiempo-2cdd4856c90e8049b9e5c2ff59033f91",
+              "visibleToPlayers": false
+            },
+            {
+              "name": "NPC — Bram",
+              "url": "https://www.notion.so/ANEXOS-Ganar-Tiempo-2cdd4856c90e8049b9e5c2ff59033f91",
+              "visibleToPlayers": false
+            },
+            {
+              "name": "NPC — Sile",
+              "url": "https://www.notion.so/ANEXOS-Ganar-Tiempo-2cdd4856c90e8049b9e5c2ff59033f91",
+              "visibleToPlayers": false
+            },
+            {
+              "name": "NPC — Eldra (Undertaker)",
+              "url": "https://www.notion.so/ANEXOS-Ganar-Tiempo-2cdd4856c90e8049b9e5c2ff59033f91",
+              "visibleToPlayers": false
+            },
+            {
+              "name": "NPC — \"El Último Carro\" (Symbol)",
+              "url": "https://www.notion.so/ANEXOS-Ganar-Tiempo-2cdd4856c90e8049b9e5c2ff59033f91",
+              "visibleToPlayers": false
+            }
+          ],
+          "categories": []
+        },
+        {
+          "name": "Enemies (Named/Role)",
+          "pages": [
+            {
+              "name": "NPC — Enemy Scout Pair (role)",
+              "url": "https://www.notion.so/ANEXOS-Ganar-Tiempo-2cdd4856c90e8049b9e5c2ff59033f91",
+              "visibleToPlayers": false
+            },
+            {
+              "name": "NPC — Officer (Mountain Pass Leader)",
+              "url": "https://www.notion.so/ANEXOS-Ganar-Tiempo-2cdd4856c90e8049b9e5c2ff59033f91",
+              "visibleToPlayers": false
             }
           ],
           "categories": []
         }
       ]
+    },
+    {
+      "name": "Locations",
+      "pages": [
+        {
+          "name": "Location — Twilight Forest Exit (Bosque del Crepúsculo)",
+          "url": "https://www.notion.so/ANEXOS-Ganar-Tiempo-2cdd4856c90e8049b9e5c2ff59033f91",
+          "visibleToPlayers": false
+        },
+        {
+          "name": "Location — The Watched Crossroads (El Cruce Vigilado)",
+          "url": "https://www.notion.so/El-Cruce-Vigilado-2ccd4856c90e81f58f8dedf4ff0fe988",
+          "visibleToPlayers": false
+        },
+        {
+          "name": "Location — The Burning Farm (La Granja en Llamas)",
+          "url": "https://www.notion.so/La-Granja-en-Llamas-2ccd4856c90e811197e2f65fdaa3cd76",
+          "visibleToPlayers": false
+        },
+        {
+          "name": "Location — Forest Cemetery (El Cementerio del Bosque)",
+          "url": "https://www.notion.so/El-Cementerio-del-Bosque-2ccd4856c90e81c39316e21e5d5f4b38",
+          "visibleToPlayers": false
+        },
+        {
+          "name": "Location — Mountain Chokepoint (El Paso de Montaña)",
+          "url": "https://www.notion.so/CL-MAX-El-Paso-de-Monta-a-2ccd4856c90e81eea942f7e0c366457f",
+          "visibleToPlayers": false
+        }
+      ],
+      "categories": []
+    },
+    {
+      "name": "Rules & References",
+      "pages": [
+        {
+          "name": "Reference — SRD Monsters (external)",
+          "url": "https://5e.tools/bestiary.html",
+          "visibleToPlayers": false
+        }
+      ],
+      "categories": []
     }
   ]
 }
