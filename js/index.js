@@ -230,9 +230,15 @@ async function initMixpanel() {
         }
         
         console.log('📊 Mixpanel analytics enabled');
+        console.log('📊 Token:', mixpanelToken ? mixpanelToken.substring(0, 10) + '...' : 'missing');
+        console.log('📊 Distinct ID:', mixpanelDistinctId);
         // Track extension opened after successful initialization
         trackExtensionOpened();
+      } else {
+        console.warn('📊 Mixpanel token not available:', data);
       }
+    } else {
+      console.warn('📊 Failed to fetch Mixpanel token:', response.status);
     }
   } catch (e) {
     console.log('📊 Mixpanel disabled (fetch error)');
@@ -247,6 +253,7 @@ async function initMixpanel() {
  */
 async function trackEvent(eventName, properties = {}) {
   if (!mixpanelEnabled || !mixpanelToken) {
+    console.warn('📊 Track skipped - enabled:', mixpanelEnabled, 'token:', !!mixpanelToken);
     return;
   }
   
@@ -281,25 +288,37 @@ async function trackEvent(eventName, properties = {}) {
     }
     const base64String = btoa(binaryString);
     
-    // Send to Mixpanel via HTTP API
-    const trackUrl = `https://api.mixpanel.com/track?data=${encodeURIComponent(base64String)}&verbose=1`;
+    // Debug: log the payload (first 100 chars only)
+    console.log('📊 Tracking event:', eventName, '| Payload length:', base64String.length);
     
-    // Use fetch with image pixel fallback for reliability
+    // Send to Mixpanel via HTTP API using POST (more reliable than GET)
+    const trackUrl = 'https://api.mixpanel.com/track';
+    
+    // Try POST first (more reliable)
     try {
       const response = await fetch(trackUrl, {
-        method: 'GET',
-        mode: 'cors'
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: `data=${encodeURIComponent(base64String)}&verbose=1`
       });
+      
       if (response.ok) {
         const result = await response.json();
         if (result.status === 1) {
           console.log(`📊 Event tracked: ${eventName}`);
         } else {
-          console.warn(`📊 Mixpanel error: ${result.error}`);
+          console.warn(`📊 Mixpanel error:`, result);
         }
+      } else {
+        console.warn(`📊 Mixpanel HTTP error: ${response.status}`);
+        // Fallback to image pixel
+        throw new Error('HTTP error, using fallback');
       }
     } catch (fetchError) {
-      // Fallback: use image pixel tracking
+      // Fallback: use image pixel tracking (most reliable, works even with CORS issues)
+      console.log(`📊 Using image pixel fallback for: ${eventName}`);
       const img = new Image();
       img.src = `https://api.mixpanel.com/track?data=${encodeURIComponent(base64String)}&img=1`;
     }
