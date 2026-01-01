@@ -1453,6 +1453,14 @@ async function clearAllRoomMetadata() {
   }
 }
 
+// Función auxiliar para verificar si una URL es de Notion
+function isNotionUrl(url) {
+  if (!url || typeof url !== 'string') {
+    return false;
+  }
+  return url.includes('notion.so') || url.includes('notion.site');
+}
+
 // Función para extraer el ID de página desde una URL de Notion
 function extractNotionPageId(url) {
   try {
@@ -1462,8 +1470,8 @@ function extractNotionPageId(url) {
     }
     
     // Verificar si es una URL de Notion
-    const isNotionUrl = url.includes('notion.so') || url.includes('notion.site');
-    if (!isNotionUrl) {
+    const isNotionUrlCheck = isNotionUrl(url);
+    if (!isNotionUrlCheck) {
       // No es una URL de Notion, no generar warning
       return null;
     }
@@ -4755,9 +4763,14 @@ async function editPageFromPageList(page, pageCategoryPath, roomId) {
     });
   }
   
+  // Agregar campo Block types solo si la URL es de Notion
+  if (isNotionUrl(page.url)) {
+    fields.push(
+      { name: 'blockTypes', label: 'Block types (optional)', type: 'text', value: Array.isArray(page.blockTypes) ? page.blockTypes.join(', ') : (page.blockTypes || ''), placeholder: 'quote, callout', help: 'Only for Notion URLs. E.g: "quote" or "quote,callout"' }
+    );
+  }
+  
   fields.push(
-    // { name: 'selector', label: 'Selector (optional)', type: 'text', value: page.selector || '', placeholder: '#main-content', help: 'Only for external URLs' }, // Temporalmente oculto
-    { name: 'blockTypes', label: 'Block types (optional)', type: 'text', value: Array.isArray(page.blockTypes) ? page.blockTypes.join(', ') : (page.blockTypes || ''), placeholder: 'quote, callout', help: 'Only for Notion URLs. E.g: "quote" or "quote,callout"' },
     { name: 'visibleToPlayers', label: 'Visible to all players', type: 'checkbox', value: page.visibleToPlayers === true, help: 'Allow all players to see this page' }
   );
   
@@ -4865,8 +4878,14 @@ async function editPageFromHeader(page, pageCategoryPath, roomId, currentUrl, cu
     });
   }
   
+  // Agregar campo Block types solo si la URL es de Notion
+  if (isNotionUrl(page.url)) {
+    fields.push(
+      { name: 'blockTypes', label: 'Block types (optional)', type: 'text', value: Array.isArray(page.blockTypes) ? page.blockTypes.join(', ') : (page.blockTypes || ''), placeholder: 'quote, callout', help: 'Only for Notion URLs. E.g: "quote" or "quote,callout"' }
+    );
+  }
+  
   fields.push(
-    { name: 'blockTypes', label: 'Block types (optional)', type: 'text', value: Array.isArray(page.blockTypes) ? page.blockTypes.join(', ') : (page.blockTypes || ''), placeholder: 'quote, callout', help: 'Only for Notion URLs. E.g: "quote" or "quote,callout"' },
     { name: 'visibleToPlayers', label: 'Visible to all players', type: 'checkbox', value: page.visibleToPlayers === true, help: 'Allow all players to see this page' }
   );
   
@@ -5356,9 +5375,12 @@ async function addPageToPageListWithCategorySelector(defaultCategoryPath, roomId
     });
   }
   
+  // Agregar campo Block types (se mostrará/ocultará dinámicamente según la URL)
   fields.push(
-    // { name: 'selector', label: 'Selector (optional)', type: 'text', placeholder: '#main-content', help: 'Only for external URLs' }, // Temporalmente oculto
-    { name: 'blockTypes', label: 'Block types (optional)', type: 'text', placeholder: 'quote, callout', help: 'Only for Notion URLs. E.g: "quote" or "quote,callout"' },
+    { name: 'blockTypes', label: 'Block types (optional)', type: 'text', placeholder: 'quote, callout', help: 'Only for Notion URLs. E.g: "quote" or "quote,callout"', conditional: true }
+  );
+  
+  fields.push(
     { name: 'visibleToPlayers', label: 'Visible to all players', type: 'checkbox', value: false, help: 'Allow all players to see this page' }
   );
   
@@ -7329,7 +7351,7 @@ function showModalForm(title, fields, onSubmit, onCancel) {
     <h2 class="modal__title">${title}</h2>
     <form id="modal-form" class="form">
       ${fields.map(field => `
-        <div class="form__field">
+        <div class="form__field" ${field.conditional ? 'style="display: none;"' : ''} data-field-name="${field.name}">
           <label class="form__label">
             ${field.label}${field.required ? ' *' : ''}
           </label>
@@ -7424,6 +7446,13 @@ function showModalForm(title, fields, onSubmit, onCancel) {
     fields.forEach(field => {
       const input = modal.querySelector(`#field-${field.name}`);
       if (input) {
+        // Para campos condicionales, solo incluir si están visibles
+        if (field.conditional) {
+          const fieldContainer = modal.querySelector(`[data-field-name="${field.name}"]`);
+          if (fieldContainer && fieldContainer.style.display === 'none') {
+            return; // No incluir campos condicionales ocultos
+          }
+        }
         // Para selects, obtener el valor directamente sin trim
         if (field.type === 'select') {
           const selectedIndex = input.selectedIndex;
@@ -7457,6 +7486,35 @@ function showModalForm(title, fields, onSubmit, onCancel) {
         console.debug('No se pudo hacer focus en el campo:', e);
       }
     }, 100);
+  }
+
+  // Agregar listener para mostrar/ocultar campos condicionales basados en la URL
+  const urlInput = modal.querySelector('#field-url');
+  if (urlInput) {
+    const blockTypesField = modal.querySelector('[data-field-name="blockTypes"]');
+    if (blockTypesField) {
+      // Función para actualizar la visibilidad del campo blockTypes
+      const updateBlockTypesVisibility = () => {
+        const urlValue = urlInput.value.trim();
+        if (isNotionUrl(urlValue)) {
+          blockTypesField.style.display = '';
+        } else {
+          blockTypesField.style.display = 'none';
+          // Limpiar el valor si no es una URL de Notion
+          const blockTypesInput = modal.querySelector('#field-blockTypes');
+          if (blockTypesInput) {
+            blockTypesInput.value = '';
+          }
+        }
+      };
+
+      // Verificar la URL inicial
+      updateBlockTypesVisibility();
+
+      // Agregar listener para cambios en la URL
+      urlInput.addEventListener('input', updateBlockTypesVisibility);
+      urlInput.addEventListener('change', updateBlockTypesVisibility);
+    }
   }
 }
 
@@ -8049,15 +8107,25 @@ async function showVisualEditor(pagesConfig, roomId = null) {
   };
 
   const editPage = (page, path) => {
+    const fields = [
+      { name: 'name', label: 'Nombre', type: 'text', required: true, value: page.name },
+      { name: 'url', label: 'URL', type: 'url', required: true, value: page.url }
+    ];
+
+    // Agregar campo Block types solo si la URL es de Notion
+    if (isNotionUrl(page.url)) {
+      fields.push(
+        { name: 'blockTypes', label: 'Block types (optional)', type: 'text', value: Array.isArray(page.blockTypes) ? page.blockTypes.join(', ') : (page.blockTypes || ''), help: 'Only for Notion URLs' }
+      );
+    }
+
+    fields.push(
+      { name: 'visibleToPlayers', label: 'Visible to all players', type: 'checkbox', value: page.visibleToPlayers === true, help: 'Allow all players to see this page' }
+    );
+
     showModalForm(
       'Edit Page',
-      [
-        { name: 'name', label: 'Nombre', type: 'text', required: true, value: page.name },
-        { name: 'url', label: 'URL', type: 'url', required: true, value: page.url },
-        // { name: 'selector', label: 'Selector (optional)', type: 'text', value: page.selector || '', help: 'Only for external URLs' }, // Temporalmente oculto
-        { name: 'blockTypes', label: 'Block types (optional)', type: 'text', value: Array.isArray(page.blockTypes) ? page.blockTypes.join(', ') : (page.blockTypes || ''), help: 'Only for Notion URLs' },
-        { name: 'visibleToPlayers', label: 'Visible to all players', type: 'checkbox', value: page.visibleToPlayers === true, help: 'Allow all players to see this page' }
-      ],
+      fields,
       async (data) => {
         const config = JSON.parse(JSON.stringify(getPagesJSON(roomId) || currentConfig));
         const target = navigatePath(config, path);
