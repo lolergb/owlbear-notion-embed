@@ -4122,6 +4122,138 @@ async function editPageFromPageList(page, pageCategoryPath, roomId) {
   );
 }
 
+// Función para editar página desde el header (actualiza título y visibilidad inmediatamente)
+async function editPageFromHeader(page, pageCategoryPath, roomId, currentUrl, currentName) {
+  const currentConfig = getPagesJSON(roomId) || await getDefaultJSON();
+  const categoryOptions = getCategoryOptions(currentConfig);
+  
+  const pageCategoryPathValue = pageCategoryPath.length > 0 ? JSON.stringify(pageCategoryPath) : '';
+  
+  const fields = [
+    { name: 'name', label: 'Name', type: 'text', required: true, value: page.name, placeholder: 'Page name' },
+    { name: 'url', label: 'URL', type: 'url', required: true, value: page.url, placeholder: 'https://...' }
+  ];
+  
+  // Agregar selector de carpeta si hay carpetas disponibles
+  if (categoryOptions.length > 0) {
+    const defaultValue = pageCategoryPathValue || categoryOptions[0].value;
+    fields.push({
+      name: 'category',
+      label: 'Folder',
+      type: 'select',
+      required: true,
+      options: categoryOptions,
+      value: defaultValue
+    });
+  }
+  
+  fields.push(
+    { name: 'blockTypes', label: 'Block types (optional)', type: 'text', value: Array.isArray(page.blockTypes) ? page.blockTypes.join(', ') : (page.blockTypes || ''), placeholder: 'quote, callout', help: 'Only for Notion URLs. E.g: "quote" or "quote,callout"' },
+    { name: 'visibleToPlayers', label: 'Visible to all players', type: 'checkbox', value: page.visibleToPlayers === true, help: 'Allow all players to see this page' }
+  );
+  
+  showModalForm(
+    'Edit Page',
+    fields,
+    async (data) => {
+      const config = JSON.parse(JSON.stringify(getPagesJSON(roomId) || currentConfig));
+      
+      // Encontrar la página actual
+      const parent = navigateConfigPath(config, pageCategoryPath);
+      if (!parent || !parent.pages) {
+        alert('Error: Could not find page to edit');
+        return;
+      }
+      
+      const pageIndex = parent.pages.findIndex(p => p.name === page.name && p.url === page.url);
+      if (pageIndex === -1) {
+        alert('Error: Could not find page to edit');
+        return;
+      }
+      
+      const currentPage = parent.pages[pageIndex];
+      const oldName = currentPage.name;
+      const oldVisibility = currentPage.visibleToPlayers === true;
+      
+      // Actualizar datos
+      currentPage.name = data.name;
+      currentPage.url = data.url;
+      if (data.selector) {
+        currentPage.selector = data.selector;
+      } else {
+        delete currentPage.selector;
+      }
+      if (data.blockTypes) {
+        currentPage.blockTypes = data.blockTypes.includes(',') 
+          ? data.blockTypes.split(',').map(s => s.trim())
+          : data.blockTypes.trim();
+      } else {
+        delete currentPage.blockTypes;
+      }
+      // Actualizar visibilidad para jugadores
+      if (data.visibleToPlayers === true) {
+        currentPage.visibleToPlayers = true;
+      } else {
+        delete currentPage.visibleToPlayers;
+      }
+      
+      // Si se cambió la carpeta, mover la página
+      if (data.category && data.category.trim() && data.category !== 'undefined') {
+        try {
+          const newCategoryPath = JSON.parse(data.category);
+          
+          // Verificar que el path es válido
+          if (Array.isArray(newCategoryPath) && newCategoryPath.length > 0) {
+            const newParent = navigateConfigPath(config, newCategoryPath);
+            
+            if (newParent && JSON.stringify(newCategoryPath) !== JSON.stringify(pageCategoryPath)) {
+              // Remover de la ubicación actual
+              parent.pages.splice(pageIndex, 1);
+              
+              // Agregar a la nueva ubicación
+              if (!newParent.pages) newParent.pages = [];
+              newParent.pages.push(currentPage);
+            }
+          }
+        } catch (e) {
+          console.error('Error al mover página:', e);
+          console.error('Valor de category:', data.category);
+          alert('Error changing folder. The page was updated but remains in its current folder.');
+        }
+      }
+      
+      await savePagesJSON(config, roomId);
+      
+      // Actualizar el título del header inmediatamente si cambió
+      if (oldName !== data.name) {
+        const pageTitle = document.getElementById("page-title");
+        if (pageTitle) {
+          pageTitle.textContent = data.name;
+        }
+      }
+      
+      // Actualizar el botón de visibilidad inmediatamente si cambió
+      const newVisibility = data.visibleToPlayers === true;
+      if (oldVisibility !== newVisibility) {
+        const visibilityButton = document.getElementById("page-visibility-button-header");
+        if (visibilityButton) {
+          const icon = visibilityButton.querySelector('img');
+          if (icon) {
+            icon.src = newVisibility ? 'img/icon-eye-open.svg' : 'img/icon-eye-close.svg';
+          }
+          visibilityButton.title = newVisibility ? 'Visible to players (click to hide)' : 'Hidden from players (click to show)';
+        }
+      }
+      
+      // Recargar la vista de page-list
+      const pageList = document.getElementById("page-list");
+      if (pageList) {
+        await renderPagesByCategories(config, pageList, roomId);
+      }
+    }
+  );
+}
+
 // Función para eliminar carpeta desde la vista de page-list
 async function deleteCategoryFromPageList(category, categoryPath, roomId) {
   try {
@@ -5655,7 +5787,7 @@ async function loadPageContent(url, name, selector = null, blockTypes = null) {
               icon: 'img/icon-edit.svg', 
               text: 'Edit', 
               action: async () => {
-                await editPageFromPageList(pageInfo.page, pageCategoryPath, roomId);
+                await editPageFromHeader(pageInfo.page, pageCategoryPath, roomId, url, name);
               }
             },
             { 
@@ -5675,7 +5807,7 @@ async function loadPageContent(url, name, selector = null, blockTypes = null) {
                 icon: 'img/icon-arrow.svg',
                 text: 'Move up',
                 action: async () => {
-                  await movePageInList(pageInfo.page, pageCategoryPath, roomId, 'up');
+                  await movePageUp(pageInfo.page, pageCategoryPath, roomId);
                 }
               });
             }
@@ -5684,7 +5816,7 @@ async function loadPageContent(url, name, selector = null, blockTypes = null) {
                 icon: 'img/icon-arrow.svg',
                 text: 'Move down',
                 action: async () => {
-                  await movePageInList(pageInfo.page, pageCategoryPath, roomId, 'down');
+                  await movePageDown(pageInfo.page, pageCategoryPath, roomId);
                 }
               });
             }
