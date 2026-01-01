@@ -321,7 +321,9 @@ async function trackEvent(eventName, properties = {}) {
           console.log(`📊 Decoded payload:`, decoded);
           console.log(`📊 Event name:`, decoded[0]?.event);
           console.log(`📊 Token in payload:`, decoded[0]?.properties?.token?.substring(0, 10) + '...');
+          console.log(`📊 Token match:`, decoded[0]?.properties?.token === mixpanelToken ? '✅' : '❌');
           console.log(`📊 Distinct ID:`, decoded[0]?.properties?.distinct_id);
+          console.log(`📊 Full properties:`, JSON.stringify(decoded[0]?.properties, null, 2));
         } catch (e) {
           console.warn(`📊 Could not decode payload:`, e);
         }
@@ -425,6 +427,25 @@ function trackContentTooLarge(size, pageName) {
 function trackExtensionOpened() {
   trackEvent('extension_opened');
 }
+
+/**
+ * Test Mixpanel connection - call this from console: testMixpanel()
+ */
+window.testMixpanel = async function() {
+  console.log('🧪 Testing Mixpanel connection...');
+  console.log('📊 Enabled:', mixpanelEnabled);
+  console.log('📊 Token:', mixpanelToken ? mixpanelToken.substring(0, 10) + '...' : 'missing');
+  console.log('📊 Distinct ID:', mixpanelDistinctId);
+  
+  // Send a test event
+  await trackEvent('test_event', {
+    test: true,
+    timestamp: new Date().toISOString()
+  });
+  
+  console.log('🧪 Test event sent. Check Mixpanel Live View in 10-30 seconds.');
+  console.log('🧪 Go to: Mixpanel → Events → Live View');
+};
 
 // La aplicación funciona con localStorage y default-config.json
 // config.js ya no es necesario - la configuración se gestiona desde la interfaz
