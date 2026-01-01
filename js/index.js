@@ -4910,6 +4910,7 @@ async function editPageFromHeader(page, pageCategoryPath, roomId, currentUrl, cu
       
       const currentPage = parent.pages[pageIndex];
       const oldName = currentPage.name;
+      const oldUrl = currentPage.url;
       const oldVisibility = currentPage.visibleToPlayers === true;
       
       // Actualizar datos
@@ -4962,29 +4963,39 @@ async function editPageFromHeader(page, pageCategoryPath, roomId, currentUrl, cu
       await savePagesJSON(config, roomId);
       trackPageEdited(data.name);
       
-      // Actualizar el título del header inmediatamente si cambió
-      if (oldName !== data.name) {
-        const pageTitle = document.getElementById("page-title");
-        if (pageTitle) {
-          pageTitle.textContent = data.name;
-        }
-      }
+      // Si cambió la URL o el nombre, recargar el contenido de la página actual
+      const notionContainer = document.getElementById("notion-container");
+      const pageList = document.getElementById("page-list");
+      const urlChanged = oldUrl !== data.url;
+      const nameChanged = oldName !== data.name;
       
-      // Actualizar el botón de visibilidad inmediatamente si cambió
-      const newVisibility = data.visibleToPlayers === true;
-      if (oldVisibility !== newVisibility) {
-        const visibilityButton = document.getElementById("page-visibility-button-header");
-        if (visibilityButton) {
-          const icon = visibilityButton.querySelector('img');
-          if (icon) {
-            icon.src = newVisibility ? 'img/icon-eye-open.svg' : 'img/icon-eye-close.svg';
+      if (urlChanged && notionContainer && !notionContainer.classList.contains('hidden')) {
+        // La URL cambió y estamos viendo la página, recargar contenido
+        await loadPageContent(data.url, data.name, currentPage.selector || null, Array.isArray(currentPage.blockTypes) ? currentPage.blockTypes : (currentPage.blockTypes || null));
+      } else {
+        // Solo actualizar el título si cambió
+        if (nameChanged) {
+          const pageTitle = document.getElementById("page-title");
+          if (pageTitle) {
+            pageTitle.textContent = data.name;
           }
-          visibilityButton.title = newVisibility ? 'Visible to players (click to hide)' : 'Hidden from players (click to show)';
+        }
+        
+        // Actualizar el botón de visibilidad inmediatamente si cambió
+        const newVisibility = data.visibleToPlayers === true;
+        if (oldVisibility !== newVisibility) {
+          const visibilityButton = document.getElementById("page-visibility-button-header");
+          if (visibilityButton) {
+            const icon = visibilityButton.querySelector('img');
+            if (icon) {
+              icon.src = newVisibility ? 'img/icon-eye-open.svg' : 'img/icon-eye-close.svg';
+            }
+            visibilityButton.title = newVisibility ? 'Visible to players (click to hide)' : 'Hidden from players (click to show)';
+          }
         }
       }
       
       // Recargar la vista de page-list
-      const pageList = document.getElementById("page-list");
       if (pageList) {
         await renderPagesByCategories(config, pageList, roomId);
       }
@@ -6332,6 +6343,22 @@ async function loadDemoHtmlContent(url, container) {
   }
 }
 
+// Función centralizada para ocultar todos los botones de página del header
+function hidePageHeaderButtons() {
+  const refreshButton = document.getElementById("refresh-page-button");
+  if (refreshButton) {
+    refreshButton.classList.add("hidden");
+  }
+  const contextMenuButton = document.getElementById("page-context-menu-button-header");
+  if (contextMenuButton) {
+    contextMenuButton.classList.add("hidden");
+  }
+  const visibilityButton = document.getElementById("page-visibility-button-header");
+  if (visibilityButton) {
+    visibilityButton.classList.add("hidden");
+  }
+}
+
 // Función para cargar contenido de una página
 async function loadPageContent(url, name, selector = null, blockTypes = null) {
   // Track page view - determine type
@@ -6623,6 +6650,23 @@ async function loadPageContent(url, name, selector = null, blockTypes = null) {
                 if (pageList) {
                   pageList.classList.remove("hidden");
                 }
+                // Ocultar todos los botones de página
+                hidePageHeaderButtons();
+                // Mostrar el button-container cuando se vuelve a la vista principal
+                const buttonContainer = document.querySelector('.button-container');
+                if (buttonContainer) {
+                  buttonContainer.classList.remove("hidden");
+                }
+                // Ocultar el botón de volver
+                const backButton = document.getElementById("back-button");
+                if (backButton) {
+                  backButton.classList.add("hidden");
+                }
+                // Restaurar el título
+                const pageTitle = document.getElementById("page-title");
+                if (pageTitle) {
+                  pageTitle.textContent = "GM vault";
+                }
               }
             }
           });
@@ -6738,21 +6782,8 @@ async function loadPageContent(url, name, selector = null, blockTypes = null) {
           iframe.src = '';
           iframe.style.display = 'none';
         }
-        // Ocultar botón de menú contextual
-        const contextMenuButton = document.getElementById("page-context-menu-button-header");
-        if (contextMenuButton) {
-          contextMenuButton.classList.add("hidden");
-        }
-        // Ocultar botón de recargar
-        const refreshButton = document.getElementById("refresh-page-button");
-        if (refreshButton) {
-          refreshButton.classList.add("hidden");
-          }
-        // Ocultar botón de visibilidad
-        const visibilityButton = document.getElementById("page-visibility-button-header");
-        if (visibilityButton) {
-          visibilityButton.classList.add("hidden");
-        }
+        // Ocultar todos los botones de página
+        hidePageHeaderButtons();
         }
         
         // Restaurar vista principal
@@ -6818,18 +6849,7 @@ async function showSettings() {
         // Cerrar token config
         settingsContainer.classList.add("hidden");
         // Ocultar botones de página que podrían haber quedado visibles
-        const refreshButton = document.getElementById("refresh-page-button");
-        if (refreshButton) {
-          refreshButton.classList.add("hidden");
-        }
-        const contextMenuButton = document.getElementById("page-context-menu-button-header");
-        if (contextMenuButton) {
-          contextMenuButton.classList.add("hidden");
-        }
-        const visibilityButton = document.getElementById("page-visibility-button-header");
-        if (visibilityButton) {
-          visibilityButton.classList.add("hidden");
-        }
+        hidePageHeaderButtons();
       } else if (isNotionContainerVisible) {
         // Volver a la vista principal desde notion-container
         notionContainer.classList.add("hidden");
@@ -6843,11 +6863,8 @@ async function showSettings() {
           iframe.src = '';
           iframe.style.display = 'none';
         }
-        // Ocultar botón de recargar
-        const refreshButton = document.getElementById("refresh-page-button");
-        if (refreshButton) {
-          refreshButton.classList.add("hidden");
-        }
+        // Ocultar todos los botones de página
+        hidePageHeaderButtons();
       }
       
       // Restaurar vista principal
@@ -6870,18 +6887,7 @@ async function showSettings() {
   }
   
   // Ocultar botones de página que podrían haber quedado visibles
-  const refreshButton = document.getElementById("refresh-page-button");
-  if (refreshButton) {
-    refreshButton.classList.add("hidden");
-  }
-  const contextMenuButton = document.getElementById("page-context-menu-button-header");
-  if (contextMenuButton) {
-    contextMenuButton.classList.add("hidden");
-  }
-  const visibilityButton = document.getElementById("page-visibility-button-header");
-  if (visibilityButton) {
-    visibilityButton.classList.add("hidden");
-  }
+  hidePageHeaderButtons();
   
   const currentToken = getUserToken() || '';
   const maskedToken = currentToken ? currentToken.substring(0, 8) + '...' + currentToken.substring(currentToken.length - 4) : '';
