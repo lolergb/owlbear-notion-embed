@@ -103,6 +103,179 @@ function logWarn(...args) {
   console.warn(...args);
 }
 
+// ============================================
+// MIXPANEL ANALYTICS
+// ============================================
+let mixpanelToken = null;
+let mixpanelEnabled = false;
+let mixpanelDistinctId = null;
+
+/**
+ * Initialize Mixpanel tracking by fetching token from Netlify
+ */
+async function initMixpanel() {
+  try {
+    // Only fetch token if we're on Netlify
+    if (!window.location.origin.includes('netlify.app') && !window.location.origin.includes('netlify.com')) {
+      console.log('🔍 Mixpanel disabled (not on Netlify)');
+      return;
+    }
+    
+    const response = await fetch('/.netlify/functions/get-mixpanel-token');
+    if (response.ok) {
+      const data = await response.json();
+      if (data.enabled && data.token) {
+        mixpanelToken = data.token;
+        mixpanelEnabled = true;
+        
+        // Generate a distinct ID based on the user (use OBR player id if available)
+        try {
+          const playerId = await OBR.player.getId();
+          mixpanelDistinctId = playerId;
+        } catch (e) {
+          // Fallback to a random ID stored in localStorage
+          mixpanelDistinctId = localStorage.getItem('mixpanel_distinct_id');
+          if (!mixpanelDistinctId) {
+            mixpanelDistinctId = 'anon_' + Math.random().toString(36).substring(2, 15);
+            localStorage.setItem('mixpanel_distinct_id', mixpanelDistinctId);
+          }
+        }
+        
+        console.log('📊 Mixpanel analytics enabled');
+      }
+    }
+  } catch (e) {
+    console.log('📊 Mixpanel disabled (fetch error)');
+    mixpanelEnabled = false;
+  }
+}
+
+/**
+ * Track an event to Mixpanel
+ * @param {string} eventName - Name of the event
+ * @param {Object} properties - Additional properties to track
+ */
+async function trackEvent(eventName, properties = {}) {
+  if (!mixpanelEnabled || !mixpanelToken) {
+    return;
+  }
+  
+  try {
+    // Get user role for context
+    let userRole = 'unknown';
+    try {
+      const role = await OBR.player.getRole();
+      userRole = role;
+    } catch (e) {}
+    
+    // Build the event payload
+    const eventData = {
+      event: eventName,
+      properties: {
+        token: mixpanelToken,
+        distinct_id: mixpanelDistinctId,
+        time: Date.now(),
+        $insert_id: Math.random().toString(36).substring(2, 15),
+        role: userRole,
+        ...properties
+      }
+    };
+    
+    // Send to Mixpanel via HTTP API (doesn't require SDK)
+    const payload = btoa(JSON.stringify(eventData));
+    
+    // Use sendBeacon for reliability (doesn't block)
+    if (navigator.sendBeacon) {
+      navigator.sendBeacon(`https://api.mixpanel.com/track/?data=${payload}`);
+    } else {
+      // Fallback to fetch
+      fetch(`https://api.mixpanel.com/track/?data=${payload}`, {
+        method: 'GET',
+        mode: 'no-cors'
+      }).catch(() => {});
+    }
+  } catch (e) {
+    // Silently fail - analytics should never break the app
+  }
+}
+
+/**
+ * Track page view event
+ * @param {string} pageName - Name of the page
+ * @param {string} pageType - Type of page (notion, image, video, iframe)
+ */
+function trackPageView(pageName, pageType = 'unknown') {
+  trackEvent('page_view', {
+    page_name: pageName,
+    page_type: pageType
+  });
+}
+
+/**
+ * Track image share event
+ * @param {string} imageUrl - URL of the shared image
+ */
+function trackImageShare(imageUrl) {
+  trackEvent('image_shared', {
+    image_url: imageUrl ? imageUrl.substring(0, 100) : 'unknown'
+  });
+}
+
+/**
+ * Track visibility toggle event
+ * @param {string} pageName - Name of the page
+ * @param {boolean} visible - New visibility state
+ */
+function trackVisibilityToggle(pageName, visible) {
+  trackEvent('visibility_toggled', {
+    page_name: pageName,
+    visible: visible
+  });
+}
+
+/**
+ * Track storage limit reached event
+ * @param {string} context - Context where the error occurred
+ */
+function trackStorageLimitReached(context) {
+  trackEvent('storage_limit_reached', {
+    context: context
+  });
+}
+
+/**
+ * Track cache cleared event
+ */
+function trackCacheCleared() {
+  trackEvent('cache_cleared');
+}
+
+/**
+ * Track GM not active event (when player can't access content)
+ */
+function trackGMNotActive() {
+  trackEvent('gm_not_active');
+}
+
+/**
+ * Track content too large event
+ * @param {number} size - Size of the content in bytes
+ * @param {string} pageName - Name of the page
+ */
+function trackContentTooLarge(size, pageName) {
+  trackEvent('content_too_large', {
+    size_kb: Math.round(size / 1024),
+    page_name: pageName
+  });
+}
+
+/**
+ * Track extension opened event
+ */
+function trackExtensionOpened() {
+  trackEvent('extension_opened');
+}
+
 // La aplicación funciona con localStorage y default-config.json
 // config.js ya no es necesario - la configuración se gestiona desde la interfaz
 
@@ -2507,6 +2680,7 @@ async function attachImageClickHandlers() {
           caption: caption
         });
         console.log('📤 Imagen compartida con jugadores:', absoluteImageUrl.substring(0, 80));
+        trackImageShare(absoluteImageUrl);
         
         // Feedback visual
         const originalContent = button.innerHTML;
@@ -2898,6 +3072,10 @@ initDebugMode();
 try {
   OBR.onReady(async () => {
     try {
+      // Initialize Mixpanel analytics
+      await initMixpanel();
+      trackExtensionOpened();
+      
       // Verificar rol primero para filtrar logs
       const isGM = await getUserRole();
       
@@ -4686,12 +4864,14 @@ async function togglePageVisibility(page, pageCategoryPath, roomId) {
     
     const currentPage = parent.pages[pageIndex];
     // Alternar visibilidad
+    const newVisibility = currentPage.visibleToPlayers !== true;
     if (currentPage.visibleToPlayers === true) {
       delete currentPage.visibleToPlayers;
     } else {
       currentPage.visibleToPlayers = true;
     }
     
+    trackVisibilityToggle(currentPage.name, newVisibility);
     await savePagesJSON(config, roomId);
     
     // Recargar la vista
@@ -5730,6 +5910,18 @@ async function loadDemoHtmlContent(url, container) {
 
 // Función para cargar contenido de una página
 async function loadPageContent(url, name, selector = null, blockTypes = null) {
+  // Track page view - determine type
+  let pageType = 'unknown';
+  if (isDemoHtmlFile(url)) {
+    pageType = 'demo';
+  } else if (isNotionUrl(url)) {
+    pageType = 'notion';
+  } else {
+    const linkType = getLinkType(url);
+    pageType = linkType.type;
+  }
+  trackPageView(name, pageType);
+  
   const pageList = document.getElementById("page-list");
   const notionContainer = document.getElementById("notion-container");
   const backButton = document.getElementById("back-button");
@@ -6838,6 +7030,9 @@ let storageLimitModalShown = false;
  * @param {string} context - Contexto donde ocurrió el error (ej: 'saving configuration', 'caching page')
  */
 function showStorageLimitModal(context = 'saving data') {
+  // Track storage limit event
+  trackStorageLimitReached(context);
+  
   // Evitar mostrar múltiples modales
   if (storageLimitModalShown) {
     console.log('⚠️ Storage limit modal already shown, skipping');
@@ -6896,6 +7091,7 @@ function showStorageLimitModal(context = 'saving data') {
   const clearCacheBtn = modal.querySelector('#storage-clear-cache');
   clearCacheBtn.addEventListener('click', async () => {
     const clearedCount = clearAllCache();
+    trackCacheCleared();
     clearCacheBtn.textContent = `✅ Cleared ${clearedCount} items`;
     clearCacheBtn.disabled = true;
     setTimeout(() => {
@@ -6917,6 +7113,8 @@ function showStorageLimitModal(context = 'saving data') {
  * Muestra un modal cuando el GM no está activo (para players)
  */
 function showGMNotActiveModal() {
+  trackGMNotActive();
+  
   const overlay = document.createElement('div');
   overlay.id = 'gm-not-active-modal';
   overlay.className = 'modal';
@@ -6976,6 +7174,8 @@ function showGMNotActiveModal() {
  * @param {string} pageName - Nombre de la página
  */
 function showContentTooLargeModal(size, pageName) {
+  trackContentTooLarge(size, pageName);
+  
   const overlay = document.createElement('div');
   overlay.id = 'content-too-large-modal';
   overlay.className = 'modal';
