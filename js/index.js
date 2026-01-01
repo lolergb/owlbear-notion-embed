@@ -432,6 +432,132 @@ function trackExtensionOpened() {
 }
 
 /**
+ * Track folder added event
+ */
+function trackFolderAdded(folderName) {
+  trackEvent('folder_added', {
+    folder_name: folderName
+  });
+}
+
+/**
+ * Track page added event
+ */
+function trackPageAdded(pageName, pageType = 'unknown') {
+  trackEvent('page_added', {
+    page_name: pageName,
+    page_type: pageType
+  });
+}
+
+/**
+ * Track folder edited event
+ */
+function trackFolderEdited(oldName, newName) {
+  trackEvent('folder_edited', {
+    old_name: oldName,
+    new_name: newName
+  });
+}
+
+/**
+ * Track page edited event
+ */
+function trackPageEdited(pageName) {
+  trackEvent('page_edited', {
+    page_name: pageName
+  });
+}
+
+/**
+ * Track folder deleted event
+ */
+function trackFolderDeleted(folderName) {
+  trackEvent('folder_deleted', {
+    folder_name: folderName
+  });
+}
+
+/**
+ * Track page deleted event
+ */
+function trackPageDeleted(pageName) {
+  trackEvent('page_deleted', {
+    page_name: pageName
+  });
+}
+
+/**
+ * Track page moved/reordered event
+ */
+function trackPageMoved(pageName, direction) {
+  trackEvent('page_moved', {
+    page_name: pageName,
+    direction: direction // 'up' or 'down'
+  });
+}
+
+/**
+ * Track Notion token configured event
+ */
+function trackTokenConfigured() {
+  trackEvent('token_configured');
+}
+
+/**
+ * Track Notion token removed event
+ */
+function trackTokenRemoved() {
+  trackEvent('token_removed');
+}
+
+/**
+ * Track JSON imported event
+ */
+function trackJSONImported(itemCount) {
+  trackEvent('json_imported', {
+    item_count: itemCount
+  });
+}
+
+/**
+ * Track JSON exported event
+ */
+function trackJSONExported(itemCount) {
+  trackEvent('json_exported', {
+    item_count: itemCount
+  });
+}
+
+/**
+ * Track page linked to token event
+ */
+function trackPageLinkedToToken(pageName, tokenId) {
+  trackEvent('page_linked_to_token', {
+    page_name: pageName,
+    token_id: tokenId ? tokenId.substring(0, 20) : 'unknown'
+  });
+}
+
+/**
+ * Track page viewed from token event
+ */
+function trackPageViewedFromToken(pageName) {
+  trackEvent('page_viewed_from_token', {
+    page_name: pageName
+  });
+}
+
+/**
+ * Track page reloaded event
+ */
+function trackPageReloaded(pageName) {
+  trackEvent('page_reloaded', {
+    page_name: pageName
+  });
+}
+
+/**
  * Test Mixpanel connection - call this from console: testMixpanel()
  */
 window.testMixpanel = async function() {
@@ -498,11 +624,13 @@ function saveUserToken(token) {
     if (token && token.trim() !== '') {
       localStorage.setItem(GLOBAL_TOKEN_KEY, token.trim());
       log('✅ Token del usuario guardado (global para toda la extensión)');
+      trackTokenConfigured();
       return true;
     } else {
       // Si el token está vacío, eliminarlo
       localStorage.removeItem(GLOBAL_TOKEN_KEY);
       log('🗑️ Token del usuario eliminado');
+      trackTokenRemoved();
       return true;
     }
   } catch (e) {
@@ -3136,6 +3264,7 @@ async function setupTokenContextMenus(pagesConfig, roomId) {
           await new Promise(resolve => setTimeout(resolve, 100));
           
           // Abrir la página usando la función existente
+          trackPageViewedFromToken(pageName);
           await loadPageContent(pageUrl, pageName);
         }
       }
@@ -3257,6 +3386,7 @@ function showPageSelectorForToken(itemId, pagesConfig, roomId) {
         });
         
         console.log('✅ Página vinculada al token:', selectedPage.name);
+        trackPageLinkedToToken(selectedPage.name, itemId);
         alert(`✅ Page "${selectedPage.name}" linked to token`);
         
       } catch (error) {
@@ -4343,6 +4473,11 @@ async function moveItemUp(itemType, itemIndex, parentPath, roomId) {
   saveCombinedOrder(parent, order);
   await savePagesJSON(config, roomId);
   
+  // Track page move
+  if (itemType === 'page' && parent.pages && parent.pages[itemIndex]) {
+    trackPageMoved(parent.pages[itemIndex].name, 'up');
+  }
+  
   // Recargar vista
   const pageList = document.getElementById("page-list");
   if (pageList) {
@@ -4369,6 +4504,11 @@ async function moveItemDown(itemType, itemIndex, parentPath, roomId) {
   
   saveCombinedOrder(parent, order);
   await savePagesJSON(config, roomId);
+  
+  // Track page move
+  if (itemType === 'page' && parent.pages && parent.pages[itemIndex]) {
+    trackPageMoved(parent.pages[itemIndex].name, 'down');
+  }
   
   // Recargar vista
   const pageList = document.getElementById("page-list");
@@ -4454,6 +4594,7 @@ async function addCategoryToPageList(categoryPath, roomId) {
       }
       
       await savePagesJSON(config, roomId);
+      trackFolderAdded(data.name);
       
       // Recargar la vista
       const pageList = document.getElementById("page-list");
@@ -4576,7 +4717,9 @@ async function editCategoryFromPageList(category, categoryPath, roomId) {
         }
       }
       
+      const oldName = currentCategory.name;
       await savePagesJSON(config, roomId);
+      trackFolderEdited(oldName, data.name);
       
       // Recargar la vista
       const pageList = document.getElementById("page-list");
@@ -4798,6 +4941,7 @@ async function editPageFromHeader(page, pageCategoryPath, roomId, currentUrl, cu
       }
       
       await savePagesJSON(config, roomId);
+      trackPageEdited(data.name);
       
       // Actualizar el título del header inmediatamente si cambió
       if (oldName !== data.name) {
@@ -4888,6 +5032,7 @@ async function deleteCategoryFromPageList(category, categoryPath, roomId) {
     }
     
     await savePagesJSON(config, roomId);
+    trackFolderDeleted(category.name);
     
     // Recargar la vista
     const pageList = document.getElementById("page-list");
@@ -4926,6 +5071,7 @@ async function deletePageFromPageList(page, pageCategoryPath, roomId) {
     parent.pages.splice(pageIndex, 1);
     
     await savePagesJSON(config, roomId);
+    trackPageDeleted(page.name);
     
     // Recargar la vista
     const pageList = document.getElementById("page-list");
@@ -5332,6 +5478,18 @@ async function addPageToPageListSimple(categoryPath, roomId) {
       }
       
       await savePagesJSON(config, roomId);
+      
+      // Determine page type
+      let pageType = 'generic';
+      if (data.url) {
+        if (isNotionUrl(data.url)) pageType = 'notion';
+        else if (isDemoHtmlFile(data.url)) pageType = 'demo';
+        else {
+          const linkType = getLinkType(data.url);
+          pageType = linkType.type;
+        }
+      }
+      trackPageAdded(data.name, pageType);
       
       // Recargar la vista
       const pageList = document.getElementById("page-list");
@@ -6255,6 +6413,11 @@ async function loadPageContent(url, name, selector = null, blockTypes = null) {
         return;
       }
       
+      // Get page name for tracking
+      const pageTitle = document.getElementById("page-title");
+      const pageName = pageTitle ? pageTitle.textContent : 'unknown';
+      trackPageReloaded(pageName);
+      
       // Limpiar caché de esta página ANTES de recargar
       const pageId = extractNotionPageId(currentUrl);
       if (pageId) {
@@ -6955,6 +7118,21 @@ async function showSettings() {
             // Guardar la nueva configuración
             const saveSuccess = await savePagesJSON(parsed, currentRoomId);
             if (saveSuccess) {
+              // Count items for tracking
+              const countItems = (config) => {
+                let count = 0;
+                const countRecursive = (cats) => {
+                  if (!cats) return;
+                  cats.forEach(cat => {
+                    if (cat.pages) count += cat.pages.length;
+                    if (cat.categories) countRecursive(cat.categories);
+                  });
+                };
+                if (config.categories) countRecursive(config.categories);
+                return count;
+              };
+              trackJSONImported(countItems(parsed));
+              
               alert('✅ JSON loaded successfully. Configuration has been updated.');
               closeSettings();
               
@@ -7014,6 +7192,22 @@ async function showSettings() {
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
+        
+        // Count items for tracking
+        const countItems = (config) => {
+          let count = 0;
+          const countRecursive = (cats) => {
+            if (!cats) return;
+            cats.forEach(cat => {
+              if (cat.pages) count += cat.pages.length;
+              if (cat.categories) countRecursive(cat.categories);
+            });
+          };
+          if (config.categories) countRecursive(config.categories);
+          return count;
+        };
+        trackJSONExported(countItems(config));
+        
         alert('✅ JSON downloaded successfully');
       } catch (e) {
         console.error('Error al descargar JSON:', e);
