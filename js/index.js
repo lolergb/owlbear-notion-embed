@@ -673,7 +673,13 @@ function getPagesJSON(roomId) {
     return pagesConfigCache;
   }
   
-  // Fallback a localStorage (para compatibilidad y cuando OBR no está disponible)
+  // Fallback a localStorage
+  return getPagesJSONFromLocalStorage(roomId);
+}
+
+// Función para obtener directamente de localStorage (ignora cache)
+// Útil para el GM que siempre debe usar su localStorage
+function getPagesJSONFromLocalStorage(roomId) {
   try {
     const storageKey = getStorageKey(roomId);
     log('🔍 Buscando configuración con clave:', storageKey, 'para roomId:', roomId);
@@ -3284,21 +3290,25 @@ try {
         return count;
       };
       
-      // PRIORIDAD: 1) Room metadata (compartida), 2) localStorage, 3) default
-      // Primero intentar cargar desde room metadata (configuración compartida entre usuarios)
-      const roomMetadataConfig = await loadPagesFromRoomMetadata();
+      // Obtener configuraciones de localStorage directamente (sin usar cache)
+      // El cache puede estar contaminado con configuración filtrada
+      const currentRoomConfig = getPagesJSONFromLocalStorage(roomId);
+      let defaultConfig = getPagesJSONFromLocalStorage('default');
       
-      // Obtener configuraciones de localStorage como fallback
-      const currentRoomConfig = getPagesJSON(roomId);
-      let defaultConfig = getPagesJSON('default');
+      // Solo cargar room metadata para players
+      let roomMetadataConfig = null;
+      if (!isGM) {
+        roomMetadataConfig = await loadPagesFromRoomMetadata();
+      }
       
       // Si no hay configuración 'default' en localStorage, cargarla desde la URL y guardarla
-      if (!defaultConfig) {
-        log('📥 No se encontró configuración "default" en localStorage, cargando desde URL pública...');
+      // Solo el GM necesita cargar/guardar la configuración default
+      if (!defaultConfig && isGM) {
+        log('📥 [GM] No se encontró configuración "default" en localStorage, cargando desde URL pública...');
         defaultConfig = await getDefaultJSON();
         if (defaultConfig && defaultConfig.categories && defaultConfig.categories.length > 0) {
           await savePagesJSON(defaultConfig, 'default');
-          log('💾 Configuración "default" cargada y guardada desde URL pública');
+          log('💾 [GM] Configuración "default" cargada y guardada desde URL pública');
         }
       }
       
@@ -3346,16 +3356,23 @@ try {
           if (visibleConfig) {
             pagesConfig = visibleConfig;
             log('✅ [Player] Configuración recibida del GM vía broadcast');
+          } else {
+            // Player sin páginas compartidas - mostrar estado vacío
+            log('ℹ️ [Player] No hay páginas compartidas por el GM');
+            pagesConfig = { categories: [] };
           }
         }
       }
       
-      // Si no hay ninguna configuración, crear una nueva por defecto
-      if (!pagesConfig) {
-        log('📝 No se encontró ninguna configuración, creando una nueva por defecto');
+      // Si no hay ninguna configuración (solo para GM), crear una nueva por defecto
+      if (!pagesConfig && isGM) {
+        log('📝 [GM] No se encontró ninguna configuración, creando una nueva por defecto');
         pagesConfig = await getDefaultJSON();
         await savePagesJSON(pagesConfig, roomId);
-        log('✅ Configuración por defecto creada para room:', roomId);
+        log('✅ [GM] Configuración por defecto creada para room:', roomId);
+      } else if (!pagesConfig) {
+        // Player sin configuración
+        pagesConfig = { categories: [] };
       }
       
       // Configurar listener para sincronización en tiempo real
