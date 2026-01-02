@@ -9,6 +9,43 @@
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Permanent+Marker&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/app.css">
   <link rel="stylesheet" href="css/notion-markdown.css">
+  <script>
+    // Detección temprana del modo modal para ocultar elementos innecesarios antes de que se cargue el JS
+    (function() {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('modal') === 'true') {
+        // Marcar que estamos en modo modal
+        document.documentElement.classList.add('modal-mode');
+      }
+    })();
+  </script>
+  <style>
+    /* Estilos para modo modal - ocultar elementos innecesarios inmediatamente */
+    html.modal-mode body {
+      padding: 0 !important;
+      overflow: hidden !important;
+    }
+    html.modal-mode .container {
+      max-width: 100% !important;
+      height: 100vh !important;
+      margin: 0 !important;
+      padding: 0 !important;
+    }
+    html.modal-mode #header,
+    html.modal-mode #page-list,
+    html.modal-mode #settings-container,
+    html.modal-mode .button-container {
+      display: none !important;
+    }
+    html.modal-mode #notion-container {
+      display: block !important;
+      height: 100vh !important;
+      border-radius: 0 !important;
+    }
+    html.modal-mode #notion-container.hidden {
+      display: block !important;
+    }
+  </style>
 </head>
 <body>
   <div class="container">

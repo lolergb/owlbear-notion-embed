@@ -3032,6 +3032,40 @@ async function attachImageClickHandlers() {
   });
 }
 
+/**
+ * Gestiona la visibilidad entre notion-content y notion-iframe
+ * @param {HTMLElement} container - El contenedor notion-container
+ * @param {'content' | 'iframe'} mode - Qué elemento mostrar
+ */
+function setNotionDisplayMode(container, mode) {
+  const contentDiv = container.querySelector('#notion-content');
+  const iframe = container.querySelector('#notion-iframe');
+  
+  if (mode === 'content') {
+    // Mostrar content, ocultar iframe
+    if (iframe) {
+      iframe.src = ''; // Limpiar para evitar contenido residual
+      iframe.style.display = 'none';
+      iframe.style.visibility = 'hidden';
+    }
+    if (contentDiv) {
+      contentDiv.style.display = 'block';
+    }
+    container.classList.add('show-content');
+  } else if (mode === 'iframe') {
+    // Mostrar iframe, ocultar content
+    if (contentDiv) {
+      contentDiv.innerHTML = ''; // Limpiar para evitar contenido residual
+      contentDiv.style.display = 'none';
+    }
+    if (iframe) {
+      iframe.style.display = 'block';
+      iframe.style.visibility = 'visible';
+    }
+    container.classList.remove('show-content');
+  }
+}
+
 // Función para cargar y renderizar contenido de Notion desde la API
 async function loadNotionContent(url, container, forceRefresh = false, blockTypes = null) {
   const contentDiv = container.querySelector('#notion-content');
@@ -3041,11 +3075,8 @@ async function loadNotionContent(url, container, forceRefresh = false, blockType
     return;
   }
   
-  // Ocultar iframe y mostrar contenido de Notion
-  const iframe = container.querySelector('#notion-iframe');
-  if (iframe) {
-    iframe.style.display = 'none';
-  }
+  // Usar la función centralizada para gestionar visibilidad
+  setNotionDisplayMode(container, 'content');
   
   // Mostrar loading
   contentDiv.innerHTML = `
@@ -3502,6 +3533,7 @@ try {
       
       if (isModalMode && modalUrl) {
         // Estamos en modo modal, cargar el contenido directamente
+        // Los estilos se aplican automáticamente por CSS (html.modal-mode)
         try {
           const decodedUrl = decodeURIComponent(modalUrl);
           const decodedName = modalName ? decodeURIComponent(modalName) : 'Page';
@@ -3515,54 +3547,20 @@ try {
             }
           }
           
-          // En modo modal, siempre ocultar todo excepto el contenido
-          // Ocultar todos los elementos excepto el notion-container
-          const header = document.getElementById("header");
-          const pageList = document.getElementById("page-list");
-          const settingsContainer = document.getElementById("settings-container");
-          const buttonContainer = document.querySelector('.button-container');
-          
-          if (header) header.classList.add("hidden");
-          if (pageList) pageList.classList.add("hidden");
-          if (settingsContainer) settingsContainer.classList.add("hidden");
-          if (buttonContainer) buttonContainer.classList.add("hidden");
-          
-          // Mostrar el notion-container
+          // El notion-container ya está visible por CSS (html.modal-mode)
+          // Solo necesitamos limpiar el contenido anterior
           const notionContainer = document.getElementById("notion-container");
           if (notionContainer) {
-            notionContainer.classList.remove("hidden");
-            
-            // Limpiar contenido anterior antes de cargar el nuevo
+            // Usar la función centralizada para limpiar el estado
+            setNotionDisplayMode(notionContainer, 'content');
             const notionContent = notionContainer.querySelector('#notion-content');
-            const notionIframe = notionContainer.querySelector('#notion-iframe');
-            
             if (notionContent) {
               notionContent.innerHTML = '';
-              notionContent.style.display = 'none';
             }
-            if (notionIframe) {
-              notionIframe.src = '';
-              notionIframe.style.display = 'none';
-            }
-            
-            // Remover clases de estado anterior
-            notionContainer.classList.remove('show-content');
-          }
-          
-          // Ajustar estilos del body para modo modal
-          document.body.style.padding = '0';
-          document.body.style.overflow = 'hidden';
-          
-          // Ajustar estilos del container para modo modal
-          const container = document.querySelector('.container');
-          if (container) {
-            container.style.maxWidth = '100%';
-            container.style.height = '100vh';
-            container.style.margin = '0';
-            container.style.padding = '0';
           }
           
           // Cargar el contenido de la página
+          // Los estilos del container ya se aplican por CSS (html.modal-mode)
           await loadPageContent(decodedUrl, decodedName, decodedSelector, blockTypes);
           
           // No continuar con la carga normal de la configuración
@@ -6047,17 +6045,12 @@ function convertToEmbedUrl(url) {
 // Función para cargar imagen en viewer dedicado
 async function loadImageContent(url, container, name) {
   const contentDiv = container.querySelector('#notion-content');
-  const iframe = container.querySelector('#notion-iframe');
   
-  // Ocultar iframe
-  if (iframe) {
-    iframe.style.display = 'none';
-  }
+  // Usar la función centralizada para gestionar visibilidad
+  setNotionDisplayMode(container, 'content');
   
   // Mostrar contenido
   if (contentDiv) {
-    contentDiv.style.display = 'block';
-    container.classList.add('show-content');
     
     // Convertir URL si es de Google Drive
     let imageUrl = url;
@@ -6158,13 +6151,10 @@ async function loadImageContent(url, container, name) {
 
 // Función para cargar video en player dedicado
 async function loadVideoContent(url, container, videoType) {
-  const contentDiv = container.querySelector('#notion-content');
   const iframe = container.querySelector('#notion-iframe');
   
-  // Ocultar contenido de Notion
-  if (contentDiv) {
-    contentDiv.style.display = 'none';
-  }
+  // Usar la función centralizada para gestionar visibilidad
+  setNotionDisplayMode(container, 'iframe');
   
   // Convertir URL a formato embed
   const embedResult = convertToEmbedUrl(url);
@@ -6174,8 +6164,6 @@ async function loadVideoContent(url, container, videoType) {
   if (iframe) {
     // Configurar el iframe para video
     iframe.src = embedUrl;
-    iframe.style.display = 'block';
-    iframe.style.visibility = 'visible';
     iframe.style.width = '100%';
     iframe.style.height = '100%';
     iframe.style.border = 'none';
@@ -6183,26 +6171,20 @@ async function loadVideoContent(url, container, videoType) {
     iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share';
     iframe.allowFullscreen = true;
   }
-  
-  container.classList.remove('show-content');
 }
 
 // Función para cargar contenido en iframe (para URLs no-Notion)
 // Si se proporciona un selector, carga solo ese elemento
 async function loadIframeContent(url, container, selector = null) {
   const iframe = container.querySelector('#notion-iframe');
-  const contentDiv = container.querySelector('#notion-content');
   
   if (!iframe) {
     console.error('No se encontró el iframe');
     return;
   }
   
-  // Ocultar el contenido de Notion
-  if (contentDiv) {
-    contentDiv.style.display = 'none';
-  }
-  container.classList.remove('show-content');
+  // Usar la función centralizada para gestionar visibilidad
+  setNotionDisplayMode(container, 'iframe');
   
   // Si hay un selector, intentar cargar solo ese elemento
   if (selector) {
@@ -6349,17 +6331,14 @@ function resolveAppUrl(url) {
 // Función para cargar contenido HTML de demo directamente en el contenedor de Notion
 async function loadDemoHtmlContent(url, container) {
   const contentDiv = container.querySelector('#notion-content');
-  const iframe = container.querySelector('#notion-iframe');
   
   if (!contentDiv) {
     console.error('No se encontró el contenedor de contenido');
     return;
   }
   
-  // Ocultar iframe y mostrar contenido
-  if (iframe) {
-    iframe.style.display = 'none';
-  }
+  // Usar la función centralizada para gestionar visibilidad
+  setNotionDisplayMode(container, 'content');
   
   // Mostrar loading
   contentDiv.innerHTML = `
