@@ -6369,6 +6369,7 @@ function hidePageHeaderButtons() {
   const notionContent = document.getElementById("notion-content");
   if (notionContent) {
     notionContent.style.maxWidth = "";
+    notionContent.style.boxSizing = "";
   }
   
   // Resetear estado expandido del panel completo
@@ -6660,9 +6661,29 @@ async function loadPageContent(url, name, selector = null, blockTypes = null) {
         notionContainer.style.width = `calc(100% + ${NOTION_MODAL_EXPAND_WIDTH}px)`;
         
         // Expandir el contenido de Notion
+        // Tener en cuenta los paddings para evitar desbordamiento:
+        // - body tiene padding: 16px cada lado (32px total horizontal)
+        // - Container original: 600px, expandido: 800px
+        // - Espacio disponible original: 600px - 32px = 568px
+        // - Espacio disponible expandido: 800px - 32px = 768px
+        // - notion-content tiene padding: 24px cada lado (48px total horizontal)
+        // - notion-content original max-width: 900px (contenido interno: 900px - 48px = 852px)
+        // Al expandir, queremos expandir el contenido proporcionalmente
+        // Usar box-sizing: border-box para que el padding se incluya en el max-width
+        const containerExpandedWidth = 600 + NOTION_MODAL_EXPAND_WIDTH; // 800px
+        const bodyPaddingHorizontal = 32; // 16px cada lado
+        const availableWidth = containerExpandedWidth - bodyPaddingHorizontal; // 768px
+        
         const notionContent = document.getElementById("notion-content");
         if (notionContent) {
-          notionContent.style.maxWidth = `${900 + NOTION_MODAL_EXPAND_WIDTH}px`;
+          // Con box-sizing: border-box, el max-width incluye el padding
+          // Expandir el contenido: 900px + 200px = 1100px
+          // Pero limitado al espacio disponible (768px) para evitar desbordamiento
+          // El espacio disponible ya tiene en cuenta el padding del body (32px)
+          notionContent.style.boxSizing = 'border-box';
+          // Usar el espacio disponible completo para que el contenido no se desborde
+          // El padding del notion-content (48px) se incluye en este max-width
+          notionContent.style.maxWidth = `${availableWidth}px`;
         }
       } else {
         // Contraer el panel completo de OBR
@@ -6700,6 +6721,7 @@ async function loadPageContent(url, name, selector = null, blockTypes = null) {
         const notionContent = document.getElementById("notion-content");
         if (notionContent) {
           notionContent.style.maxWidth = "";
+          notionContent.style.boxSizing = "";
         }
       }
       
