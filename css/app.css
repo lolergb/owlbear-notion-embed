@@ -904,17 +904,28 @@
   
   .notion-container.show-content .notion-container__iframe,
   .notion-container.show-content #notion-iframe {
-    display: none;
+    display: none !important;
   }
   
   .notion-container.show-content .notion-container__content,
   .notion-container.show-content #notion-content {
-    display: block;
+    display: block !important;
   }
   
-  /* Alias para compatibilidad */
-  #notion-iframe { width: 100%; height: 100%; border: none; display: block; }
-  #notion-content { display: none; }
+  /* Estados por defecto (sin .show-content) - mostrar iframe, ocultar content */
+  .notion-container:not(.show-content) .notion-container__iframe,
+  .notion-container:not(.show-content) #notion-iframe {
+    display: block !important;
+  }
+  
+  .notion-container:not(.show-content) .notion-container__content,
+  .notion-container:not(.show-content) #notion-content {
+    display: none !important;
+  }
+  
+  /* Alias para compatibilidad - ahora sin display fijo */
+  #notion-iframe { width: 100%; height: 100%; border: none; }
+  #notion-content { /* display controlado por .show-content */ }
   
   /* ==========================================================================
       Estados

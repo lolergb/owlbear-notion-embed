@@ -3548,19 +3548,25 @@ try {
           }
           
           // El notion-container ya está visible por CSS (html.modal-mode)
-          // Solo necesitamos limpiar el contenido anterior
+          // Limpiar todo el contenido anterior antes de cargar
           const notionContainer = document.getElementById("notion-container");
           if (notionContainer) {
-            // Usar la función centralizada para limpiar el estado
-            setNotionDisplayMode(notionContainer, 'content');
+            // Limpiar ambos: content e iframe
             const notionContent = notionContainer.querySelector('#notion-content');
+            const notionIframe = notionContainer.querySelector('#notion-iframe');
             if (notionContent) {
               notionContent.innerHTML = '';
             }
+            if (notionIframe) {
+              notionIframe.src = 'about:blank';
+            }
+            // Remover la clase show-content para empezar en estado limpio
+            // loadPageContent establecerá el modo correcto
+            notionContainer.classList.remove('show-content');
           }
           
           // Cargar el contenido de la página
-          // Los estilos del container ya se aplican por CSS (html.modal-mode)
+          // loadPageContent se encargará de establecer el modo correcto (content o iframe)
           await loadPageContent(decodedUrl, decodedName, decodedSelector, blockTypes);
           
           // No continuar con la carga normal de la configuración
