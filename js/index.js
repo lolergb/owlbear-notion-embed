@@ -3515,6 +3515,7 @@ try {
             }
           }
           
+          // En modo modal, siempre ocultar todo excepto el contenido
           // Ocultar todos los elementos excepto el notion-container
           const header = document.getElementById("header");
           const pageList = document.getElementById("page-list");

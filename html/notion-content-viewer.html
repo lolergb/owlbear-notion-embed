@@ -67,10 +67,6 @@
   <script type="module">
     import OBR from "https://esm.sh/@owlbear-rodeo/sdk@3.1.0";
     
-    // Importar las funciones necesarias desde el index.js principal
-    // Como no podemos importar directamente, vamos a usar un iframe que apunte al index.html
-    // con parámetros para que cargue solo el contenido
-    
     // Obtener parámetros de la URL
     const urlParams = new URLSearchParams(window.location.search);
     const pageUrl = urlParams.get('url');
@@ -81,36 +77,109 @@
     if (!pageUrl) {
       document.body.innerHTML = '<div style="padding: 40px; text-align: center; color: #999;">Error: No page URL provided</div>';
     } else {
-      // Usar un iframe que apunte al index.html con parámetros de modal
-      // Esto cargará el contenido usando la misma lógica que el panel principal
-      const currentPath = window.location.pathname;
-      const baseDir = currentPath.substring(0, currentPath.lastIndexOf('/') + 1);
-      const baseUrl = window.location.origin + baseDir;
-      
-      const indexUrl = new URL('index.html', baseUrl);
-      indexUrl.searchParams.set('modal', 'true');
-      indexUrl.searchParams.set('url', pageUrl);
-      indexUrl.searchParams.set('name', pageName);
+      const decodedUrl = decodeURIComponent(pageUrl);
+      const decodedName = decodeURIComponent(pageName);
+      const decodedSelector = selector ? decodeURIComponent(selector) : null;
+      let blockTypes = null;
       if (blockTypesParam) {
-        indexUrl.searchParams.set('blockTypes', blockTypesParam);
-      }
-      if (selector) {
-        indexUrl.searchParams.set('selector', selector);
+        try {
+          blockTypes = JSON.parse(decodeURIComponent(blockTypesParam));
+        } catch (e) {
+          console.warn('Error parsing blockTypes:', e);
+        }
       }
       
+      // Cargar el contenido directamente usando postMessage para comunicarse con el iframe padre
+      // o mejor, cargar directamente el contenido
+      loadContentDirectly(decodedUrl, decodedName, decodedSelector, blockTypes);
+    }
+    
+    async function loadContentDirectly(url, name, selector, blockTypes) {
+      const notionContainer = document.getElementById("notion-container");
+      const notionContent = document.getElementById("notion-content");
       const notionIframe = document.getElementById("notion-iframe");
-      if (notionIframe) {
-        // Limpiar el iframe anterior antes de cargar el nuevo contenido
-        notionIframe.src = '';
+      
+      if (!notionContainer) return;
+      
+      // Detectar tipo de contenido
+      const isNotionUrl = (url) => {
+        try {
+          const urlObj = new URL(url);
+          return urlObj.hostname.includes('notion.so') || urlObj.hostname.includes('notion.site');
+        } catch {
+          return false;
+        }
+      };
+      
+      const isDemoHtmlFile = (url) => {
+        return url.includes('/content-demo/') && url.endsWith('.html');
+      };
+      
+      const isImage = (url) => {
+        const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.bmp'];
+        return imageExtensions.some(ext => url.toLowerCase().endsWith(ext));
+      };
+      
+      if (isDemoHtmlFile(url)) {
+        // Cargar HTML de demo
+        try {
+          const response = await fetch(url);
+          const html = await response.text();
+          if (notionContent) {
+            notionContent.innerHTML = html;
+            notionContainer.classList.add("show-content");
+          }
+        } catch (error) {
+          if (notionContent) {
+            notionContent.innerHTML = `<div style="padding: 40px; text-align: center; color: #999;">Error loading content: ${error.message}</div>`;
+            notionContainer.classList.add("show-content");
+          }
+        }
+      } else if (isNotionUrl(url)) {
+        // Para Notion, usar un iframe que apunte al index.html en modo modal
+        // pero asegurándonos de que solo muestre el contenido
+        // Construir la URL relativa correctamente
+        const currentPath = window.location.pathname;
+        // El viewer está en /html/notion-content-viewer.html, necesitamos ir a /index.html
+        const baseUrl = window.location.origin;
+        const indexPath = currentPath.replace('/html/notion-content-viewer.html', '/index.html');
         
-        // Agregar un timestamp a la URL para evitar caché del navegador
+        const indexUrl = new URL(indexPath, baseUrl);
+        indexUrl.searchParams.set('modal', 'true');
+        indexUrl.searchParams.set('url', encodeURIComponent(url));
+        indexUrl.searchParams.set('name', encodeURIComponent(name));
+        if (blockTypes) {
+          indexUrl.searchParams.set('blockTypes', JSON.stringify(blockTypes));
+        }
         indexUrl.searchParams.set('_t', Date.now().toString());
         
-        // Cargar el nuevo contenido
-        notionIframe.src = indexUrl.toString();
-        notionIframe.style.width = '100%';
-        notionIframe.style.height = '100%';
-        notionIframe.style.border = 'none';
+        if (notionIframe) {
+          // Limpiar el iframe antes de cargar
+          notionIframe.src = '';
+          // Pequeño delay para asegurar que se limpia
+          setTimeout(() => {
+            if (notionIframe) {
+              notionIframe.src = indexUrl.toString();
+            }
+          }, 50);
+          notionContainer.classList.remove("show-content");
+        }
+      } else if (isImage(url)) {
+        // Para imágenes, mostrar directamente
+        if (notionContent) {
+          notionContent.innerHTML = `
+            <div style="text-align: center; padding: 40px;">
+              <img src="${url}" alt="${name}" style="max-width: 100%; height: auto; border-radius: 8px;" />
+            </div>
+          `;
+          notionContainer.classList.add("show-content");
+        }
+      } else {
+        // Cargar en iframe (PDFs, páginas web, etc.)
+        if (notionIframe) {
+          notionIframe.src = url;
+          notionContainer.classList.remove("show-content");
+        }
       }
     }
     
