@@ -6681,8 +6681,32 @@ async function loadPageContent(url, name, selector = null, blockTypes = null) {
       openModalButton.appendChild(openModalIcon);
       openModalButton.title = 'Abrir en modal';
       
+      // IMPORTANTE: Guardar la URL actual en el botón mismo
+      // Esto asegura que siempre tengamos la URL correcta, sin importar el tipo de contenido
+      openModalButton.dataset.currentUrl = url;
+      openModalButton.dataset.currentName = name || 'Page';
+      if (blockTypes) {
+        openModalButton.dataset.blockTypes = JSON.stringify(blockTypes);
+      } else {
+        delete openModalButton.dataset.blockTypes;
+      }
+      if (selector) {
+        openModalButton.dataset.selector = selector;
+      } else {
+        delete openModalButton.dataset.selector;
+      }
+      
       // Remover listeners anteriores
       const newOpenModalButton = openModalButton.cloneNode(true);
+      // Copiar los datos al nuevo botón
+      newOpenModalButton.dataset.currentUrl = openModalButton.dataset.currentUrl;
+      newOpenModalButton.dataset.currentName = openModalButton.dataset.currentName;
+      if (openModalButton.dataset.blockTypes) {
+        newOpenModalButton.dataset.blockTypes = openModalButton.dataset.blockTypes;
+      }
+      if (openModalButton.dataset.selector) {
+        newOpenModalButton.dataset.selector = openModalButton.dataset.selector;
+      }
       openModalButton.parentNode.replaceChild(newOpenModalButton, openModalButton);
       openModalButton = newOpenModalButton;
       openModalButton.id = "page-open-modal-button-header";
@@ -6703,16 +6727,36 @@ async function loadPageContent(url, name, selector = null, blockTypes = null) {
         e.stopPropagation();
         
         try {
-          // Obtener la URL y el nombre de la página actual
-          const pageTitle = document.getElementById("page-title");
-          const currentPageName = pageTitle ? pageTitle.textContent : name || 'Page';
+          // Obtener la URL y el nombre desde los datos del botón (siempre actualizados)
+          // Esto es más confiable que buscar en refreshButton que solo existe para Notion
+          let currentUrl = openModalButton.dataset.currentUrl || url;
+          let currentPageName = openModalButton.dataset.currentName || name || 'Page';
           
-          // Obtener la URL de la página actual desde los datos del botón de refresh o del contexto
-          let currentUrl = url;
-          const refreshButton = document.getElementById("refresh-page-button");
-          if (refreshButton && refreshButton.dataset.pageUrl) {
-            currentUrl = refreshButton.dataset.pageUrl;
+          // Si no hay datos en el botón, intentar obtener del contexto
+          if (!currentUrl) {
+            const refreshButton = document.getElementById("refresh-page-button");
+            if (refreshButton && refreshButton.dataset.pageUrl) {
+              currentUrl = refreshButton.dataset.pageUrl;
+            } else {
+              // Fallback: obtener del título de la página
+              const pageTitle = document.getElementById("page-title");
+              currentPageName = pageTitle ? pageTitle.textContent : name || 'Page';
+            }
           }
+          
+          console.log('🔍 URL actual obtenida para modal:', currentUrl);
+          console.log('🔍 Nombre actual obtenido para modal:', currentPageName);
+          
+          // Obtener blockTypes y selector desde los datos del botón
+          let currentBlockTypes = null;
+          if (openModalButton.dataset.blockTypes) {
+            try {
+              currentBlockTypes = JSON.parse(openModalButton.dataset.blockTypes);
+            } catch (e) {
+              console.warn('Error parsing blockTypes from button:', e);
+            }
+          }
+          const currentSelector = openModalButton.dataset.selector || selector;
           
           // Crear una URL para el modal que cargue index.html directamente en modo modal
           // Esto evita usar un viewer intermedio y carga el contenido con la misma lógica
@@ -6724,11 +6768,11 @@ async function loadPageContent(url, name, selector = null, blockTypes = null) {
           modalUrl.searchParams.set('modal', 'true');
           modalUrl.searchParams.set('url', encodeURIComponent(currentUrl));
           modalUrl.searchParams.set('name', encodeURIComponent(currentPageName));
-          if (blockTypes) {
-            modalUrl.searchParams.set('blockTypes', JSON.stringify(blockTypes));
+          if (currentBlockTypes) {
+            modalUrl.searchParams.set('blockTypes', JSON.stringify(currentBlockTypes));
           }
-          if (selector) {
-            modalUrl.searchParams.set('selector', encodeURIComponent(selector));
+          if (currentSelector) {
+            modalUrl.searchParams.set('selector', encodeURIComponent(currentSelector));
           }
           // Agregar timestamp y un ID único para evitar caché del navegador
           const timestamp = Date.now();
