@@ -480,3 +480,9 @@
   flex: 1;
   min-width: 200px;
 }
+
+.modal-mode .notion-image-container {
+  margin-top: 56px;
+  border-radius: 16px;
+  overflow: hidden;
+}
