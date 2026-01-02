@@ -3530,6 +3530,22 @@ try {
           const notionContainer = document.getElementById("notion-container");
           if (notionContainer) {
             notionContainer.classList.remove("hidden");
+            
+            // Limpiar contenido anterior antes de cargar el nuevo
+            const notionContent = notionContainer.querySelector('#notion-content');
+            const notionIframe = notionContainer.querySelector('#notion-iframe');
+            
+            if (notionContent) {
+              notionContent.innerHTML = '';
+              notionContent.style.display = 'none';
+            }
+            if (notionIframe) {
+              notionIframe.src = '';
+              notionIframe.style.display = 'none';
+            }
+            
+            // Remover clases de estado anterior
+            notionContainer.classList.remove('show-content');
           }
           
           // Ajustar estilos del body para modo modal
@@ -6667,9 +6683,19 @@ async function loadPageContent(url, name, selector = null, blockTypes = null) {
           viewerUrl.searchParams.set('selector', encodeURIComponent(selector));
         }
         
+        // Cerrar el modal anterior si existe (usando el mismo ID)
+        try {
+          await OBR.modal.close('notion-content-modal');
+        } catch (e) {
+          // Ignorar errores si el modal no existe
+        }
+        
+        // Usar un ID único basado en la URL para evitar caché
+        const modalId = `notion-content-modal-${Date.now()}`;
+        
         // Abrir modal usando Owlbear SDK
         await OBR.modal.open({
-          id: 'notion-content-modal',
+          id: modalId,
           url: viewerUrl.toString(),
           height: 800,
           width: 1200

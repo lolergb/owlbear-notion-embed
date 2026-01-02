@@ -100,6 +100,13 @@
       
       const notionIframe = document.getElementById("notion-iframe");
       if (notionIframe) {
+        // Limpiar el iframe anterior antes de cargar el nuevo contenido
+        notionIframe.src = '';
+        
+        // Agregar un timestamp a la URL para evitar caché del navegador
+        indexUrl.searchParams.set('_t', Date.now().toString());
+        
+        // Cargar el nuevo contenido
         notionIframe.src = indexUrl.toString();
         notionIframe.style.width = '100%';
         notionIframe.style.height = '100%';
