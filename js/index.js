@@ -6618,93 +6618,95 @@ async function loadPageContent(url, name, selector = null, blockTypes = null) {
       }
     }
     
-    // Agregar botón para abrir el contenido en un modal de OBR (siempre visible cuando hay contenido)
-    let openModalButton = document.getElementById("page-open-modal-button-header");
-    if (!openModalButton) {
-      openModalButton = document.createElement("button");
+    // Agregar botón para abrir el contenido en un modal de OBR
+    // Solo mostrarlo si NO estamos ya en modo modal (evitar recursión)
+    const currentUrlParams = new URLSearchParams(window.location.search);
+    const isAlreadyInModalMode = currentUrlParams.get('modal') === 'true';
+    
+    if (!isAlreadyInModalMode) {
+      let openModalButton = document.getElementById("page-open-modal-button-header");
+      if (!openModalButton) {
+        openModalButton = document.createElement("button");
+        openModalButton.id = "page-open-modal-button-header";
+        openModalButton.className = "icon-button";
+        header.appendChild(openModalButton);
+      }
+      
+      // Limpiar contenido anterior y configurar icono
+      openModalButton.innerHTML = "";
+      const openModalIcon = document.createElement("img");
+      openModalIcon.src = 'img/open-modal.svg';
+      openModalIcon.className = 'icon-button-icon';
+      openModalButton.appendChild(openModalIcon);
+      openModalButton.title = 'Abrir en modal';
+      
+      // Remover listeners anteriores
+      const newOpenModalButton = openModalButton.cloneNode(true);
+      openModalButton.parentNode.replaceChild(newOpenModalButton, openModalButton);
+      openModalButton = newOpenModalButton;
       openModalButton.id = "page-open-modal-button-header";
       openModalButton.className = "icon-button";
-      header.appendChild(openModalButton);
-    }
-    
-    // Limpiar contenido anterior y configurar icono
-    openModalButton.innerHTML = "";
-    const openModalIcon = document.createElement("img");
-    openModalIcon.src = 'img/open-modal.svg';
-    openModalIcon.className = 'icon-button-icon';
-    openModalButton.appendChild(openModalIcon);
-    openModalButton.title = 'Abrir en modal';
-    
-    // Remover listeners anteriores
-    const newOpenModalButton = openModalButton.cloneNode(true);
-    openModalButton.parentNode.replaceChild(newOpenModalButton, openModalButton);
-    openModalButton = newOpenModalButton;
-    openModalButton.id = "page-open-modal-button-header";
-    openModalButton.className = "icon-button";
-    
-    // Asegurar que el botón esté visible (remover clase hidden si existe)
-    openModalButton.classList.remove("hidden");
-    
-    // Actualizar icono después de clonar
-    const openModalIconAfter = openModalButton.querySelector('img');
-    if (openModalIconAfter) {
-      openModalIconAfter.src = 'img/open-modal.svg';
-    }
-    openModalButton.title = 'Abrir en modal';
-    
-    // Agregar listener para abrir en modal
-    openModalButton.addEventListener('click', async (e) => {
-      e.stopPropagation();
       
-      try {
-        // Obtener la URL y el nombre de la página actual
-        const pageTitle = document.getElementById("page-title");
-        const currentPageName = pageTitle ? pageTitle.textContent : name || 'Page';
-        
-        // Obtener la URL de la página actual desde los datos del botón de refresh o del contexto
-        let currentUrl = url;
-        const refreshButton = document.getElementById("refresh-page-button");
-        if (refreshButton && refreshButton.dataset.pageUrl) {
-          currentUrl = refreshButton.dataset.pageUrl;
-        }
-        
-        // Crear una URL para el modal que muestre el contenido
-        const currentPath = window.location.pathname;
-        const baseDir = currentPath.substring(0, currentPath.lastIndexOf('/') + 1);
-        const baseUrl = window.location.origin + baseDir;
-        
-        // Usar el viewer de contenido de Notion (similar al image-viewer)
-        const viewerUrl = new URL('html/notion-content-viewer.html', baseUrl);
-        viewerUrl.searchParams.set('url', encodeURIComponent(currentUrl));
-        viewerUrl.searchParams.set('name', encodeURIComponent(currentPageName));
-        if (blockTypes) {
-          viewerUrl.searchParams.set('blockTypes', JSON.stringify(blockTypes));
-        }
-        if (selector) {
-          viewerUrl.searchParams.set('selector', encodeURIComponent(selector));
-        }
-        
-        // Cerrar el modal anterior si existe (usando el mismo ID)
-        try {
-          await OBR.modal.close('notion-content-modal');
-        } catch (e) {
-          // Ignorar errores si el modal no existe
-        }
-        
-        // Usar un ID único basado en la URL para evitar caché
-        const modalId = `notion-content-modal-${Date.now()}`;
-        
-        // Abrir modal usando Owlbear SDK
-        await OBR.modal.open({
-          id: modalId,
-          url: viewerUrl.toString(),
-          height: 800,
-          width: 1200
-        });
-      } catch (error) {
-        console.error('Error al abrir modal de OBR:', error);
+      // Asegurar que el botón esté visible (remover clase hidden si existe)
+      openModalButton.classList.remove("hidden");
+      
+      // Actualizar icono después de clonar
+      const openModalIconAfter = openModalButton.querySelector('img');
+      if (openModalIconAfter) {
+        openModalIconAfter.src = 'img/open-modal.svg';
       }
-    });
+      openModalButton.title = 'Abrir en modal';
+      
+      // Agregar listener para abrir en modal
+      openModalButton.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        
+        try {
+          // Obtener la URL y el nombre de la página actual
+          const pageTitle = document.getElementById("page-title");
+          const currentPageName = pageTitle ? pageTitle.textContent : name || 'Page';
+          
+          // Obtener la URL de la página actual desde los datos del botón de refresh o del contexto
+          let currentUrl = url;
+          const refreshButton = document.getElementById("refresh-page-button");
+          if (refreshButton && refreshButton.dataset.pageUrl) {
+            currentUrl = refreshButton.dataset.pageUrl;
+          }
+          
+          // Crear una URL para el modal que cargue index.html directamente en modo modal
+          // Esto evita usar un viewer intermedio y carga el contenido con la misma lógica
+          const currentPath = window.location.pathname;
+          const baseUrl = window.location.origin + currentPath;
+          
+          // Abrir directamente index.html con parámetros de modal
+          const modalUrl = new URL(baseUrl);
+          modalUrl.searchParams.set('modal', 'true');
+          modalUrl.searchParams.set('url', encodeURIComponent(currentUrl));
+          modalUrl.searchParams.set('name', encodeURIComponent(currentPageName));
+          if (blockTypes) {
+            modalUrl.searchParams.set('blockTypes', JSON.stringify(blockTypes));
+          }
+          if (selector) {
+            modalUrl.searchParams.set('selector', encodeURIComponent(selector));
+          }
+          // Agregar timestamp para evitar caché
+          modalUrl.searchParams.set('_t', Date.now().toString());
+          
+          // Usar un ID único basado en timestamp para evitar problemas de caché
+          const modalId = `notion-content-modal-${Date.now()}`;
+          
+          // Abrir modal usando Owlbear SDK
+          await OBR.modal.open({
+            id: modalId,
+            url: modalUrl.toString(),
+            height: 800,
+            width: 1200
+          });
+        } catch (error) {
+          console.error('Error al abrir modal de OBR:', error);
+        }
+      });
+    }
     
     // Agregar botón de menú contextual para GMs (solo si la página está en la configuración)
     // Esto debe ejecutarse tanto para URLs de Notion como para otras URLs
