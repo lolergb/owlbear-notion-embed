@@ -6616,7 +6616,7 @@ async function loadPageContent(url, name, selector = null, blockTypes = null) {
       try {
         // Obtener la URL y el nombre de la página actual
         const pageTitle = document.getElementById("page-title");
-        const currentPageName = pageTitle ? pageTitle.textContent : 'Page';
+        const currentPageName = pageTitle ? pageTitle.textContent : name || 'Page';
         
         // Obtener la URL de la página actual desde los datos del botón de refresh o del contexto
         let currentUrl = url;
@@ -6626,24 +6626,25 @@ async function loadPageContent(url, name, selector = null, blockTypes = null) {
         }
         
         // Crear una URL para el modal que muestre el contenido
-        // Usar la misma URL pero en un modal de OBR
         const currentPath = window.location.pathname;
         const baseDir = currentPath.substring(0, currentPath.lastIndexOf('/') + 1);
         const baseUrl = window.location.origin + baseDir;
         
-        // Crear una página HTML temporal que muestre el contenido
-        const modalUrl = new URL('index.html', baseUrl);
-        modalUrl.searchParams.set('modal', 'true');
-        modalUrl.searchParams.set('url', encodeURIComponent(currentUrl));
-        modalUrl.searchParams.set('name', encodeURIComponent(currentPageName));
+        // Usar el viewer de contenido de Notion (similar al image-viewer)
+        const viewerUrl = new URL('html/notion-content-viewer.html', baseUrl);
+        viewerUrl.searchParams.set('url', encodeURIComponent(currentUrl));
+        viewerUrl.searchParams.set('name', encodeURIComponent(currentPageName));
         if (blockTypes) {
-          modalUrl.searchParams.set('blockTypes', JSON.stringify(blockTypes));
+          viewerUrl.searchParams.set('blockTypes', JSON.stringify(blockTypes));
+        }
+        if (selector) {
+          viewerUrl.searchParams.set('selector', encodeURIComponent(selector));
         }
         
         // Abrir modal usando Owlbear SDK
         await OBR.modal.open({
           id: 'notion-content-modal',
-          url: modalUrl.toString(),
+          url: viewerUrl.toString(),
           height: 800,
           width: 1200
         });
