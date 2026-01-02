@@ -110,16 +110,6 @@
     transition: width 0.3s ease;
   }
   
-  /* Estado expandido del panel */
-  body.panel-expanded,
-  html.panel-expanded {
-    overflow-x: auto;
-  }
-  
-  .container.expanded {
-    transition: width 0.3s ease;
-  }
-  
   /* ==========================================================================
       Utilidades
       ========================================================================== */
@@ -1086,7 +1076,7 @@
   #page-context-menu-button-header,
   #refresh-page-button,
   #page-visibility-button-header,
-  #page-expand-button-header {
+  #page-open-modal-button-header {
     background: transparent;
     border: none;
     border-radius: var(--radius-full);
@@ -1101,7 +1091,7 @@
     margin-left: var(--spacing-sm);
   }
 
-  /* Orden de botones de derecha a izquierda: menú contextual, refresh, visibility, expand */
+  /* Orden de botones de derecha a izquierda: menú contextual, refresh, visibility, open-modal */
   #page-context-menu-button-header {
     order: 4; /* Más a la derecha */
     margin-left: 0;
@@ -1117,22 +1107,22 @@
     margin-left: 0;
   }
   
-  #page-expand-button-header {
-    order: 1; /* Más a la izquierda */
+  #page-open-modal-button-header {
+    order: 1; /* Primero (más a la izquierda) */
     margin-left: 0;
   }
   
   #page-context-menu-button-header:hover,
   #refresh-page-button:hover,
   #page-visibility-button-header:hover,
-  #page-expand-button-header:hover {
+  #page-open-modal-button-header:hover {
     background: var(--color-bg-hover);
   }
   
   #page-context-menu-button-header:active,
   #refresh-page-button:active,
   #page-visibility-button-header:active,
-  #page-expand-button-header:active {
+  #page-open-modal-button-header:active {
     background: var(--color-bg-active);
   }
   

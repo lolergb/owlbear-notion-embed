@@ -4,9 +4,6 @@ import OBR from "https://esm.sh/@owlbear-rodeo/sdk@3.1.0";
 
 console.log('✅ OBR SDK importado');
 
-// Configuración del ancho de expansión del modal de Notion (en píxeles)
-const NOTION_MODAL_EXPAND_WIDTH = 200;
-
 // Sistema de logs controlado por variable de entorno de Netlify
 let DEBUG_MODE = false;
 
@@ -3495,6 +3492,44 @@ try {
         console.log('✅ Room ID final que se usará:', roomId);
       }
       
+      // Verificar si estamos en modo modal (abierto desde el botón de abrir en modal)
+      const urlParams = new URLSearchParams(window.location.search);
+      const isModalMode = urlParams.get('modal') === 'true';
+      const modalUrl = urlParams.get('url');
+      const modalName = urlParams.get('name');
+      const modalBlockTypes = urlParams.get('blockTypes');
+      
+      if (isModalMode && modalUrl) {
+        // Estamos en modo modal, cargar el contenido directamente
+        try {
+          const decodedUrl = decodeURIComponent(modalUrl);
+          const decodedName = modalName ? decodeURIComponent(modalName) : 'Page';
+          let blockTypes = null;
+          if (modalBlockTypes) {
+            try {
+              blockTypes = JSON.parse(decodeURIComponent(modalBlockTypes));
+            } catch (e) {
+              console.warn('Error parsing blockTypes:', e);
+            }
+          }
+          
+          // Ocultar la lista de páginas y mostrar solo el contenido
+          const pageList = document.getElementById("page-list");
+          if (pageList) {
+            pageList.classList.add("hidden");
+          }
+          
+          // Cargar el contenido de la página
+          await loadPageContent(decodedUrl, decodedName, null, blockTypes);
+          
+          // No continuar con la carga normal de la configuración
+          return;
+        } catch (error) {
+          console.error('Error al cargar contenido en modal:', error);
+          // Continuar con la carga normal si hay error
+        }
+      }
+      
       // Cargar configuración desde JSON (específica para esta room)
       log('🔍 Intentando cargar configuración para room:', roomId);
       
@@ -6345,9 +6380,9 @@ function hidePageHeaderButtons() {
   if (refreshButton) {
     refreshButton.classList.add("hidden");
   }
-  const expandButton = document.getElementById("page-expand-button-header");
-  if (expandButton) {
-    expandButton.classList.add("hidden");
+  const openModalButton = document.getElementById("page-open-modal-button-header");
+  if (openModalButton) {
+    openModalButton.classList.add("hidden");
   }
   const contextMenuButton = document.getElementById("page-context-menu-button-header");
   if (contextMenuButton) {
@@ -6356,44 +6391,6 @@ function hidePageHeaderButtons() {
   const visibilityButton = document.getElementById("page-visibility-button-header");
   if (visibilityButton) {
     visibilityButton.classList.add("hidden");
-  }
-  
-  // Resetear estado expandido del modal y del panel
-  const notionContainer = document.getElementById("notion-container");
-  if (notionContainer) {
-    notionContainer.classList.remove("expanded");
-    notionContainer.style.width = "";
-  }
-  
-  // Resetear el contenido de Notion
-  const notionContent = document.getElementById("notion-content");
-  if (notionContent) {
-    notionContent.style.maxWidth = "";
-    notionContent.style.boxSizing = "";
-  }
-  
-  // Resetear estado expandido del panel completo
-  document.body.classList.remove("panel-expanded");
-  document.documentElement.classList.remove("panel-expanded");
-  document.body.style.width = "";
-  document.documentElement.style.width = "";
-  
-  const container = document.querySelector('.container');
-  if (container) {
-    container.classList.remove("expanded");
-    container.style.width = "";
-    container.style.maxWidth = "";
-  }
-  
-  // Intentar resetear el tamaño del panel de OBR si es posible
-  try {
-    if (typeof OBR !== 'undefined' && OBR.action) {
-      OBR.action.setWidth(600).catch(() => {
-        // Ignorar errores si la API no está disponible
-      });
-    }
-  } catch (error) {
-    // Ignorar errores
   }
 }
 
@@ -6578,159 +6575,81 @@ async function loadPageContent(url, name, selector = null, blockTypes = null) {
       }
     }
     
-    // Agregar botón de expandir/contraer el modal (siempre visible cuando hay contenido)
-    let expandButton = document.getElementById("page-expand-button-header");
-    if (!expandButton) {
-      expandButton = document.createElement("button");
-      expandButton.id = "page-expand-button-header";
-      expandButton.className = "icon-button";
-      header.appendChild(expandButton);
+    // Agregar botón para abrir el contenido en un modal de OBR (siempre visible cuando hay contenido)
+    let openModalButton = document.getElementById("page-open-modal-button-header");
+    if (!openModalButton) {
+      openModalButton = document.createElement("button");
+      openModalButton.id = "page-open-modal-button-header";
+      openModalButton.className = "icon-button";
+      header.appendChild(openModalButton);
     }
-    
-    // Estado inicial: no expandido
-    let isExpanded = notionContainer.classList.contains("expanded");
     
     // Limpiar contenido anterior y configurar icono
-    expandButton.innerHTML = "";
-    const expandIcon = document.createElement("img");
-    expandIcon.src = isExpanded ? 'img/icon=expand-true.svg' : 'img/icon=expand-false.svg';
-    expandIcon.className = 'icon-button-icon';
-    expandButton.appendChild(expandIcon);
-    expandButton.title = isExpanded ? 'Contraer ancho del modal' : 'Expandir ancho del modal';
+    openModalButton.innerHTML = "";
+    const openModalIcon = document.createElement("img");
+    openModalIcon.src = 'img/open-modal.svg';
+    openModalIcon.className = 'icon-button-icon';
+    openModalButton.appendChild(openModalIcon);
+    openModalButton.title = 'Abrir en modal';
     
     // Remover listeners anteriores
-    const newExpandButton = expandButton.cloneNode(true);
-    expandButton.parentNode.replaceChild(newExpandButton, expandButton);
-    expandButton = newExpandButton;
-    expandButton.id = "page-expand-button-header";
-    expandButton.className = "icon-button";
+    const newOpenModalButton = openModalButton.cloneNode(true);
+    openModalButton.parentNode.replaceChild(newOpenModalButton, openModalButton);
+    openModalButton = newOpenModalButton;
+    openModalButton.id = "page-open-modal-button-header";
+    openModalButton.className = "icon-button";
     
     // Asegurar que el botón esté visible (remover clase hidden si existe)
-    expandButton.classList.remove("hidden");
+    openModalButton.classList.remove("hidden");
     
     // Actualizar icono después de clonar
-    const icon = expandButton.querySelector('img');
-    if (icon) {
-      icon.src = isExpanded ? 'img/icon=expand-true.svg' : 'img/icon=expand-false.svg';
+    const openModalIconAfter = openModalButton.querySelector('img');
+    if (openModalIconAfter) {
+      openModalIconAfter.src = 'img/open-modal.svg';
     }
-    expandButton.title = isExpanded ? 'Contraer ancho del modal' : 'Expandir ancho del modal';
+    openModalButton.title = 'Abrir en modal';
     
-    // Agregar listener para toggle
-    expandButton.addEventListener('click', async (e) => {
+    // Agregar listener para abrir en modal
+    openModalButton.addEventListener('click', async (e) => {
       e.stopPropagation();
-      isExpanded = !isExpanded;
       
-      if (isExpanded) {
-        // Expandir el panel completo de OBR
-        try {
-          // Intentar usar la API de OBR para cambiar el tamaño del panel si está disponible
-          if (typeof OBR !== 'undefined' && OBR.action) {
-            // Obtener el ancho actual del panel (600px por defecto según manifest)
-            const currentWidth = 600;
-            const newWidth = currentWidth + NOTION_MODAL_EXPAND_WIDTH;
-            
-            // Intentar actualizar el tamaño del panel (si la API lo permite)
-            // Nota: Esta funcionalidad puede no estar disponible en todas las versiones de OBR
-            try {
-              await OBR.action.setWidth(newWidth);
-            } catch (apiError) {
-              // Si la API no está disponible, usar método alternativo
-              console.log('API de OBR no disponible, usando método alternativo');
-            }
-          }
-        } catch (error) {
-          console.log('Error al intentar usar API de OBR:', error);
+      try {
+        // Obtener la URL y el nombre de la página actual
+        const pageTitle = document.getElementById("page-title");
+        const currentPageName = pageTitle ? pageTitle.textContent : 'Page';
+        
+        // Obtener la URL de la página actual desde los datos del botón de refresh o del contexto
+        let currentUrl = url;
+        const refreshButton = document.getElementById("refresh-page-button");
+        if (refreshButton && refreshButton.dataset.pageUrl) {
+          currentUrl = refreshButton.dataset.pageUrl;
         }
         
-        // Expandir el body y html para que el contenido se vea más ancho
-        document.body.classList.add("panel-expanded");
-        document.documentElement.classList.add("panel-expanded");
-        document.body.style.width = `calc(100% + ${NOTION_MODAL_EXPAND_WIDTH}px)`;
-        document.documentElement.style.width = `calc(100% + ${NOTION_MODAL_EXPAND_WIDTH}px)`;
+        // Crear una URL para el modal que muestre el contenido
+        // Usar la misma URL pero en un modal de OBR
+        const currentPath = window.location.pathname;
+        const baseDir = currentPath.substring(0, currentPath.lastIndexOf('/') + 1);
+        const baseUrl = window.location.origin + baseDir;
         
-        // También expandir el contenedor principal
-        const container = document.querySelector('.container');
-        if (container) {
-          container.classList.add("expanded");
-          container.style.width = `calc(100% + ${NOTION_MODAL_EXPAND_WIDTH}px)`;
-          container.style.maxWidth = `${600 + NOTION_MODAL_EXPAND_WIDTH}px`;
+        // Crear una página HTML temporal que muestre el contenido
+        const modalUrl = new URL('index.html', baseUrl);
+        modalUrl.searchParams.set('modal', 'true');
+        modalUrl.searchParams.set('url', encodeURIComponent(currentUrl));
+        modalUrl.searchParams.set('name', encodeURIComponent(currentPageName));
+        if (blockTypes) {
+          modalUrl.searchParams.set('blockTypes', JSON.stringify(blockTypes));
         }
         
-        // Expandir el contenedor de Notion
-        notionContainer.classList.add("expanded");
-        notionContainer.style.width = `calc(100% + ${NOTION_MODAL_EXPAND_WIDTH}px)`;
-        
-        // Expandir el contenido de Notion
-        // Tener en cuenta los paddings para evitar desbordamiento:
-        // - body tiene padding: 16px cada lado (32px total horizontal)
-        // - Container original: 600px, expandido: 800px
-        // - Espacio disponible original: 600px - 32px = 568px
-        // - Espacio disponible expandido: 800px - 32px = 768px
-        // - notion-content tiene padding: 24px cada lado (48px total horizontal)
-        // - notion-content original max-width: 900px (contenido interno: 900px - 48px = 852px)
-        // Al expandir, queremos expandir el contenido proporcionalmente
-        // Usar box-sizing: border-box para que el padding se incluya en el max-width
-        const containerExpandedWidth = 600 + NOTION_MODAL_EXPAND_WIDTH; // 800px
-        const bodyPaddingHorizontal = 32; // 16px cada lado
-        const availableWidth = containerExpandedWidth - bodyPaddingHorizontal; // 768px
-        
-        const notionContent = document.getElementById("notion-content");
-        if (notionContent) {
-          // Con box-sizing: border-box, el max-width incluye el padding
-          // Expandir el contenido: 900px + 200px = 1100px
-          // Pero limitado al espacio disponible (768px) para evitar desbordamiento
-          // El espacio disponible ya tiene en cuenta el padding del body (32px)
-          notionContent.style.boxSizing = 'border-box';
-          // Usar el espacio disponible completo para que el contenido no se desborde
-          // El padding del notion-content (48px) se incluye en este max-width
-          notionContent.style.maxWidth = `${availableWidth}px`;
-        }
-      } else {
-        // Contraer el panel completo de OBR
-        try {
-          if (typeof OBR !== 'undefined' && OBR.action) {
-            try {
-              await OBR.action.setWidth(600); // Volver al ancho original
-            } catch (apiError) {
-              console.log('API de OBR no disponible, usando método alternativo');
-            }
-          }
-        } catch (error) {
-          console.log('Error al intentar usar API de OBR:', error);
-        }
-        
-        // Contraer el body y html
-        document.body.classList.remove("panel-expanded");
-        document.documentElement.classList.remove("panel-expanded");
-        document.body.style.width = "";
-        document.documentElement.style.width = "";
-        
-        // También contraer el contenedor principal
-        const container = document.querySelector('.container');
-        if (container) {
-          container.classList.remove("expanded");
-          container.style.width = "";
-          container.style.maxWidth = "";
-        }
-        
-        // Contraer el contenedor de Notion
-        notionContainer.classList.remove("expanded");
-        notionContainer.style.width = "";
-        
-        // Contraer el contenido de Notion
-        const notionContent = document.getElementById("notion-content");
-        if (notionContent) {
-          notionContent.style.maxWidth = "";
-          notionContent.style.boxSizing = "";
-        }
+        // Abrir modal usando Owlbear SDK
+        await OBR.modal.open({
+          id: 'notion-content-modal',
+          url: modalUrl.toString(),
+          height: 800,
+          width: 1200
+        });
+      } catch (error) {
+        console.error('Error al abrir modal de OBR:', error);
       }
-      
-      // Actualizar icono y título
-      const currentIcon = expandButton.querySelector('img');
-      if (currentIcon) {
-        currentIcon.src = isExpanded ? 'img/icon=expand-true.svg' : 'img/icon=expand-false.svg';
-      }
-      expandButton.title = isExpanded ? 'Contraer ancho del modal' : 'Expandir ancho del modal';
     });
     
     // Agregar botón de menú contextual para GMs (solo si la página está en la configuración)
