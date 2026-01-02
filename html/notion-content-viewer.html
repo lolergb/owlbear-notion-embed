@@ -67,6 +67,10 @@
   <script type="module">
     import OBR from "https://esm.sh/@owlbear-rodeo/sdk@3.1.0";
     
+    // Importar las funciones necesarias desde el index.js principal
+    // Como no podemos importar directamente, vamos a usar un iframe que apunte al index.html
+    // con parámetros para que cargue solo el contenido
+    
     // Obtener parámetros de la URL
     const urlParams = new URLSearchParams(window.location.search);
     const pageUrl = urlParams.get('url');
@@ -74,83 +78,32 @@
     const blockTypesParam = urlParams.get('blockTypes');
     const selector = urlParams.get('selector');
     
-    let blockTypes = null;
-    if (blockTypesParam) {
-      try {
-        blockTypes = JSON.parse(decodeURIComponent(blockTypesParam));
-      } catch (e) {
-        console.warn('Error parsing blockTypes:', e);
-      }
-    }
-    
     if (!pageUrl) {
       document.body.innerHTML = '<div style="padding: 40px; text-align: center; color: #999;">Error: No page URL provided</div>';
     } else {
-      const decodedUrl = decodeURIComponent(pageUrl);
-      const decodedName = decodeURIComponent(pageName);
-      const decodedSelector = selector ? decodeURIComponent(selector) : null;
+      // Usar un iframe que apunte al index.html con parámetros de modal
+      // Esto cargará el contenido usando la misma lógica que el panel principal
+      const currentPath = window.location.pathname;
+      const baseDir = currentPath.substring(0, currentPath.lastIndexOf('/') + 1);
+      const baseUrl = window.location.origin + baseDir;
       
-      loadPageContent(decodedUrl, decodedName, decodedSelector, blockTypes);
-    }
-    
-    // Función simplificada para cargar contenido
-    async function loadPageContent(url, name, selector = null, blockTypes = null) {
-      const notionContainer = document.getElementById("notion-container");
-      const notionContent = document.getElementById("notion-content");
-      const notionIframe = document.getElementById("notion-iframe");
-      
-      if (!notionContainer || !notionContent || !notionIframe) {
-        console.error('Contenedores de Notion no encontrados');
-        return;
+      const indexUrl = new URL('index.html', baseUrl);
+      indexUrl.searchParams.set('modal', 'true');
+      indexUrl.searchParams.set('url', pageUrl);
+      indexUrl.searchParams.set('name', pageName);
+      if (blockTypesParam) {
+        indexUrl.searchParams.set('blockTypes', blockTypesParam);
+      }
+      if (selector) {
+        indexUrl.searchParams.set('selector', selector);
       }
       
-      // Detectar tipo de contenido
-      const isNotionUrl = (url) => {
-        try {
-          const urlObj = new URL(url);
-          return urlObj.hostname.includes('notion.so') || urlObj.hostname.includes('notion.site');
-        } catch {
-          return false;
-        }
-      };
-      
-      const isDemoHtmlFile = (url) => {
-        return url.includes('/content-demo/') && url.endsWith('.html');
-      };
-      
-      const isImage = (url) => {
-        const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.bmp'];
-        return imageExtensions.some(ext => url.toLowerCase().endsWith(ext));
-      };
-      
-      if (isDemoHtmlFile(url)) {
-        // Cargar HTML de demo
-        try {
-          const response = await fetch(url);
-          const html = await response.text();
-          notionContent.innerHTML = html;
-          notionContainer.classList.add("show-content");
-        } catch (error) {
-          notionContent.innerHTML = `<div style="padding: 40px; text-align: center; color: #999;">Error loading content: ${error.message}</div>`;
-          notionContainer.classList.add("show-content");
-        }
-      } else if (isNotionUrl(url)) {
-        // Para Notion, intentar cargar directamente (funciona para páginas públicas)
-        // Si es privada, mostrará el login de Notion
-        notionIframe.src = url;
-        notionContainer.classList.remove("show-content");
-      } else if (isImage(url)) {
-        // Para imágenes, mostrar directamente
-        notionContent.innerHTML = `
-          <div style="text-align: center; padding: 40px;">
-            <img src="${url}" alt="${name}" style="max-width: 100%; height: auto; border-radius: 8px;" />
-          </div>
-        `;
-        notionContainer.classList.add("show-content");
-      } else {
-        // Cargar en iframe (PDFs, páginas web, etc.)
-        notionIframe.src = url;
-        notionContainer.classList.remove("show-content");
+      const notionIframe = document.getElementById("notion-iframe");
+      if (notionIframe) {
+        notionIframe.src = indexUrl.toString();
+        notionIframe.style.width = '100%';
+        notionIframe.style.height = '100%';
+        notionIframe.style.border = 'none';
       }
     }
     

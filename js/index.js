@@ -3498,12 +3498,14 @@ try {
       const modalUrl = urlParams.get('url');
       const modalName = urlParams.get('name');
       const modalBlockTypes = urlParams.get('blockTypes');
+      const modalSelector = urlParams.get('selector');
       
       if (isModalMode && modalUrl) {
         // Estamos en modo modal, cargar el contenido directamente
         try {
           const decodedUrl = decodeURIComponent(modalUrl);
           const decodedName = modalName ? decodeURIComponent(modalName) : 'Page';
+          const decodedSelector = modalSelector ? decodeURIComponent(modalSelector) : null;
           let blockTypes = null;
           if (modalBlockTypes) {
             try {
@@ -3513,14 +3515,38 @@ try {
             }
           }
           
-          // Ocultar la lista de páginas y mostrar solo el contenido
+          // Ocultar todos los elementos excepto el notion-container
+          const header = document.getElementById("header");
           const pageList = document.getElementById("page-list");
-          if (pageList) {
-            pageList.classList.add("hidden");
+          const settingsContainer = document.getElementById("settings-container");
+          const buttonContainer = document.querySelector('.button-container');
+          
+          if (header) header.classList.add("hidden");
+          if (pageList) pageList.classList.add("hidden");
+          if (settingsContainer) settingsContainer.classList.add("hidden");
+          if (buttonContainer) buttonContainer.classList.add("hidden");
+          
+          // Mostrar el notion-container
+          const notionContainer = document.getElementById("notion-container");
+          if (notionContainer) {
+            notionContainer.classList.remove("hidden");
+          }
+          
+          // Ajustar estilos del body para modo modal
+          document.body.style.padding = '0';
+          document.body.style.overflow = 'hidden';
+          
+          // Ajustar estilos del container para modo modal
+          const container = document.querySelector('.container');
+          if (container) {
+            container.style.maxWidth = '100%';
+            container.style.height = '100vh';
+            container.style.margin = '0';
+            container.style.padding = '0';
           }
           
           // Cargar el contenido de la página
-          await loadPageContent(decodedUrl, decodedName, null, blockTypes);
+          await loadPageContent(decodedUrl, decodedName, decodedSelector, blockTypes);
           
           // No continuar con la carga normal de la configuración
           return;
