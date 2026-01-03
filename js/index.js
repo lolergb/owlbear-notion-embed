@@ -3759,20 +3759,28 @@ try {
       // - Player: room metadata > broadcast (recibe configuración filtrada del GM)
       if (isGM) {
         // GM siempre usa su localStorage (configuración completa)
-        // SIEMPRE priorizar la configuración del roomId actual si existe
-        // Esto asegura que cuando un usuario carga un vault, se mantenga al recargar
+        // Prioridad: roomId específico > default
         if (currentRoomConfig) {
-          log('✅ [GM] Usando configuración del localStorage con', currentRoomCount, 'elementos');
+          // Si hay configuración para este roomId, usarla
+          log('✅ [GM] Usando configuración del localStorage para roomId:', roomId, 'con', currentRoomCount, 'elementos');
           pagesConfig = currentRoomConfig;
           // Sincronizar con room metadata para que los players la vean
           await savePagesJSON(pagesConfig, roomId);
         } else if (defaultCount > 0) {
           // Solo usar default si NO hay configuración para este roomId
-          log('✅ [GM] No hay configuración para este roomId, usando configuración "default" con', defaultCount, 'elementos');
+          // NO copiar al roomId - usar directamente hasta que el GM cargue su propio vault
+          log('✅ [GM] No hay configuración para este roomId, usando "default" con', defaultCount, 'elementos');
           pagesConfig = defaultConfig;
-          // Copiar la configuración default al roomId actual
-          await savePagesJSON(defaultConfig, roomId);
-          log('💾 [GM] Configuración "default" copiada a roomId:', roomId);
+          // Solo sincronizar con room metadata, pero NO guardar como roomId
+          pagesConfigCache = pagesConfig;
+          const visibleOnlyConfig = filterVisiblePagesForMetadata(pagesConfig);
+          try {
+            const compressed = compressJson(visibleOnlyConfig);
+            await OBR.room.setMetadata({ [ROOM_METADATA_KEY]: compressed });
+            log('✅ Default sincronizado con room metadata para players');
+          } catch (e) {
+            console.warn('No se pudo sincronizar default con room metadata:', e);
+          }
         }
       } else {
         // Player usa room metadata (configuración filtrada por el GM)
@@ -7874,6 +7882,14 @@ async function showSettings() {
             
             // Limpiar el cache antes de guardar para evitar conflictos
             pagesConfigCache = null;
+            
+            // Borrar el default del localStorage para evitar conflictos
+            // El vault cargado será el único para este roomId
+            const defaultStorageKey = 'notion-pages-json-default';
+            if (localStorage.getItem(defaultStorageKey)) {
+              localStorage.removeItem(defaultStorageKey);
+              log('🗑️ Default eliminado del localStorage (nuevo vault cargado)');
+            }
             
             // Guardar la nueva configuración
             const saveSuccess = await savePagesJSON(parsed, currentRoomId);
