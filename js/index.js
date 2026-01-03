@@ -7815,6 +7815,19 @@ async function showSettings() {
       }
     });
   }
+
+  // Feedback button - evitar múltiples listeners
+  const feedbackBtn = document.getElementById('feedback-btn');
+  if (feedbackBtn && !feedbackBtn.dataset.listenerAdded) {
+    feedbackBtn.dataset.listenerAdded = 'true';
+    feedbackBtn.addEventListener('click', () => {
+      const feedbackUrl = 'https://www.notion.so/DM-Panel-Roadmap-2d8d4856c90e8088825df40c3be24393?source=copy_link';
+      window.open(feedbackUrl, '_blank', 'noopener,noreferrer');
+      trackEvent('feedback_opened', {
+        source: 'settings'
+      });
+    });
+  }
 }
 
 // ============================================
