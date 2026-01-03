@@ -1452,7 +1452,7 @@
 }
 
 .icon-loading {
-  animation: pulse 1.5s ease-in-out infinite;
+  /* Animación removida - solo se aplica al reloj ⏳ en empty-state */
 }
 
 /* ==========================================================================
