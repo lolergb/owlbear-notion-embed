@@ -934,14 +934,14 @@
   
   .notion-container.show-content .notion-container__content,
   .notion-container.show-content #notion-content {
-    display: flex !important;
+    display: block !important;
     visibility: visible !important;
   }
   
   /* Estados por defecto (sin .show-content) - mostrar iframe, ocultar content */
   .notion-container:not(.show-content) .notion-container__iframe,
   .notion-container:not(.show-content) #notion-iframe {
-    display: flex !important;
+    display: block !important;
     visibility: visible !important;
   }
   
