@@ -181,12 +181,13 @@
   z-index: 1;
 }
 
-.notion-content .notion-image-container img {
+/* Solo afectar a las imágenes de Notion que son hijos directos, no a las imágenes dentro de los share buttons */
+.notion-content .notion-image-container > img {
   opacity: 0;
   transition: opacity var(--transition-normal);
 }
 
-.notion-content .notion-image-container img.loaded {
+.notion-content .notion-image-container > img.loaded {
   opacity: 1;
 }
 

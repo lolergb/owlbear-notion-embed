@@ -3178,7 +3178,8 @@ async function loadNotionContent(url, container, forceRefresh = false, blockType
   // Usar la función centralizada para gestionar visibilidad
   setNotionDisplayMode(container, 'content');
   
-  // Remover clase centered-content si existe (solo para imágenes/videos)
+  // Restaurar clases originales y remover centered-content si existe
+  contentDiv.className = 'notion-container__content notion-content';
   contentDiv.classList.remove('centered-content');
   
   // Mostrar loading (setNotionDisplayMode ya gestionó la visibilidad)
@@ -6243,7 +6244,8 @@ async function loadImageContent(url, container, name) {
     const caption = name || '';
     const escapedCaption = caption.replace(/"/g, '&quot;');
     
-    contentDiv.className = 'centered-content';
+    // Agregar clase centered-content sin perder las clases originales
+    contentDiv.classList.add('centered-content');
     contentDiv.innerHTML = `
       <div class="image-viewer-container" style="
         display: flex;
@@ -6383,7 +6385,8 @@ async function loadVideoThumbnailContent(url, container, name, videoType) {
   const caption = name || '';
   const escapedCaption = caption.replace(/"/g, '&quot;');
   
-  contentDiv.className = 'centered-content';
+  // Agregar clase centered-content sin perder las clases originales
+  contentDiv.classList.add('centered-content');
   contentDiv.innerHTML = `
     <div class="video-thumbnail-container" style="
       display: flex;
