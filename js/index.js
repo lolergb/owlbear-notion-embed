@@ -3143,16 +3143,19 @@ async function loadNotionContent(url, container, forceRefresh = false, blockType
       return;
     }
     
-    console.log('Obteniendo bloques para página:', pageId, forceRefresh ? '(recarga forzada - sin caché)' : '(con caché)');
+    log('Obteniendo bloques para página:', pageId, forceRefresh ? '(recarga forzada)' : '(con caché)');
     
-    // Obtener bloques (usar caché a menos que se fuerce la recarga)
-    // Si forceRefresh es true, pasamos useCache = false para ignorar el caché
+    // Usar caché a menos que se fuerce la recarga
     const useCache = !forceRefresh;
-    console.log('📋 Parámetros fetchNotionBlocks - useCache:', useCache, 'forceRefresh:', forceRefresh);
-    const blocks = await fetchNotionBlocks(pageId, useCache);
-    console.log('Bloques obtenidos:', blocks.length);
     
-    if (blocks.length === 0) {
+    // Obtener bloques y página info EN PARALELO para mejor rendimiento
+    const isNotionLink = url.includes('notion.so') || url.includes('notion.site');
+    const [blocks, pageInfo] = await Promise.all([
+      fetchNotionBlocks(pageId, useCache),
+      isNotionLink ? fetchNotionPageInfo(pageId, useCache) : Promise.resolve(null)
+    ]);
+    
+    if (!blocks || blocks.length === 0) {
       contentDiv.innerHTML = `
         <div class="empty-state notion-loading">
           <div class="empty-state-icon">📄</div>
@@ -3162,19 +3165,14 @@ async function loadNotionContent(url, container, forceRefresh = false, blockType
       return;
     }
     
-    // Obtener información de la página (incluyendo cover y título) si es una URL de Notion
-    // Usar caché a menos que se fuerce la recarga
+    // Extraer cover y título de pageInfo
     let pageCover = null;
     let pageTitle = null;
-    if (url.includes('notion.so') || url.includes('notion.site')) {
-      const pageInfo = await fetchNotionPageInfo(pageId, useCache);
-      if (pageInfo) {
-        if (pageInfo.cover) {
-          pageCover = pageInfo.cover;
-        }
-        // Extraer el título de la página
-        pageTitle = extractPageTitle(pageInfo);
+    if (pageInfo) {
+      if (pageInfo.cover) {
+        pageCover = pageInfo.cover;
       }
+      pageTitle = extractPageTitle(pageInfo);
     }
     
     // Renderizar bloques (ahora es async)
@@ -3449,11 +3447,11 @@ initDebugMode();
 try {
   OBR.onReady(async () => {
     try {
-      // Initialize Mixpanel analytics (will show consent banner if needed)
-      await initMixpanel();
-      
-      // Verificar rol primero para filtrar logs
-      const isGM = await getUserRole();
+      // Inicializar analytics y verificar rol EN PARALELO
+      const [, isGM] = await Promise.all([
+        initMixpanel(),
+        getUserRole()
+      ]);
       
       if (isGM) {
         console.log('✅ Owlbear SDK listo');
@@ -3557,45 +3555,23 @@ try {
           }
           
           // El notion-container ya está visible por CSS (html.modal-mode)
-          // LIMPIAR TODO el contenido anterior INMEDIATAMENTE antes de cargar
-          // Esto es crítico porque OBR podría estar reutilizando la misma instancia
+          // Limpiar contenido anterior antes de cargar nuevo contenido
           const notionContainer = document.getElementById("notion-container");
           if (notionContainer) {
-            // FORZAR limpieza completa del contenido de Notion
+            // Limpiar notion-content
             const notionContent = notionContainer.querySelector('#notion-content');
             if (notionContent) {
-              // Método 1: Remover todos los hijos
-              while (notionContent.firstChild) {
-                notionContent.removeChild(notionContent.firstChild);
-              }
-              // Método 2: Limpiar innerHTML
               notionContent.innerHTML = '';
-              // Método 3: Forzar reemplazo del elemento (más agresivo)
-              const newContent = document.createElement('div');
-              newContent.id = 'notion-content';
-              newContent.className = 'notion-container__content notion-content';
-              notionContent.parentNode.replaceChild(newContent, notionContent);
             }
             
-            // FORZAR limpieza completa del iframe
+            // Limpiar iframe
             const notionIframe = notionContainer.querySelector('#notion-iframe');
             if (notionIframe) {
-              // Método 1: Cambiar src a about:blank
               notionIframe.src = 'about:blank';
-              // Método 2: Remover y recrear el iframe (más agresivo)
-              const newIframe = document.createElement('iframe');
-              newIframe.id = 'notion-iframe';
-              newIframe.className = 'notion-container__iframe';
-              newIframe.setAttribute('frameborder', '0');
-              newIframe.setAttribute('allowfullscreen', '');
-              notionIframe.parentNode.replaceChild(newIframe, notionIframe);
             }
             
-            // Remover la clase show-content para empezar en estado limpio
+            // Estado inicial limpio
             notionContainer.classList.remove('show-content');
-            
-            // Delay para asegurar que el navegador procese la limpieza
-            await new Promise(resolve => setTimeout(resolve, 150));
           }
           
           // Cargar el contenido de la página
@@ -6189,36 +6165,21 @@ async function loadImageContent(url, container, name) {
 }
 
 // Función para cargar video en player dedicado
-async function loadVideoContent(url, container, videoType) {
+function loadVideoContent(url, container, videoType) {
   const iframe = container.querySelector('#notion-iframe');
+  if (!iframe) return;
   
-  // Usar la función centralizada para gestionar visibilidad
+  // Cambiar a modo iframe
   setNotionDisplayMode(container, 'iframe');
   
-  // Forzar limpieza del iframe antes de cargar nuevo contenido
-  if (iframe) {
-    if (iframe.src && iframe.src !== 'about:blank') {
-      iframe.src = 'about:blank';
-      // Pequeño delay para asegurar que el navegador procese el cambio
-      await new Promise(resolve => setTimeout(resolve, 50));
-    }
-  }
-  
-  // Convertir URL a formato embed
+  // Convertir URL a formato embed y cargar
   const embedResult = convertToEmbedUrl(url);
-  const embedUrl = embedResult.url;
   
-  // Mostrar video en iframe con estilo mejorado
-  if (iframe) {
-    // Configurar el iframe para video
-    iframe.src = embedUrl;
-    iframe.style.width = '100%';
-    iframe.style.height = '100%';
-    iframe.style.border = 'none';
-    iframe.style.borderRadius = '8px';
-    iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share';
-    iframe.allowFullscreen = true;
-  }
+  // Configurar iframe para video
+  iframe.src = embedResult.url;
+  iframe.style.cssText = 'width:100%;height:100%;border:none;border-radius:8px';
+  iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share';
+  iframe.allowFullscreen = true;
 }
 
 // Función para cargar contenido en iframe (para URLs no-Notion)
@@ -6235,18 +6196,13 @@ async function loadIframeContent(url, container, selector = null) {
   // Esto asegura que el contenido de Notion se elimine completamente
   setNotionDisplayMode(container, 'iframe');
   
-  // SEGUNDO: Forzar limpieza del iframe antes de cargar nuevo contenido
-  // Esto asegura que el iframe se recargue correctamente
+  // Limpiar iframe si tiene contenido previo
   if (iframe.src && iframe.src !== 'about:blank') {
     iframe.src = 'about:blank';
-    // Pequeño delay para asegurar que el navegador procese el cambio
-    await new Promise(resolve => setTimeout(resolve, 50));
   }
   
-  // Verificar que show-content fue removida (por si acaso)
-  if (container.classList.contains('show-content')) {
-    container.classList.remove('show-content');
-  }
+  // Asegurar modo iframe
+  container.classList.remove('show-content');
   
   // Si hay un selector, intentar cargar solo ese elemento
   if (selector) {
@@ -6780,56 +6736,26 @@ async function loadPageContent(url, name, selector = null, blockTypes = null) {
           modalUrl.searchParams.set('_t', timestamp.toString());
           modalUrl.searchParams.set('_id', uniqueId);
           
-          // Cerrar TODOS los modales anteriores antes de abrir uno nuevo
-          // OBR podría estar reutilizando modales, así que cerramos todos los posibles
+          // Cerrar modal anterior si existe (usar ID fijo para simplicidad)
+          const modalId = 'notion-content-modal';
           try {
-            // Intentar cerrar todos los modales con el patrón que usamos
-            // Cerrar varios IDs posibles (últimos 5 segundos)
-            for (let i = 0; i < 10; i++) {
-              const previousTimestamp = timestamp - (i * 1000);
-              const previousModalId = `notion-content-modal-${previousTimestamp}`;
-              try {
-                await OBR.modal.close(previousModalId);
-              } catch (e) {
-                // Ignorar errores si el modal no existe
-              }
-            }
-            // También intentar cerrar el ID base
-            try {
-              await OBR.modal.close('notion-content-modal');
-            } catch (e) {
-              // Ignorar errores
-            }
-            // Delay más largo para asegurar que los modales se cierren completamente
-            await new Promise(resolve => setTimeout(resolve, 200));
+            await OBR.modal.close(modalId);
           } catch (e) {
-            // Continuar aunque falle el cierre
+            // Modal no existía, continuar
           }
           
-          // Usar un ID único basado en timestamp para evitar problemas de caché
-          const modalId = `notion-content-modal-${timestamp}`;
+          // Debug (solo en desarrollo)
+          if (window.DEBUG_MODE) {
+            console.log('🔍 Modal URL:', modalUrl.toString());
+          }
           
-          // Mostrar la URL del modal en consola para debug
-          console.log('🔍 URL del modal que se va a abrir:', modalUrl.toString());
-          console.log('🔍 ID del modal:', modalId);
-          console.log('🔍 URL decodificada:', {
-            url: decodeURIComponent(modalUrl.searchParams.get('url') || ''),
-            name: decodeURIComponent(modalUrl.searchParams.get('name') || ''),
-            modal: modalUrl.searchParams.get('modal'),
-            timestamp: modalUrl.searchParams.get('_t'),
-            uniqueId: modalUrl.searchParams.get('_id')
-          });
-          
-          // Abrir modal usando Owlbear SDK
-          // La URL ya tiene timestamp y uniqueId para evitar caché del navegador
+          // Abrir modal - la URL tiene timestamp para evitar caché
           await OBR.modal.open({
             id: modalId,
             url: modalUrl.toString(),
             height: 800,
             width: 1200
           });
-          
-          console.log('✅ Modal abierto con ID:', modalId);
         } catch (error) {
           console.error('Error al abrir modal de OBR:', error);
         }
