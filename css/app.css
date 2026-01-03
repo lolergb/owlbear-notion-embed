@@ -1354,7 +1354,7 @@
     margin-bottom: var(--spacing-md);
   }
   
-  .notion-loading .empty-state-icon {
+  .empty-state.notion-loading .empty-state-icon {
     animation: pulse 1.5s ease-in-out infinite;
   }
 
