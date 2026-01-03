@@ -1837,7 +1837,7 @@ async function fetchNotionBlocks(pageId, useCache = true) {
       if (response.status === 401) {
         throw new Error('Invalid token or no permissions. Verify that the configured token (🔑 button) is correct and that the integration has access to this page.');
       } else if (response.status === 404) {
-        throw new Error('Página no encontrada. Verifica que la URL sea correcta y que la integración tenga acceso.');
+        throw new Error('Page not found. Verify that the URL is correct and that the integration has access.');
       } else {
         throw new Error(`Error de API: ${response.status} - ${errorData.message || response.statusText}`);
       }
@@ -2034,7 +2034,7 @@ function renderBlock(block) {
     
     case 'table':
       // Las tablas se renderizan de forma especial (ver renderBlocks)
-      return '<div class="notion-table-container" data-table-id="' + block.id + '">Cargando tabla...</div>';
+      return '<div class="notion-table-container" data-table-id="' + block.id + '">Loading table...</div>';
     
     case 'child_database':
       return '<div class="notion-database-placeholder">[Base de datos - Requiere implementación adicional]</div>';
@@ -2060,7 +2060,7 @@ function renderBlock(block) {
       // Este caso no debería ejecutarse nunca, pero lo dejamos por seguridad
       const toggle = block.toggle;
       const toggleText = renderRichText(toggle?.rich_text);
-      return `<details class="notion-toggle"><summary>${toggleText}</summary><div class="notion-toggle-content" data-toggle-id="${block.id}">Cargando contenido...</div></details>`;
+      return `<details class="notion-toggle"><summary>${toggleText}</summary><div class="notion-toggle-content" data-toggle-id="${block.id}">Loading content...</div></details>`;
     
     default:
       console.warn('⚠️ Tipo de bloque no soportado:', type, {
@@ -3098,7 +3098,7 @@ async function loadNotionContent(url, container, forceRefresh = false, blockType
   contentDiv.innerHTML = `
     <div class="empty-state notion-loading">
       <div class="empty-state-icon">⏳</div>
-      <p class="empty-state-text">Cargando contenido...</p>
+      <p class="empty-state-text">Loading content...</p>
     </div>
   `;
   // No usar estilos inline - la clase show-content ya está añadida por setNotionDisplayMode
@@ -3107,7 +3107,7 @@ async function loadNotionContent(url, container, forceRefresh = false, blockType
     // Extraer ID de la página
     const pageId = extractNotionPageId(url);
     if (!pageId) {
-      throw new Error('No se pudo extraer el ID de la página desde la URL');
+      throw new Error('Could not extract page ID from URL');
     }
     
     const userToken = getUserToken();
@@ -3878,8 +3878,8 @@ try {
           <div class="empty-state">
             <div class="empty-state-icon">🚨</div>
             <p class="empty-state-text">Error loading extension</p>
-            <p class="empty-state-hint">Verifica la consola para más detalles</p>
-            <p class="empty-state-hint">${error.message || 'Error desconocido'}</p>
+            <p class="empty-state-hint">Check the console for more details</p>
+            <p class="empty-state-hint">${error.message || 'Unknown error'}</p>
           </div>
         `;
       }
@@ -3893,9 +3893,9 @@ try {
     pageList.innerHTML = `
       <div class="empty-state">
         <div class="empty-state-icon">🚨</div>
-        <p class="empty-state-text">Error crítico al cargar la extensión</p>
-        <p class="empty-state-hint">Verifica la consola para más detalles</p>
-        <p class="empty-state-hint">${error.message || 'Error desconocido'}</p>
+        <p class="empty-state-text">Critical error loading extension</p>
+        <p class="empty-state-hint">Check the console for more details</p>
+        <p class="empty-state-hint">${error.message || 'Unknown error'}</p>
       </div>
     `;
   }
@@ -5129,7 +5129,7 @@ async function deleteCategoryFromPageList(category, categoryPath, roomId) {
     }
     if (!Array.isArray(path)) {
       console.error('categoryPath no es un array:', path);
-      alert('Error: Path de carpeta inválido');
+        alert('Error: Invalid folder path');
       return false;
     }
     
@@ -6171,7 +6171,7 @@ async function loadImageContent(url, container, name) {
             <img src="img/icon-players.svg" alt="Share" style="width: 16px; height: 16px; filter: brightness(0) invert(1);" />
           </button>
         </div>
-        <p style="color: var(--color-text-secondary); font-size: 14px;">Haz clic en la imagen para verla a tamaño completo</p>
+        <p style="color: var(--color-text-secondary); font-size: 14px;">Click on the image to view it full size</p>
       </div>
     `;
     
@@ -6265,7 +6265,7 @@ async function loadVideoThumbnailContent(url, container, name, videoType) {
     contentDiv.innerHTML = `
       <div class="empty-state notion-loading">
         <div class="empty-state-icon">❌</div>
-        <p class="empty-state-text">No se pudo extraer el ID del video</p>
+        <p class="empty-state-text">Could not extract video ID</p>
       </div>
     `;
     return;
@@ -6354,7 +6354,7 @@ async function loadVideoThumbnailContent(url, container, name, videoType) {
           <img src="img/icon-players.svg" alt="Share" style="width: 16px; height: 16px; filter: brightness(0) invert(1);" />
         </button>
       </div>
-      <p style="color: var(--color-text-secondary); font-size: 14px;">Haz clic en el video para reproducirlo</p>
+      <p style="color: var(--color-text-secondary); font-size: 14px;">Click on the video to play it</p>
     </div>
   `;
   
@@ -6764,7 +6764,7 @@ async function loadDemoHtmlContent(url, container) {
   contentDiv.innerHTML = `
     <div class="empty-state notion-loading">
       <div class="empty-state-icon">⏳</div>
-      <p class="empty-state-text">Cargando contenido...</p>
+      <p class="empty-state-text">Loading content...</p>
     </div>
   `;
   // No usar estilos inline - la clase show-content ya está añadida por setNotionDisplayMode
@@ -6809,7 +6809,7 @@ async function loadDemoHtmlContent(url, container) {
     contentDiv.innerHTML = `
       <div class="empty-state notion-loading">
         <div class="empty-state-icon">❌</div>
-        <p class="empty-state-text">Error al cargar contenido de demo: ${error.message}</p>
+        <p class="empty-state-text">Error loading demo content: ${error.message}</p>
       </div>
     `;
   }
@@ -6946,7 +6946,7 @@ async function loadPageContent(url, name, selector = null, blockTypes = null) {
       openModalIcon.src = 'img/open-modal.svg';
       openModalIcon.className = 'icon-button-icon';
       openModalButton.appendChild(openModalIcon);
-      openModalButton.title = 'Abrir en modal';
+      openModalButton.title = 'Open in modal';
       
       // IMPORTANTE: Guardar la URL actual en el botón mismo
       // Esto asegura que siempre tengamos la URL correcta, sin importar el tipo de contenido
@@ -6987,7 +6987,7 @@ async function loadPageContent(url, name, selector = null, blockTypes = null) {
       if (openModalIconAfter) {
         openModalIconAfter.src = 'img/open-modal.svg';
       }
-      openModalButton.title = 'Abrir en modal';
+      openModalButton.title = 'Open in modal';
       
       // Agregar listener para abrir en modal
       openModalButton.addEventListener('click', async (e) => {
@@ -7106,7 +7106,7 @@ async function loadPageContent(url, name, selector = null, blockTypes = null) {
         contextMenuIcon.src = "img/icon-contextualmenu.svg";
         contextMenuIcon.className = "icon-button-icon";
         contextMenuButton.appendChild(contextMenuIcon);
-        contextMenuButton.title = "Menú";
+        contextMenuButton.title = "Menu";
         
         // Remover listeners anteriores (mantener clase hidden hasta que se quite explícitamente)
         const newContextMenuButton = contextMenuButton.cloneNode(true);
@@ -7205,7 +7205,7 @@ async function loadPageContent(url, name, selector = null, blockTypes = null) {
             icon: 'img/icon-trash.svg',
             text: 'Delete',
             action: async () => {
-              if (confirm(`¿Eliminar la página "${pageInfo.page.name}"?`)) {
+              if (confirm(`Delete page "${pageInfo.page.name}"?`)) {
                 await deletePageFromPageList(pageInfo.page, pageCategoryPath, roomId);
                 // Volver a la vista principal después de eliminar
                 const notionContainer = document.getElementById("notion-container");
@@ -7760,7 +7760,7 @@ async function showSettings() {
         fileInput.click();
       } catch (e) {
         console.error('Error al cargar JSON:', e);
-        alert('❌ Error al cargar JSON: ' + e.message);
+        alert('❌ Error loading JSON: ' + e.message);
       }
     });
   }
@@ -7866,7 +7866,10 @@ function createContextMenu(items, position, onClose) {
       } else if (item.text === 'Move down') {
         rotation = 'transform: rotate(-90deg);';
       }
-      iconHtml = `<img src="${item.icon}" alt="" style="width: 24px; height: 24px; display: block; ${rotation}" />`;
+      // Detectar si es icono de reloj/recarga para añadir animación pulse
+      const isClockIcon = item.icon.includes('icon-reload') || item.icon.includes('icon-clock') || item.icon.includes('clock');
+      const pulseClass = isClockIcon ? 'icon-loading' : '';
+      iconHtml = `<img src="${item.icon}" alt="" class="${pulseClass}" style="width: 24px; height: 24px; display: block; ${rotation}" />`;
     } else {
       iconHtml = `<span style="font-size: 16px; width: 20px; text-align: center;">${item.icon || ''}</span>`;
     }
@@ -8830,7 +8833,7 @@ async function showVisualEditor(pagesConfig, roomId = null) {
       `;
       emptyState.innerHTML = `
         <p style="margin-bottom: 12px;">No folders</p>
-        <p style="font-size: 12px; color: #555;">Haz clic en el botón + para agregar una carpeta</p>
+        <p style="font-size: 12px; color: #555;">Click the + button to add a folder</p>
       `;
       contentArea.appendChild(emptyState);
     }
