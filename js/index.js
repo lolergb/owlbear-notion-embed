@@ -3759,13 +3759,14 @@ try {
       // - Player: room metadata > broadcast (recibe configuración filtrada del GM)
       if (isGM) {
         // GM siempre usa su localStorage (configuración completa)
-        if (currentRoomCount >= defaultCount && currentRoomCount > 0) {
+        // SIEMPRE priorizar la configuración del roomId actual si existe (sin importar cuántos elementos tenga)
+        if (currentRoomConfig && (currentRoomConfig.categories && currentRoomConfig.categories.length > 0 || currentRoomCount > 0)) {
           log('✅ [GM] Usando configuración del localStorage con', currentRoomCount, 'elementos');
           pagesConfig = currentRoomConfig;
           // Sincronizar con room metadata para que los players la vean
           await savePagesJSON(pagesConfig, roomId);
         } else if (defaultCount > 0) {
-          log('✅ [GM] Usando configuración "default" con', defaultCount, 'elementos');
+          log('✅ [GM] No hay configuración para este roomId, usando configuración "default" con', defaultCount, 'elementos');
           pagesConfig = defaultConfig;
           // Copiar la configuración default al roomId actual
           await savePagesJSON(defaultConfig, roomId);
@@ -7871,6 +7872,9 @@ async function showSettings() {
                 console.warn('No se pudo obtener roomId:', e);
               }
             }
+            
+            // Limpiar el cache antes de guardar para evitar conflictos
+            pagesConfigCache = null;
             
             // Guardar la nueva configuración
             const saveSuccess = await savePagesJSON(parsed, currentRoomId);
