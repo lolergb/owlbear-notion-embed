@@ -3759,21 +3759,20 @@ try {
       // - Player: room metadata > broadcast (recibe configuración filtrada del GM)
       if (isGM) {
         // GM siempre usa su localStorage (configuración completa)
-        // SIEMPRE priorizar la configuración del roomId actual si existe (sin importar cuántos elementos tenga)
-        if (currentRoomConfig && (currentRoomConfig.categories && currentRoomConfig.categories.length > 0 || currentRoomCount > 0)) {
+        // SIEMPRE priorizar la configuración del roomId actual si existe
+        // Esto asegura que cuando un usuario carga un vault, se mantenga al recargar
+        if (currentRoomConfig) {
           log('✅ [GM] Usando configuración del localStorage con', currentRoomCount, 'elementos');
           pagesConfig = currentRoomConfig;
           // Sincronizar con room metadata para que los players la vean
           await savePagesJSON(pagesConfig, roomId);
         } else if (defaultCount > 0) {
+          // Solo usar default si NO hay configuración para este roomId
           log('✅ [GM] No hay configuración para este roomId, usando configuración "default" con', defaultCount, 'elementos');
           pagesConfig = defaultConfig;
           // Copiar la configuración default al roomId actual
           await savePagesJSON(defaultConfig, roomId);
           log('💾 [GM] Configuración "default" copiada a roomId:', roomId);
-        } else if (currentRoomConfig) {
-          log('⚠️ [GM] Configuración vacía, usando la existente del roomId');
-          pagesConfig = currentRoomConfig;
         }
       } else {
         // Player usa room metadata (configuración filtrada por el GM)
