@@ -900,9 +900,9 @@
       Notion Container
       ========================================================================== */
   .notion-container {
+    display: flex;
+    flex-direction: column;
     width: 100%;
-    height: calc(100vh - 100px);
-    min-height: 500px;
     background-color: var(--color-bg-primary);
     border-radius: var(--radius-lg);
     overflow-y: auto;
@@ -934,14 +934,14 @@
   
   .notion-container.show-content .notion-container__content,
   .notion-container.show-content #notion-content {
-    display: block !important;
+    display: flex !important;
     visibility: visible !important;
   }
   
   /* Estados por defecto (sin .show-content) - mostrar iframe, ocultar content */
   .notion-container:not(.show-content) .notion-container__iframe,
   .notion-container:not(.show-content) #notion-iframe {
-    display: block !important;
+    display: flex !important;
     visibility: visible !important;
   }
   
@@ -966,13 +966,6 @@
   }
   
   /* Centrado de contenido en modales */
-  .notion-container {
-    display: flex;
-    flex-direction: column;
-    min-height: 100%;
-    height: calc(100vh - 100px);
-  }
-  
   .notion-container.show-content {
     justify-content: flex-start;
     align-items: stretch;
