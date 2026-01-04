@@ -6731,7 +6731,7 @@ function getLinkType(url) {
     
     // 5e.tools - Renderizado nativo como Notion
     if (hostname.includes('5e.tools')) {
-      return { type: '5etools', icon: 'icon-dnd.svg' };
+      return { type: '5etools', icon: 'icon-5e-monster.svg' };
     }
     
     // ============================================================
