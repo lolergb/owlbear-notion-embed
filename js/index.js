@@ -6061,42 +6061,79 @@ async function fetch5eToolsMonster(source, monsterId) {
     
     // Usar proxy de Netlify para evitar CORS
     const proxyUrl = `/.netlify/functions/5etools-api?url=${encodeURIComponent(jsonUrl)}`;
+    console.log(`🔗 Using Netlify proxy: ${proxyUrl}`);
     
-    const response = await fetch(proxyUrl);
+    let response;
+    try {
+      response = await fetch(proxyUrl);
+    } catch (fetchError) {
+      console.error('❌ Error en fetch al proxy:', fetchError);
+      throw new Error(`Network error: ${fetchError.message}. Make sure you're on the Netlify deployment.`);
+    }
+    
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
+      console.error('❌ Error response del proxy:', response.status, errorData);
       throw new Error(`Error fetching bestiary: ${response.status} - ${errorData.error || response.statusText}`);
     }
     
     const data = await response.json();
+    console.log(`✅ JSON recibido, ${data.monster?.length || 0} monstruos encontrados`);
     
     // Buscar el monstruo por ID
-    // El ID es el nombre en minúsculas con espacios reemplazados por guiones bajos + _ + source
+    // El ID de 5e.tools tiene formato: nombre_source (ej: cultist_mm)
     const monsters = data.monster || [];
     
-    // Buscar coincidencia exacta primero
+    console.log(`🔍 Buscando monstruo: ${monsterId} en ${monsters.length} monstruos`);
+    
+    // Extraer nombre y fuente del ID
+    const parts = monsterId.toLowerCase().split('_');
+    const searchSource = parts.pop() || source.toLowerCase(); // Última parte es la fuente
+    const searchName = parts.join('_').replace(/-/g, ' '); // El resto es el nombre
+    
+    console.log(`🔍 Búsqueda: nombre="${searchName}", fuente="${searchSource}"`);
+    
+    // Estrategia 1: Buscar por nombre exacto y fuente
     let monster = monsters.find(m => {
-      const generatedId = `${m.name.toLowerCase().replace(/[^a-z0-9]/g, '')}${m.source ? '_' + m.source.toLowerCase() : ''}`;
-      const simpleId = monsterId.toLowerCase().replace(/[^a-z0-9_]/g, '');
-      return generatedId === simpleId || 
-             `${m.name.toLowerCase().replace(/\s+/g, '-')}_${(m.source || source).toLowerCase()}` === monsterId.toLowerCase();
+      const mName = m.name.toLowerCase().replace(/[^a-z0-9]/g, '');
+      const mSource = (m.source || '').toLowerCase();
+      const searchNameClean = searchName.toLowerCase().replace(/[^a-z0-9]/g, '');
+      return mName === searchNameClean && mSource === searchSource;
     });
     
-    // Si no hay coincidencia exacta, buscar por nombre parcial
+    // Estrategia 2: Buscar solo por nombre (ignorar fuente)
     if (!monster) {
-      const searchName = monsterId.split('_')[0].replace(/-/g, ' ');
+      console.log('⚠️ No encontrado con fuente, buscando solo por nombre...');
+      const searchNameClean = searchName.toLowerCase().replace(/[^a-z0-9]/g, '');
+      monster = monsters.find(m => {
+        const mName = m.name.toLowerCase().replace(/[^a-z0-9]/g, '');
+        return mName === searchNameClean;
+      });
+    }
+    
+    // Estrategia 3: Búsqueda parcial (contiene)
+    if (!monster) {
+      console.log('⚠️ No encontrado exacto, buscando parcial...');
+      const searchNameLower = searchName.toLowerCase();
       monster = monsters.find(m => 
-        m.name.toLowerCase() === searchName.toLowerCase() ||
-        m.name.toLowerCase().replace(/[^a-z0-9]/g, '') === searchName.toLowerCase().replace(/[^a-z0-9]/g, '')
+        m.name.toLowerCase().includes(searchNameLower) ||
+        searchNameLower.includes(m.name.toLowerCase())
       );
     }
     
     if (!monster) {
       console.warn(`⚠️ Monstruo no encontrado: ${monsterId} en ${jsonFile}`);
+      console.log('📋 Primeros 5 monstruos disponibles:', monsters.slice(0, 5).map(m => `${m.name}_${m.source || 'unknown'}`));
       return null;
     }
     
-    console.log(`✅ Monstruo encontrado: ${monster.name}`);
+    console.log(`✅ Monstruo encontrado: ${monster.name} (${monster.source || 'unknown'})`);
+    console.log('📊 Datos del monstruo encontrado:', {
+      name: monster.name,
+      ac: monster.ac,
+      hp: monster.hp,
+      speed: monster.speed
+    });
     return monster;
     
   } catch (e) {
@@ -6111,29 +6148,44 @@ async function fetch5eToolsMonster(source, monsterId) {
  * @returns {Array} - Array de bloques de Notion
  */
 function convert5eMonsterToNotionBlocks(monster) {
+  console.log('🔄 Convirtiendo monstruo a bloques Notion:', monster.name);
+  console.log('📊 Datos del monstruo:', {
+    ac: monster.ac,
+    hp: monster.hp,
+    speed: monster.speed,
+    size: monster.size,
+    type: monster.type
+  });
+  
   const blocks = [];
   
-  // Helper para crear bloques de texto
+  // Helper para crear bloques de texto (formato compatible con renderRichText)
+  const createTextBlock = (text) => ({
+    type: 'text',
+    text: { content: text },
+    plain_text: text  // Necesario para renderRichText
+  });
+  
   const createParagraph = (text) => ({
     type: 'paragraph',
-    paragraph: { rich_text: [{ type: 'text', text: { content: text } }] }
+    paragraph: { rich_text: [createTextBlock(text)] }
   });
   
   const createHeading2 = (text) => ({
     type: 'heading_2',
-    heading_2: { rich_text: [{ type: 'text', text: { content: text } }] }
+    heading_2: { rich_text: [createTextBlock(text)] }
   });
   
   const createHeading3 = (text) => ({
     type: 'heading_3',
-    heading_3: { rich_text: [{ type: 'text', text: { content: text } }] }
+    heading_3: { rich_text: [createTextBlock(text)] }
   });
   
   const createCallout = (emoji, text) => ({
     type: 'callout',
     callout: {
       icon: { emoji: emoji },
-      rich_text: [{ type: 'text', text: { content: text } }]
+      rich_text: [createTextBlock(text)]
     }
   });
   
@@ -6141,7 +6193,7 @@ function convert5eMonsterToNotionBlocks(monster) {
   
   const createBullet = (text) => ({
     type: 'bulleted_list_item',
-    bulleted_list_item: { rich_text: [{ type: 'text', text: { content: text } }] }
+    bulleted_list_item: { rich_text: [createTextBlock(text)] }
   });
   
   // Helper para formatear tamaño
@@ -6260,7 +6312,7 @@ function convert5eMonsterToNotionBlocks(monster) {
   // Título (nombre del monstruo)
   blocks.push({
     type: 'heading_1',
-    heading_1: { rich_text: [{ type: 'text', text: { content: monster.name } }] }
+    heading_1: { rich_text: [createTextBlock(monster.name)] }
   });
   
   // Subtítulo: Tamaño, Tipo, Alineamiento
@@ -6272,9 +6324,21 @@ function convert5eMonsterToNotionBlocks(monster) {
   blocks.push(createDivider());
   
   // Stats principales
-  blocks.push(createCallout('🛡️', `Armor Class: ${formatAC(monster.ac)}`));
-  blocks.push(createCallout('❤️', `Hit Points: ${formatHP(monster.hp)}`));
-  blocks.push(createCallout('🏃', `Speed: ${formatSpeed(monster.speed)}`));
+  const acValue = formatAC(monster.ac);
+  const hpValue = formatHP(monster.hp);
+  const speedValue = formatSpeed(monster.speed);
+  
+  console.log('📊 Valores formateados:', { ac: acValue, hp: hpValue, speed: speedValue });
+  
+  if (acValue && acValue !== 'N/A') {
+    blocks.push(createCallout('🛡️', `Armor Class: ${acValue}`));
+  }
+  if (hpValue && hpValue !== 'N/A') {
+    blocks.push(createCallout('❤️', `Hit Points: ${hpValue}`));
+  }
+  if (speedValue && speedValue !== 'N/A') {
+    blocks.push(createCallout('🏃', `Speed: ${speedValue}`));
+  }
   
   blocks.push(createDivider());
   
@@ -6497,12 +6561,24 @@ async function load5eToolsContent(url, container) {
     return false;
     
   } catch (error) {
-    console.error('Error cargando contenido de 5e.tools:', error);
+    console.error('❌ Error cargando contenido de 5e.tools:', error);
+    const errorMessage = error.message || 'Unknown error';
+    
+    // Detectar si es un error de red/CORS
+    const isNetworkError = errorMessage.includes('Network error') || 
+                          errorMessage.includes('Failed to fetch') ||
+                          errorMessage.includes('CORS');
+    
     contentDiv.innerHTML = `
       <div class="empty-state">
         <div class="empty-state-icon">❌</div>
         <p class="empty-state-text">Error loading 5e.tools content</p>
-        <p class="empty-state-hint">${error.message}</p>
+        <p class="empty-state-hint">${errorMessage}</p>
+        ${isNetworkError ? `
+          <p class="empty-state-hint" style="margin-top: 1rem; font-size: 0.9em; opacity: 0.8;">
+            💡 Tip: Make sure you're using the Netlify deployment. The proxy function may not be available in local development.
+          </p>
+        ` : ''}
       </div>
     `;
     return false;
