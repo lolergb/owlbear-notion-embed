@@ -3575,7 +3575,31 @@ async function showPageSelectorForToken(itemId, pagesConfig, roomId) {
         
         console.log('✅ Página vinculada al token:', selectedPage.name);
         trackPageLinkedToToken(selectedPage.name, itemId);
-        alert(`✅ Page "${selectedPage.name}" linked to token`);
+        
+        // Si es una página de 5e.tools (bestiary), intentar configurar stats automáticamente
+        let statsApplied = false;
+        if (is5eToolsUrl(selectedPage.url)) {
+          const detected = detect5eToolsContent(selectedPage.url);
+          if (detected && detected.type === 'bestiary') {
+            try {
+              console.log('📊 Detectada página de bestiary, cargando stats...');
+              const stats = await apply5eToolsStatsToToken(itemId, detected.source, detected.id);
+              if (stats) {
+                statsApplied = true;
+              }
+            } catch (error) {
+              console.warn('⚠️ No se pudieron aplicar stats automáticamente:', error);
+              // No mostrar error al usuario, solo log
+            }
+          }
+        }
+        
+        // Mensaje de confirmación
+        if (statsApplied) {
+          alert(`✅ Page "${selectedPage.name}" linked to token\n📊 Stats (HP & AC) applied automatically!`);
+        } else {
+          alert(`✅ Page "${selectedPage.name}" linked to token`);
+        }
         
       } catch (error) {
         console.error('Error al vincular página:', error);
@@ -3586,6 +3610,136 @@ async function showPageSelectorForToken(itemId, pagesConfig, roomId) {
       // Cancelar - no hacer nada
     }
   );
+}
+
+/**
+ * Aplicar stats de 5e.tools (HP y AC) a un token automáticamente
+ * @param {string} itemId - ID del token
+ * @param {string} source - Fuente del bestiary (mm, vgm, etc.)
+ * @param {string} monsterId - ID del monstruo
+ */
+async function apply5eToolsStatsToToken(itemId, source, monsterId) {
+  try {
+    // Cargar datos del monstruo
+    const monster = await fetch5eToolsMonster(source, monsterId);
+    if (!monster) {
+      console.warn('⚠️ No se pudo cargar el monstruo para aplicar stats');
+      return;
+    }
+    
+    // Extraer HP y AC
+    let hp = null;
+    let ac = null;
+    
+    // Formatear HP
+    if (monster.hp) {
+      if (typeof monster.hp === 'number') {
+        hp = monster.hp;
+      } else if (monster.hp.average) {
+        hp = monster.hp.average;
+      } else if (monster.hp.formula) {
+        // Intentar calcular promedio de la fórmula (ej: "2d8+2")
+        const match = monster.hp.formula.match(/(\d+)d(\d+)([+-]\d+)?/);
+        if (match) {
+          const dice = parseInt(match[1]);
+          const sides = parseInt(match[2]);
+          const modifier = match[3] ? parseInt(match[3]) : 0;
+          hp = Math.floor((dice * (sides + 1)) / 2) + modifier;
+        }
+      }
+    }
+    
+    // Formatear AC
+    if (monster.ac) {
+      if (typeof monster.ac === 'number') {
+        ac = monster.ac;
+      } else if (Array.isArray(monster.ac) && monster.ac.length > 0) {
+        const firstAc = monster.ac[0];
+        if (typeof firstAc === 'number') {
+          ac = firstAc;
+        } else if (typeof firstAc === 'object' && firstAc.ac) {
+          ac = firstAc.ac;
+        }
+      }
+    }
+    
+    if (!hp && !ac) {
+      console.log('⚠️ No se encontraron HP o AC para aplicar');
+      return;
+    }
+    
+    // Obtener el token actual
+    const items = await OBR.scene.items.getItems([itemId]);
+    if (items.length === 0) {
+      console.warn('⚠️ Token no encontrado');
+      return;
+    }
+    
+    const item = items[0];
+    
+    // Actualizar el token con las stats
+    await OBR.scene.items.updateItems([item], (updateItems) => {
+      const token = updateItems[0];
+      
+      // Actualizar HP si está disponible
+      if (hp !== null) {
+        // Owlbear Rodeo puede usar diferentes estructuras para stats
+        // Intentar múltiples formatos para compatibilidad
+        if (!token.dndStats) {
+          token.dndStats = {};
+        }
+        
+        // Formato estándar de Owlbear Rodeo
+        token.dndStats.hitPoints = hp;
+        token.dndStats.maxHitPoints = hp;
+        
+        // También intentar formato alternativo
+        if (!token.stats) {
+          token.stats = {};
+        }
+        token.stats.hp = hp;
+        token.stats.maxHp = hp;
+        
+        console.log(`✅ HP configurado: ${hp}`);
+      }
+      
+      // Actualizar AC si está disponible
+      if (ac !== null) {
+        if (!token.dndStats) {
+          token.dndStats = {};
+        }
+        
+        // Formato estándar de Owlbear Rodeo
+        token.dndStats.armorClass = ac;
+        
+        // También intentar formato alternativo
+        if (!token.stats) {
+          token.stats = {};
+        }
+        token.stats.ac = ac;
+        
+        console.log(`✅ AC configurado: ${ac}`);
+      }
+      
+      // Guardar también en metadatos para referencia y compatibilidad
+      if (hp !== null) {
+        token.metadata[`${METADATA_KEY}/monsterHP`] = hp;
+        token.metadata[`${METADATA_KEY}/monsterMaxHP`] = hp;
+      }
+      if (ac !== null) {
+        token.metadata[`${METADATA_KEY}/monsterAC`] = ac;
+      }
+    });
+    
+    console.log('✅ Stats aplicadas al token:', { hp, ac });
+    
+    // Devolver las stats aplicadas para mostrar en el mensaje
+    return { hp, ac };
+    
+  } catch (error) {
+    console.error('❌ Error aplicando stats al token:', error);
+    throw error;
+  }
 }
 
 // Intentar inicializar Owlbear con manejo de errores
