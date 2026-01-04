@@ -3457,46 +3457,70 @@ async function showPageSelectorForToken(itemId, pagesConfig, roomId) {
     return;
   }
   
-  // Recopilar todas las páginas de la configuración
+  // Recopilar todas las páginas de la configuración respetando el orden del vault
   const allPages = [];
   
-  function collectPages(categories, path = []) {
-    if (!categories) return;
+  // Función recursiva que respeta el orden combinado (como en renderCategory)
+  function collectPagesOrdered(category, path = [], level = 0) {
+    if (!category) return;
     
-    for (const category of categories) {
-      const currentPath = [...path, category.name];
-      
-      if (category.pages) {
-        for (const page of category.pages) {
-          if (page.url) {
-            allPages.push({
-              name: page.name,
-              url: page.url,
-              path: currentPath.join(' / '),
-              icon: page.icon || null
-            });
-          }
+    const currentPath = [...path, category.name];
+    
+    // Usar el mismo orden que el vault (getCombinedOrder)
+    const combinedOrder = getCombinedOrder(category);
+    
+    combinedOrder.forEach(item => {
+      if (item.type === 'category' && category.categories && category.categories[item.index]) {
+        // Recursivamente procesar subcategorías
+        const subcategory = category.categories[item.index];
+        collectPagesOrdered(subcategory, currentPath, level + 1);
+      } else if (item.type === 'page' && category.pages && category.pages[item.index]) {
+        // Agregar página con su información
+        const page = category.pages[item.index];
+        if (page.url) {
+          // Crear indentación visual (2 espacios por nivel, similar a 16px del vault)
+          // Usar caracteres visuales para mejor jerarquía: "  " por cada nivel
+          const indent = '  '.repeat(level);
+          const displayPath = currentPath.join(' / ');
+          
+          allPages.push({
+            name: page.name,
+            url: page.url,
+            path: currentPath,
+            displayPath: displayPath,
+            level: level,
+            indent: indent,
+            icon: page.icon || null
+          });
         }
       }
-      
-      if (category.categories) {
-        collectPages(category.categories, currentPath);
-      }
-    }
+    });
   }
   
-  collectPages(currentConfig.categories);
+  // Procesar todas las categorías raíz usando el orden combinado
+  const rootOrder = getCombinedOrder(currentConfig);
+  rootOrder.forEach(item => {
+    if (item.type === 'category' && currentConfig.categories && currentConfig.categories[item.index]) {
+      collectPagesOrdered(currentConfig.categories[item.index], [], 0);
+    }
+  });
   
   if (allPages.length === 0) {
     alert('No pages configured. Add pages from the main panel.');
     return;
   }
   
-  // Crear opciones para el select
-  const pageOptions = allPages.map((page, index) => ({
-    label: `${page.path} → ${page.name}`,
-    value: index.toString()
-  }));
+  // Crear opciones para el select con indentación visual
+  const pageOptions = allPages.map((page, index) => {
+    // Formato: indentación + path → nombre (similar al vault)
+    // Usar la indentación calculada para mostrar la jerarquía
+    const label = `${page.indent}${page.displayPath} → ${page.name}`;
+    
+    return {
+      label: label,
+      value: index.toString()
+    };
+  });
   
   // Mostrar modal de selección
   showModalForm(
