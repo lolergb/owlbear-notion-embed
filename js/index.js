@@ -3449,7 +3449,8 @@ async function setupTokenContextMenus(pagesConfig, roomId) {
 // Función para mostrar selector de páginas para vincular a un token
 async function showPageSelectorForToken(itemId, pagesConfig, roomId) {
   // Obtener la configuración más reciente cada vez que se llama
-  const currentConfig = getPagesJSONFromLocalStorage(roomId) || getPagesJSON(roomId) || await getDefaultJSON();
+  // Usar cache primero (más rápido), luego localStorage, luego default
+  const currentConfig = getPagesJSON(roomId) || getPagesJSONFromLocalStorage(roomId) || await getDefaultJSON();
   
   // Verificar que la configuración sea válida
   if (!currentConfig || !currentConfig.categories) {
