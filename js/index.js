@@ -3358,8 +3358,11 @@ async function setupTokenContextMenus(pagesConfig, roomId) {
         }
       ],
       onClick: async (context) => {
-        const item = context.items[0];
-        if (!item) return;
+        const items = context.items;
+        if (!items || items.length === 0) return;
+        
+        // Obtener los IDs de todos los tokens seleccionados
+        const itemIds = items.map(item => item.id);
         
         // Primero abrir el panel de la extensión
         await OBR.action.open();
@@ -3368,7 +3371,7 @@ async function setupTokenContextMenus(pagesConfig, roomId) {
         await new Promise(resolve => setTimeout(resolve, 100));
         
         // Mostrar selector de páginas (obtiene la configuración más reciente)
-        await showPageSelectorForToken(item.id, pagesConfig, roomId);
+        await showPageSelectorForToken(itemIds, pagesConfig, roomId);
       }
     });
     
@@ -3446,8 +3449,10 @@ async function setupTokenContextMenus(pagesConfig, roomId) {
   }
 }
 
-// Función para mostrar selector de páginas para vincular a un token
-async function showPageSelectorForToken(itemId, pagesConfig, roomId) {
+// Función para mostrar selector de páginas para vincular a uno o varios tokens
+async function showPageSelectorForToken(itemIds, pagesConfig, roomId) {
+  // Asegurar que itemIds sea un array
+  const tokenIds = Array.isArray(itemIds) ? itemIds : [itemIds];
   // Obtener la configuración más reciente cada vez que se llama
   // Usar cache primero (más rápido), luego localStorage, luego default
   const currentConfig = getPagesJSON(roomId) || getPagesJSONFromLocalStorage(roomId) || await getDefaultJSON();
@@ -3518,9 +3523,14 @@ async function showPageSelectorForToken(itemId, pagesConfig, roomId) {
     };
   });
   
+  // Determinar el título del modal según la cantidad de tokens
+  const modalTitle = tokenIds.length === 1 
+    ? 'Link page to token' 
+    : `Link page to ${tokenIds.length} tokens`;
+  
   // Mostrar modal de selección
   showModalForm(
-    'Link page to token',
+    modalTitle,
     [
       {
         name: 'pageIndex',
@@ -3539,22 +3549,35 @@ async function showPageSelectorForToken(itemId, pagesConfig, roomId) {
       }
       
       try {
-        // Obtener el item y actualizar sus metadatos
-        const items = await OBR.scene.items.getItems([itemId]);
+        // Obtener todos los items seleccionados
+        const items = await OBR.scene.items.getItems(tokenIds);
         if (items.length === 0) {
-          alert('Error: token not found');
+          alert('Error: tokens not found');
           return;
         }
         
-        await OBR.scene.items.updateItems([items[0]], (updateItems) => {
-          updateItems[0].metadata[`${METADATA_KEY}/pageUrl`] = selectedPage.url;
-          updateItems[0].metadata[`${METADATA_KEY}/pageName`] = selectedPage.name;
-          updateItems[0].metadata[`${METADATA_KEY}/pageIcon`] = selectedPage.icon;
+        // Actualizar metadatos de todos los tokens
+        await OBR.scene.items.updateItems(items, (updateItems) => {
+          updateItems.forEach(item => {
+            item.metadata[`${METADATA_KEY}/pageUrl`] = selectedPage.url;
+            item.metadata[`${METADATA_KEY}/pageName`] = selectedPage.name;
+            item.metadata[`${METADATA_KEY}/pageIcon`] = selectedPage.icon;
+          });
         });
         
-        console.log('✅ Página vinculada al token:', selectedPage.name);
-        trackPageLinkedToToken(selectedPage.name, itemId);
-        alert(`✅ Page "${selectedPage.name}" linked to token`);
+        // Registrar y mostrar mensaje de confirmación
+        const tokenCount = items.length;
+        console.log(`✅ Página "${selectedPage.name}" vinculada a ${tokenCount} token(s)`);
+        
+        // Trackear para cada token
+        tokenIds.forEach(itemId => {
+          trackPageLinkedToToken(selectedPage.name, itemId);
+        });
+        
+        const successMessage = tokenCount === 1
+          ? `✅ Page "${selectedPage.name}" linked to token`
+          : `✅ Page "${selectedPage.name}" linked to ${tokenCount} tokens`;
+        alert(successMessage);
         
       } catch (error) {
         console.error('Error al vincular página:', error);
