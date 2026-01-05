@@ -1045,37 +1045,39 @@ async function savePagesJSON(json, roomId) {
       
       if (fitsInMetadata) {
         // Intentar guardar config completa
+        // ESTRATEGIA: Limpiar cachés ANTES de guardar para asegurar espacio
         try {
+          console.log('  - Clearing caches first to ensure space...');
+          
+          // Limpiar cachés PRIMERO en una sola operación con la config completa
           await OBR.room.setMetadata({
+            [ROOM_CONTENT_CACHE_KEY]: {},
+            [ROOM_HTML_CACHE_KEY]: {},
             [FULL_CONFIG_KEY]: fullConfigCompressed
           });
-          console.log(`✅ Full config saved (${Math.round(fullConfigSize/1024)}KB, ${pageCount} pages)`);
-        } catch (metadataError) {
-          // Si es error de límite, limpiar cachés y reintentar
-          if (metadataError.message && metadataError.message.includes('size limit')) {
-            console.log('⚠️ Metadata full, clearing caches and retrying full config...');
-            
+          
+          console.log(`✅ Full config saved successfully (${Math.round(fullConfigSize/1024)}KB, ${pageCount} pages)`);
+          
+          // Verificar que realmente se guardó
+          setTimeout(async () => {
             try {
-              // Limpiar cachés para hacer espacio
-              await OBR.room.setMetadata({
-                [ROOM_CONTENT_CACHE_KEY]: {},
-                [ROOM_HTML_CACHE_KEY]: {}
-              });
-              
-              // Reintentar
-              await OBR.room.setMetadata({
-                [FULL_CONFIG_KEY]: fullConfigCompressed
-              });
-              console.log(`✅ Full config saved after clearing caches (${Math.round(fullConfigSize/1024)}KB, ${pageCount} pages)`);
-            } catch (retryError) {
-              console.error('❌ Failed to save full config even after clearing caches:', retryError.message);
-              trackEvent('vault_save_failed_after_cache_clear', {
-                size_kb: Math.round(fullConfigSize / 1024)
-              });
+              const metadata = await OBR.room.getMetadata();
+              const savedPages = metadata[FULL_CONFIG_KEY] ? countPages(metadata[FULL_CONFIG_KEY]) : 0;
+              console.log(`✔️  Verification: Full config has ${savedPages} pages in metadata`);
+              if (savedPages !== pageCount) {
+                console.error(`❌ Verification failed! Expected ${pageCount} pages but got ${savedPages}`);
+              }
+            } catch (e) {
+              console.error('❌ Could not verify save:', e.message);
             }
-          } else {
-            console.error('❌ Error saving full config:', metadataError.message);
-          }
+          }, 500);
+          
+        } catch (metadataError) {
+          console.error('❌ Failed to save full config:', metadataError.message);
+          trackEvent('vault_save_failed', {
+            size_kb: Math.round(fullConfigSize / 1024),
+            error: metadataError.message
+          });
         }
       } else {
         console.log(`⚠️ Full config (${Math.round(fullConfigSize/1024)}KB) exceeds 16KB, not syncing`);
@@ -8537,13 +8539,31 @@ async function showSettings() {
       checkInheritanceBtn.textContent = '🔄 Checking...';
       checkInheritanceBtn.disabled = true;
       
+      // Obtener roomId dinámicamente (puede ser null en scope)
+      let currentRoomId = null;
+      try {
+        currentRoomId = OBR.room.id || await OBR.room.getId();
+        console.log('  - Room ID:', currentRoomId);
+      } catch (e) {
+        console.error('  - Failed to get room ID:', e);
+      }
+      
+      if (!currentRoomId) {
+        checkInheritanceBtn.textContent = '❌ No room ID';
+        setTimeout(() => {
+          checkInheritanceBtn.textContent = originalText;
+          checkInheritanceBtn.disabled = false;
+        }, 2000);
+        return;
+      }
+      
       // Resetear el flag de "ya rechazado"
-      const inheritanceKey = `${INHERITANCE_DECLINED_KEY_PREFIX}${roomId}`;
+      const inheritanceKey = `${INHERITANCE_DECLINED_KEY_PREFIX}${currentRoomId}`;
       localStorage.removeItem(inheritanceKey);
       console.log('  - Removed inheritance declined flag');
       
       // Forzar verificación de herencia
-      await checkVaultInheritance(roomId);
+      await checkVaultInheritance(currentRoomId);
       
       // Restaurar botón
       setTimeout(() => {
