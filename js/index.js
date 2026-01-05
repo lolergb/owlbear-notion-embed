@@ -664,9 +664,16 @@ const ROOM_HTML_CACHE_KEY = 'com.dmscreen/htmlCache';
 const BROADCAST_CHANNEL_REQUEST = 'com.dmscreen/requestContent';
 const BROADCAST_CHANNEL_RESPONSE = 'com.dmscreen/responseContent';
 
+// Nueva key para configuración completa (para herencia de GM)
+const FULL_CONFIG_KEY = 'com.dmscreen/fullConfig';
+const LAST_ROLE_KEY = 'com.dmscreen/lastRole';
+const VAULT_SIZE_WARNING_SHOWN_KEY = 'com.dmscreen/vaultSizeWarningShown';
+const INHERITANCE_DECLINED_KEY_PREFIX = 'com.dmscreen/inheritanceDeclined-';
+
 // Límite de tamaño para room metadata (16KB en bytes)
 const ROOM_METADATA_SIZE_LIMIT = 16 * 1024; // 16384 bytes
 const ROOM_METADATA_SAFE_LIMIT = ROOM_METADATA_SIZE_LIMIT - 1024; // Dejar 1KB de margen
+const MAX_METADATA_SIZE = ROOM_METADATA_SIZE_LIMIT; // Alias para consistencia
 
 /**
  * Calcula el tamaño aproximado de un objeto en bytes cuando se serializa a JSON
@@ -809,6 +816,68 @@ function filterVisiblePagesForMetadata(config) {
     categories: filteredCategories,
     ...(config.order ? { order: config.order } : {})
   };
+}
+
+/**
+ * Cuenta el total de páginas en una configuración
+ * @param {object} config - Configuración del vault
+ * @returns {number} - Número total de páginas
+ */
+function countPages(config) {
+  if (!config || !config.categories) return 0;
+  let count = 0;
+  
+  const countRecursive = (categories) => {
+    if (!Array.isArray(categories)) return;
+    categories.forEach(cat => {
+      if (cat.pages && Array.isArray(cat.pages)) {
+        count += cat.pages.filter(p => p && p.url).length;
+      }
+      if (cat.categories) {
+        countRecursive(cat.categories);
+      }
+    });
+  };
+  
+  countRecursive(config.categories);
+  return count;
+}
+
+/**
+ * Cuenta el total de categorías en una configuración
+ * @param {object} config - Configuración del vault
+ * @returns {number} - Número total de categorías
+ */
+function countCategories(config) {
+  if (!config || !config.categories) return 0;
+  let count = config.categories.length;
+  
+  const countRecursive = (categories) => {
+    if (!Array.isArray(categories)) return;
+    categories.forEach(cat => {
+      if (cat.categories && Array.isArray(cat.categories)) {
+        count += cat.categories.length;
+        countRecursive(cat.categories);
+      }
+    });
+  };
+  
+  countRecursive(config.categories);
+  return count;
+}
+
+/**
+ * Calcula el tamaño en bytes de una configuración comprimida
+ * @param {object} config - Configuración del vault
+ * @returns {number} - Tamaño en bytes
+ */
+function getConfigSize(config) {
+  try {
+    const compressed = compressJson(config);
+    return new Blob([JSON.stringify(compressed)]).size;
+  } catch (e) {
+    return 0;
+  }
 }
 
 // Canal de broadcast para sincronizar lista de páginas visibles
@@ -1010,6 +1079,48 @@ async function savePagesJSON(json, roomId) {
       }
     }
     
+    // NUEVO: Intentar guardar configuración completa para herencia de GM
+    try {
+      const fullConfigCompressed = compressJson(json);
+      const fullConfigSize = getConfigSize(json);
+      const pageCount = countPages(json);
+      const categoryCount = countCategories(json);
+      const fitsInMetadata = fullConfigSize < MAX_METADATA_SIZE;
+      
+      // Track tamaño del vault a Mixpanel
+      trackEvent('vault_size_measured', {
+        size_bytes: fullConfigSize,
+        size_kb: Math.round(fullConfigSize / 1024),
+        fits_in_metadata: fitsInMetadata,
+        page_count: pageCount,
+        category_count: categoryCount
+      });
+      
+      if (fitsInMetadata) {
+        // Si cabe, guardar config completa para herencia de GM
+        await OBR.room.setMetadata({
+          [FULL_CONFIG_KEY]: fullConfigCompressed
+        });
+        log(`✅ Config completa sincronizada para herencia de GM (${Math.round(fullConfigSize/1024)}KB)`);
+      } else {
+        log(`⚠️ Config completa (${Math.round(fullConfigSize/1024)}KB) excede 16KB, no se sincroniza`);
+        
+        // Track que no cabe
+        trackEvent('vault_too_large_for_sync', {
+          size_kb: Math.round(fullConfigSize / 1024)
+        });
+        
+        // Mostrar warning al GM si es primera vez
+        const warningShown = localStorage.getItem(VAULT_SIZE_WARNING_SHOWN_KEY);
+        if (!warningShown) {
+          showVaultSizeWarning(fullConfigSize);
+          localStorage.setItem(VAULT_SIZE_WARNING_SHOWN_KEY, 'true');
+        }
+      }
+    } catch (e) {
+      log('⚠️ No se pudo sincronizar config completa:', e.message);
+    }
+    
     log('✅ Configuración guardada exitosamente para room:', roomId);
     return true;
   } catch (e) {
@@ -1117,6 +1228,158 @@ async function getDefaultJSON() {
       }
     ]
   };
+}
+
+/**
+ * Detectar cambio de rol (promoción a GM)
+ * @param {string} currentRole - Rol actual del usuario
+ * @param {string} roomId - ID de la room
+ * @returns {boolean} - true si hubo promoción a GM
+ */
+async function detectRoleChange(currentRole, roomId) {
+  const lastRole = localStorage.getItem(LAST_ROLE_KEY);
+  const isGM = currentRole === 'GM';
+  
+  // Guardar rol actual
+  localStorage.setItem(LAST_ROLE_KEY, currentRole);
+  
+  // Detectar promoción: era Player (o null), ahora es GM
+  const wasPromoted = lastRole && lastRole !== 'GM' && isGM;
+  
+  if (wasPromoted) {
+    log('🎖️ Usuario promovido a GM');
+    trackEvent('promoted_to_gm', {});
+    
+    // Verificar si ya tiene configuración para esta room
+    const hasLocalConfig = getPagesJSONFromLocalStorage(roomId) !== null;
+    
+    // Si no tiene configuración local, intentar heredar
+    if (!hasLocalConfig) {
+      await checkVaultInheritance(roomId);
+    }
+  }
+  
+  return wasPromoted;
+}
+
+/**
+ * Verificar si hay vault disponible para heredar y mostrar banner
+ * @param {string} roomId - ID de la room
+ */
+async function checkVaultInheritance(roomId) {
+  // Verificar si el usuario ya rechazó la herencia
+  const inheritanceKey = `${INHERITANCE_DECLINED_KEY_PREFIX}${roomId}`;
+  const alreadyDeclined = localStorage.getItem(inheritanceKey) === 'true';
+  
+  if (alreadyDeclined) {
+    log('ℹ️ Usuario ya rechazó herencia de vault para esta room');
+    return;
+  }
+  
+  try {
+    const metadata = await OBR.room.getMetadata();
+    
+    // Verificar si hay configuración completa disponible
+    if (metadata && metadata[FULL_CONFIG_KEY]) {
+      const fullConfig = metadata[FULL_CONFIG_KEY];
+      const configSize = getConfigSize(fullConfig);
+      const pageCount = countPages(fullConfig);
+      
+      log('✅ Config completa encontrada en metadata');
+      
+      // Mostrar banner de herencia
+      showVaultInheritanceBanner(fullConfig, configSize, pageCount, roomId);
+    } else {
+      // No hay config completa, mostrar opción de usar default o importar
+      log('⚠️ No hay config completa disponible');
+      trackEvent('vault_not_available_for_inheritance', {});
+      showNoVaultAvailableBanner(roomId);
+    }
+  } catch (e) {
+    console.error('Error al verificar herencia de vault:', e);
+  }
+}
+
+/**
+ * Heredar vault desde metadata
+ * @param {object} fullConfig - Configuración completa
+ * @param {string} roomId - ID de la room
+ */
+async function inheritVault(fullConfig, roomId) {
+  try {
+    const configSize = getConfigSize(fullConfig);
+    const pageCount = countPages(fullConfig);
+    
+    await savePagesJSON(fullConfig, roomId);
+    
+    trackEvent('vault_inherited', {
+      size_kb: Math.round(configSize / 1024),
+      page_count: pageCount
+    });
+    
+    log('✅ Vault heredado exitosamente');
+    
+    // Recargar extensión para mostrar el vault heredado
+    window.location.reload();
+  } catch (e) {
+    console.error('Error al heredar vault:', e);
+    alert('Error al heredar vault: ' + e.message);
+  }
+}
+
+/**
+ * Actualizar el indicador de estado del vault en Settings
+ * @param {string} roomId - ID de la room
+ */
+async function updateVaultStatusIndicator(roomId) {
+  const statusIcon = document.getElementById('vault-status-icon');
+  const statusText = document.getElementById('vault-status-text');
+  const statusDetails = document.getElementById('vault-status-details');
+  
+  if (!statusIcon || !statusText || !statusDetails) {
+    return; // Elementos no encontrados
+  }
+  
+  try {
+    // Obtener configuración actual
+    const config = getPagesJSON(roomId) || getPagesJSONFromLocalStorage(roomId);
+    
+    if (!config || !config.categories) {
+      statusIcon.textContent = 'ℹ️';
+      statusText.textContent = 'No vault configured';
+      statusDetails.textContent = 'Add pages to start building your vault.';
+      return;
+    }
+    
+    // Calcular estadísticas
+    const configSize = getConfigSize(config);
+    const pageCount = countPages(config);
+    const categoryCount = countCategories(config);
+    const sizeKB = Math.round(configSize / 1024);
+    const fitsInMetadata = configSize < MAX_METADATA_SIZE;
+    
+    // Actualizar UI según el estado
+    if (fitsInMetadata) {
+      statusIcon.textContent = '✅';
+      statusText.textContent = `${sizeKB} KB (Syncable)`;
+      statusDetails.innerHTML = `
+        <strong>${pageCount} pages</strong> in <strong>${categoryCount} folders</strong><br>
+        Your vault can be automatically inherited by co-GMs when promoted.
+      `;
+    } else {
+      statusIcon.textContent = '⚠️';
+      statusText.textContent = `${sizeKB} KB (Manual share required)`;
+      statusDetails.innerHTML = `
+        <strong>${pageCount} pages</strong> in <strong>${categoryCount} folders</strong><br>
+        Your vault is too large for automatic sync. Use <strong>Download vault</strong> to share with co-GMs manually.
+      `;
+    }
+  } catch (e) {
+    console.error('Error updating vault status:', e);
+    statusIcon.textContent = '❌';
+    statusText.textContent = 'Error';
+    statusDetails.textContent = 'Could not determine vault status.';
+  }
 }
 
 // Función para obtener todas las configuraciones de rooms (para debugging)
@@ -3682,6 +3945,12 @@ try {
       
       if (isGM) {
         log('✅ Room ID final que se usará:', roomId);
+      }
+      
+      // NUEVO: Detectar cambio de rol (promoción a GM)
+      if (isGM) {
+        const role = await OBR.player.getRole();
+        await detectRoleChange(role, roomId);
       }
       
       // Verificar si estamos en modo modal (abierto desde el botón de abrir en modal)
@@ -7679,6 +7948,9 @@ async function showSettings() {
     allForms.forEach(form => {
       form.style.display = '';
     });
+    
+    // NUEVO: Actualizar vault status indicator
+    updateVaultStatusIndicator(roomId);
   }
   
   const currentToken = getUserToken() || '';
@@ -8461,6 +8733,378 @@ function showStorageLimitModal(context = 'saving data') {
   overlay.addEventListener('click', (e) => {
     if (e.target === overlay) close();
   });
+}
+
+/**
+ * Muestra un toast discreto cuando el vault supera 16KB (primera vez)
+ * @param {number} vaultSize - Tamaño del vault en bytes
+ */
+function showVaultSizeWarning(vaultSize) {
+  const vaultSizeKB = Math.round(vaultSize / 1024);
+  
+  // Crear toast
+  const toast = document.createElement('div');
+  toast.className = 'toast toast--warning';
+  toast.style.cssText = `
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #fef3c7;
+    border: 2px solid #f59e0b;
+    border-radius: 8px;
+    padding: 16px 24px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    z-index: 10000;
+    max-width: 500px;
+    animation: slideDown 0.3s ease-out;
+  `;
+  
+  toast.innerHTML = `
+    <div style="display: flex; align-items: start; gap: 12px;">
+      <div style="font-size: 24px;">💡</div>
+      <div style="flex: 1;">
+        <div style="font-weight: 600; margin-bottom: 4px; color: #92400e;">
+          Tip para Co-GMs
+        </div>
+        <div style="font-size: 14px; color: #78350f; margin-bottom: 8px;">
+          Tu vault (${vaultSizeKB} KB) es muy completo para sincronización automática.
+          Si trabajas con co-GM, usa <strong>Configuración → Exportar JSON</strong>.
+        </div>
+        <div style="display: flex; gap: 8px;">
+          <button id="toast-ok" style="
+            background: #f59e0b;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 500;
+          ">OK</button>
+          <button id="toast-dismiss" style="
+            background: transparent;
+            color: #92400e;
+            border: 1px solid #f59e0b;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+          ">No mostrar más</button>
+        </div>
+      </div>
+      <button id="toast-close" style="
+        background: none;
+        border: none;
+        font-size: 20px;
+        cursor: pointer;
+        color: #92400e;
+        padding: 0;
+        line-height: 1;
+      ">×</button>
+    </div>
+  `;
+  
+  // Añadir estilos de animación si no existen
+  if (!document.getElementById('toast-animations')) {
+    const style = document.createElement('style');
+    style.id = 'toast-animations';
+    style.textContent = `
+      @keyframes slideDown {
+        from {
+          opacity: 0;
+          transform: translateX(-50%) translateY(-20px);
+        }
+        to {
+          opacity: 1;
+          transform: translateX(-50%) translateY(0);
+        }
+      }
+      @keyframes slideUp {
+        from {
+          opacity: 1;
+          transform: translateX(-50%) translateY(0);
+        }
+        to {
+          opacity: 0;
+          transform: translateX(-50%) translateY(-20px);
+        }
+      }
+    `;
+    document.head.appendChild(style);
+  }
+  
+  document.body.appendChild(toast);
+  
+  const close = () => {
+    toast.style.animation = 'slideUp 0.3s ease-in';
+    setTimeout(() => toast.remove(), 300);
+  };
+  
+  // Botón OK
+  toast.querySelector('#toast-ok').addEventListener('click', () => {
+    trackEvent('vault_size_warning_acknowledged', { action: 'ok' });
+    close();
+  });
+  
+  // Botón "No mostrar más"
+  toast.querySelector('#toast-dismiss').addEventListener('click', () => {
+    localStorage.setItem(VAULT_SIZE_WARNING_SHOWN_KEY, 'permanent');
+    trackEvent('vault_size_warning_acknowledged', { action: 'dismiss' });
+    close();
+  });
+  
+  // Botón cerrar (X)
+  toast.querySelector('#toast-close').addEventListener('click', () => {
+    trackEvent('vault_size_warning_acknowledged', { action: 'close' });
+    close();
+  });
+  
+  // Auto-cerrar después de 10 segundos
+  setTimeout(() => {
+    if (document.body.contains(toast)) {
+      close();
+    }
+  }, 10000);
+}
+
+/**
+ * Muestra banner de herencia de vault (cuando hay vault disponible)
+ * @param {object} fullConfig - Configuración completa disponible
+ * @param {number} configSize - Tamaño en bytes
+ * @param {number} pageCount - Número de páginas
+ * @param {string} roomId - ID de la room
+ */
+function showVaultInheritanceBanner(fullConfig, configSize, pageCount, roomId) {
+  const banner = document.createElement('div');
+  banner.id = 'vault-inheritance-banner';
+  banner.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 16px 24px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    z-index: 9999;
+    animation: slideDown 0.4s ease-out;
+  `;
+  
+  banner.innerHTML = `
+    <div style="max-width: 600px; margin: 0 auto; display: flex; align-items: center; gap: 16px;">
+      <div style="font-size: 32px;">🎖️</div>
+      <div style="flex: 1;">
+        <div style="font-weight: 700; font-size: 16px; margin-bottom: 4px;">
+          Ahora eres GM de esta partida
+        </div>
+        <div style="font-size: 14px; opacity: 0.95;">
+          ¿Usar el vault del GM anterior (${pageCount} páginas) o empezar de cero?
+        </div>
+      </div>
+      <div style="display: flex; gap: 8px; flex-shrink: 0;">
+        <button id="inherit-vault-btn" style="
+          background: white;
+          color: #667eea;
+          border: none;
+          padding: 8px 16px;
+          border-radius: 6px;
+          cursor: pointer;
+          font-size: 14px;
+          font-weight: 600;
+          white-space: nowrap;
+        ">Usar existente</button>
+        <button id="start-fresh-btn" style="
+          background: transparent;
+          color: white;
+          border: 2px solid rgba(255,255,255,0.5);
+          padding: 8px 16px;
+          border-radius: 6px;
+          cursor: pointer;
+          font-size: 14px;
+          font-weight: 600;
+          white-space: nowrap;
+        ">Empezar de cero</button>
+      </div>
+      <button id="banner-close-btn" style="
+        background: none;
+        border: none;
+        color: white;
+        font-size: 24px;
+        cursor: pointer;
+        padding: 0;
+        line-height: 1;
+        opacity: 0.7;
+      ">×</button>
+    </div>
+  `;
+  
+  document.body.appendChild(banner);
+  
+  // Ajustar padding del body para que el contenido no quede detrás del banner
+  document.body.style.paddingTop = banner.offsetHeight + 'px';
+  
+  const removeBanner = () => {
+    banner.style.animation = 'slideUp 0.3s ease-in';
+    setTimeout(() => {
+      banner.remove();
+      document.body.style.paddingTop = '';
+    }, 300);
+  };
+  
+  // Botón "Usar existente"
+  banner.querySelector('#inherit-vault-btn').addEventListener('click', async () => {
+    await inheritVault(fullConfig, roomId);
+    removeBanner();
+  });
+  
+  // Botón "Empezar de cero"
+  banner.querySelector('#start-fresh-btn').addEventListener('click', async () => {
+    trackEvent('vault_inheritance_declined', {});
+    
+    // Guardar que el usuario rechazó la herencia
+    const inheritanceKey = `${INHERITANCE_DECLINED_KEY_PREFIX}${roomId}`;
+    localStorage.setItem(inheritanceKey, 'true');
+    
+    // Cargar vault por defecto
+    const defaultConfig = await getDefaultJSON();
+    await savePagesJSON(defaultConfig, roomId);
+    
+    removeBanner();
+    window.location.reload();
+  });
+  
+  // Botón cerrar (X)
+  banner.querySelector('#banner-close-btn').addEventListener('click', () => {
+    trackEvent('vault_inheritance_banner_closed', {});
+    removeBanner();
+  });
+}
+
+/**
+ * Muestra banner cuando NO hay vault disponible para heredar
+ * @param {string} roomId - ID de la room
+ */
+function showNoVaultAvailableBanner(roomId) {
+  const banner = document.createElement('div');
+  banner.id = 'no-vault-banner';
+  banner.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 16px 24px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    z-index: 9999;
+    animation: slideDown 0.4s ease-out;
+  `;
+  
+  banner.innerHTML = `
+    <div style="max-width: 600px; margin: 0 auto; display: flex; align-items: center; gap: 16px;">
+      <div style="font-size: 32px;">🎖️</div>
+      <div style="flex: 1;">
+        <div style="font-weight: 700; font-size: 16px; margin-bottom: 4px;">
+          Ahora eres GM de esta partida
+        </div>
+        <div style="font-size: 14px; opacity: 0.95;">
+          El vault del GM anterior no está disponible. ¿Importar JSON manualmente o usar vault por defecto?
+        </div>
+      </div>
+      <div style="display: flex; gap: 8px; flex-shrink: 0;">
+        <button id="import-json-btn" style="
+          background: white;
+          color: #667eea;
+          border: none;
+          padding: 8px 16px;
+          border-radius: 6px;
+          cursor: pointer;
+          font-size: 14px;
+          font-weight: 600;
+          white-space: nowrap;
+        ">Importar JSON</button>
+        <button id="use-default-btn" style="
+          background: transparent;
+          color: white;
+          border: 2px solid rgba(255,255,255,0.5);
+          padding: 8px 16px;
+          border-radius: 6px;
+          cursor: pointer;
+          font-size: 14px;
+          font-weight: 600;
+          white-space: nowrap;
+        ">Usar por defecto</button>
+      </div>
+      <button id="banner-close-btn-2" style="
+        background: none;
+        border: none;
+        color: white;
+        font-size: 24px;
+        cursor: pointer;
+        padding: 0;
+        line-height: 1;
+        opacity: 0.7;
+      ">×</button>
+    </div>
+  `;
+  
+  document.body.appendChild(banner);
+  
+  // Ajustar padding del body
+  document.body.style.paddingTop = banner.offsetHeight + 'px';
+  
+  const removeBanner = () => {
+    banner.style.animation = 'slideUp 0.3s ease-in';
+    setTimeout(() => {
+      banner.remove();
+      document.body.style.paddingTop = '';
+    }, 300);
+  };
+  
+  // Botón "Importar JSON"
+  banner.querySelector('#import-json-btn').addEventListener('click', () => {
+    trackEvent('vault_import_from_banner', {});
+    removeBanner();
+    // Abrir settings y activar import
+    showSettings();
+    // Pequeño delay para asegurar que el modal se abrió
+    setTimeout(() => {
+      const loadJsonBtn = document.querySelector('#load-json');
+      if (loadJsonBtn) {
+        loadJsonBtn.click();
+      }
+    }, 300);
+  });
+  
+  // Botón "Usar por defecto"
+  banner.querySelector('#use-default-btn').addEventListener('click', async () => {
+    trackEvent('vault_use_default_from_banner', {});
+    
+    // Guardar que el usuario rechazó la herencia
+    const inheritanceKey = `${INHERITANCE_DECLINED_KEY_PREFIX}${roomId}`;
+    localStorage.setItem(inheritanceKey, 'true');
+    
+    // Cargar vault por defecto
+    const defaultConfig = await getDefaultJSON();
+    await savePagesJSON(defaultConfig, roomId);
+    
+    removeBanner();
+    window.location.reload();
+  });
+  
+  // Botón cerrar (X)
+  banner.querySelector('#banner-close-btn-2').addEventListener('click', () => {
+    trackEvent('no_vault_banner_closed', {});
+    removeBanner();
+  });
+  
+  // Auto-dismiss después de 15 segundos
+  setTimeout(() => {
+    if (document.body.contains(banner)) {
+      removeBanner();
+    }
+  }, 15000);
 }
 
 /**
