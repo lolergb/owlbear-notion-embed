@@ -828,6 +828,9 @@ let ownerHeartbeatInterval = null;
 // Variable global para indicar si el usuario es Co-GM (solo lectura)
 let isCoGMGlobal = false;
 
+// Variable global para el roomId (se establece una vez al inicio)
+let currentRoomId = null;
+
 // Variable para almacenar el último rol conocido
 let lastKnownRole = null;
 
@@ -4015,6 +4018,9 @@ try {
       if (isGM) {
         log('✅ Room ID final que se usará:', roomId);
       }
+      
+      // Guardar roomId en variable global para uso en otras funciones (ej: showSettings)
+      currentRoomId = roomId;
       
       // ============================================
       // DETECCIÓN DE CO-GM (GM promovido)
@@ -8072,15 +8078,30 @@ function showMasterGMDisconnectedBanner(ownershipInfo) {
 
 // Función para mostrar configuración de token
 async function showSettings() {
-  // Obtener roomId de forma segura
-  let roomId = null;
-  try {
-    if (typeof OBR !== 'undefined' && OBR.room && OBR.room.getId) {
-      roomId = await OBR.room.getId();
+  // Obtener roomId de forma segura (usar variable global si está disponible)
+  let roomId = currentRoomId;
+  
+  // Si no hay roomId en la variable global, intentar obtenerlo
+  if (!roomId) {
+    try {
+      if (typeof OBR !== 'undefined' && OBR.room) {
+        roomId = OBR.room.id || await OBR.room.getId();
+        // Actualizar variable global
+        if (roomId) {
+          currentRoomId = roomId;
+        }
+      }
+    } catch (e) {
+      console.warn('No se pudo obtener roomId:', e);
     }
-  } catch (e) {
-    console.warn('No se pudo obtener roomId:', e);
   }
+  
+  // Fallback a 'default' si sigue siendo null
+  if (!roomId) {
+    roomId = 'default';
+  }
+  
+  console.log('🔧 [Settings] roomId:', roomId, 'isCoGMGlobal:', isCoGMGlobal);
   const pageList = document.getElementById("page-list");
   const notionContainer = document.getElementById("notion-container");
   const settingsContainer = document.getElementById("settings-container");
@@ -8177,24 +8198,30 @@ async function showSettings() {
   
   if (isGM) {
     ownershipInfo = await checkVaultOwnership();
+    console.log('🔧 [Settings] ownershipInfo:', ownershipInfo);
     
     if (isCoGMGlobal) {
       // Co-GM: obtener config desde metadata
       try {
         const metadata = await OBR.room.getMetadata();
         vaultConfig = metadata ? metadata[FULL_CONFIG_KEY] : null;
+        console.log('🔧 [Settings Co-GM] metadata keys:', metadata ? Object.keys(metadata) : 'null');
+        console.log('🔧 [Settings Co-GM] vaultConfig:', vaultConfig ? 'exists' : 'null');
       } catch (e) {
         console.warn('Error getting metadata for Co-GM:', e);
       }
     } else {
       // Master GM: obtener config desde localStorage
       vaultConfig = getPagesJSONFromLocalStorage(roomId);
+      console.log('🔧 [Settings Master GM] vaultConfig from localStorage:', vaultConfig ? 'exists' : 'null');
     }
     
     pageCount = countPages(vaultConfig || { categories: [] });
     categoryCount = countCategories(vaultConfig || { categories: [] });
     configSize = getConfigSize(vaultConfig || { categories: [] });
     canSync = configSize < MAX_METADATA_SIZE;
+    
+    console.log('🔧 [Settings] pageCount:', pageCount, 'categoryCount:', categoryCount, 'configSize:', configSize, 'canSync:', canSync);
   }
   
   // Ocultar/mostrar secciones según rol
@@ -8202,6 +8229,9 @@ async function showSettings() {
   const notionTokenForm = allForms[0]; // Primera sección: Notion Token
   const exportVaultForm = allForms[1]; // Segunda sección: Export vault
   const feedbackForm = allForms[2]; // Tercera sección: Feedback
+  
+  console.log('🔧 [Settings] allForms count:', allForms.length);
+  console.log('🔧 [Settings] exportVaultForm:', exportVaultForm ? 'exists' : 'null');
   
   if (!isGM) {
     // Player: solo mostrar feedback
@@ -8229,9 +8259,13 @@ async function showSettings() {
     existingVaultStatus.remove();
   }
   
+  console.log('🔧 [Settings] Creating vault status box:', isGM, exportVaultForm ? 'form exists' : 'form null');
+  
   if (isGM && exportVaultForm) {
     const vaultStatusBox = document.createElement('div');
     vaultStatusBox.id = 'vault-status-box';
+    
+    console.log('🔧 [Settings] vaultStatusBox created');
     
     if (isCoGMGlobal) {
       // Co-GM: modo solo lectura
@@ -8266,10 +8300,14 @@ async function showSettings() {
     
     // Insertar vault status al principio del form de export
     const exportLabel = exportVaultForm.querySelector('.form__label');
+    console.log('🔧 [Settings] exportLabel:', exportLabel ? 'exists' : 'null');
+    
     if (exportLabel) {
       exportLabel.insertAdjacentElement('afterend', vaultStatusBox);
+      console.log('🔧 [Settings] vaultStatusBox inserted after label');
     } else {
       exportVaultForm.insertBefore(vaultStatusBox, exportVaultForm.firstChild);
+      console.log('🔧 [Settings] vaultStatusBox inserted at beginning');
     }
     
     // Actualizar descripción del export según rol
