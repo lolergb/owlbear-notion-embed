@@ -3550,9 +3550,13 @@ async function loadNotionContent(url, container, forceRefresh = false, blockType
     const userToken = getUserToken();
     const isGM = await getUserRole();
     
-    // Si el jugador no tiene token, solicitar HTML al GM via broadcast
-    if (!userToken && !isGM) {
-      log('👤 Jugador sin token, solicitando HTML al GM para:', pageId);
+    // Si el jugador no tiene token O es Co-GM (sin token propio), solicitar HTML al GM via broadcast
+    // El Co-GM no tiene acceso al token del Master GM, así que usa el mismo flujo que los Players
+    const shouldUseBroadcast = !userToken && (!isGM || isCoGMGlobal);
+    
+    if (shouldUseBroadcast) {
+      const role = isCoGMGlobal ? 'Co-GM' : 'Player';
+      log(`👤 ${role} sin token, solicitando HTML al GM para:`, pageId);
       const cachedHtml = await requestHtmlFromGM(pageId);
       if (cachedHtml) {
         log('✅ Usando HTML recibido del GM');
@@ -3561,16 +3565,25 @@ async function loadNotionContent(url, container, forceRefresh = false, blockType
         return;
       }
       log('⚠️ El GM no tiene el contenido disponible');
-      // Sin HTML disponible, mostrar mensaje más claro
-      contentDiv.innerHTML = `
-        <div class="notion-waiting notion-waiting--gm-offline">
-          <div class="notion-waiting-icon">👋</div>
-          <p class="notion-waiting-text">Your GM is not active right now</p>
-          <p class="notion-waiting-hint">Wait for them to join the session or send them a greeting!</p>
-          <p class="notion-waiting-subhint">The content you're trying to view requires your GM to be online.</p>
-          <button class="btn btn--sm btn--secondary notion-retry-button">🔄 Retry</button>
-        </div>
-      `;
+      
+      // Mensaje diferente para Co-GM vs Player
+      const waitingMessage = isCoGMGlobal
+        ? `<div class="notion-waiting notion-waiting--gm-offline">
+            <div class="notion-waiting-icon">👁️</div>
+            <p class="notion-waiting-text">Content not available</p>
+            <p class="notion-waiting-hint">The Master GM needs to load this page first</p>
+            <p class="notion-waiting-subhint">Ask them to open this page so you can view it.</p>
+            <button class="btn btn--sm btn--secondary notion-retry-button">🔄 Retry</button>
+          </div>`
+        : `<div class="notion-waiting notion-waiting--gm-offline">
+            <div class="notion-waiting-icon">👋</div>
+            <p class="notion-waiting-text">Your GM is not active right now</p>
+            <p class="notion-waiting-hint">Wait for them to join the session or send them a greeting!</p>
+            <p class="notion-waiting-subhint">The content you're trying to view requires your GM to be online.</p>
+            <button class="btn btn--sm btn--secondary notion-retry-button">🔄 Retry</button>
+          </div>`;
+      
+      contentDiv.innerHTML = waitingMessage;
       
       // Agregar event listener al botón de reintentar
       const retryButton = contentDiv.querySelector('.notion-retry-button');
