@@ -1100,6 +1100,10 @@ async function savePagesJSON(json, roomId) {
       const categoryCount = countCategories(json);
       const fitsInMetadata = fullConfigSize < MAX_METADATA_SIZE;
       
+      console.log('💾 [VAULT SAVE - Full Config Attempt]');
+      console.log('  - Config size:', Math.round(fullConfigSize / 1024), 'KB');
+      console.log('  - Fits in metadata:', fitsInMetadata);
+      
       // Track tamaño del vault a Mixpanel
       trackEvent('vault_size_measured', {
         size_bytes: fullConfigSize,
@@ -1110,13 +1114,42 @@ async function savePagesJSON(json, roomId) {
       });
       
       if (fitsInMetadata) {
-        // Si cabe, guardar config completa para herencia de GM
-        await OBR.room.setMetadata({
-          [FULL_CONFIG_KEY]: fullConfigCompressed
-        });
-        log(`✅ Config completa sincronizada para herencia de GM (${Math.round(fullConfigSize/1024)}KB)`);
+        // Intentar guardar config completa
+        // Si falla por límite total, limpiar cachés y reintentar
+        try {
+          await OBR.room.setMetadata({
+            [FULL_CONFIG_KEY]: fullConfigCompressed
+          });
+          console.log(`✅ Config completa sincronizada (${Math.round(fullConfigSize/1024)}KB)`);
+        } catch (metadataError) {
+          // Si es error de límite, limpiar cachés y reintentar
+          if (metadataError.message && metadataError.message.includes('size limit')) {
+            console.log('⚠️ Metadata full, clearing caches and retrying...');
+            
+            try {
+              // Limpiar cachés para hacer espacio
+              await OBR.room.setMetadata({
+                [ROOM_CONTENT_CACHE_KEY]: {},
+                [ROOM_HTML_CACHE_KEY]: {}
+              });
+              
+              // Reintentar
+              await OBR.room.setMetadata({
+                [FULL_CONFIG_KEY]: fullConfigCompressed
+              });
+              console.log(`✅ Config completa guardada después de limpiar cachés (${Math.round(fullConfigSize/1024)}KB)`);
+            } catch (retryError) {
+              console.error('❌ No se pudo guardar config completa ni después de limpiar cachés:', retryError.message);
+              trackEvent('vault_save_failed_after_cache_clear', {
+                size_kb: Math.round(fullConfigSize / 1024)
+              });
+            }
+          } else {
+            throw metadataError;
+          }
+        }
       } else {
-        log(`⚠️ Config completa (${Math.round(fullConfigSize/1024)}KB) excede 16KB, no se sincroniza`);
+        console.log(`⚠️ Config completa (${Math.round(fullConfigSize/1024)}KB) excede 16KB, no se sincroniza`);
         
         // Track que no cabe
         trackEvent('vault_too_large_for_sync', {
@@ -1131,7 +1164,7 @@ async function savePagesJSON(json, roomId) {
         }
       }
     } catch (e) {
-      log('⚠️ No se pudo sincronizar config completa:', e.message);
+      console.error('❌ Error al sincronizar config completa:', e.message);
     }
     
     log('✅ Configuración guardada exitosamente para room:', roomId);
@@ -1265,13 +1298,21 @@ async function detectRoleChange(currentRole, roomId) {
   const wasPromoted = lastRole === 'PLAYER' && isGM;
   
   // SIEMPRE verificar herencia si es GM y no tiene config local
-  // (incluso en primera apertura)
+  // O si tiene config pero es la por defecto (vacía)
   if (isGM) {
-    const hasLocalConfig = getPagesJSONFromLocalStorage(roomId) !== null;
-    console.log('  - Has local config:', hasLocalConfig);
+    const localConfig = getPagesJSONFromLocalStorage(roomId);
+    const hasLocalConfig = localConfig !== null;
+    const isDefaultConfig = localConfig && countPages(localConfig) === 0;
     
-    if (!hasLocalConfig) {
-      console.log('  - No local config, checking vault inheritance...');
+    console.log('  - Has local config:', hasLocalConfig);
+    console.log('  - Is default/empty config:', isDefaultConfig);
+    console.log('  - Pages in local config:', localConfig ? countPages(localConfig) : 0);
+    
+    // Verificar herencia si:
+    // 1. No tiene config local, O
+    // 2. Tiene config pero es la por defecto (sin páginas)
+    if (!hasLocalConfig || isDefaultConfig) {
+      console.log('  - Config is empty or missing, checking vault inheritance...');
       await checkVaultInheritance(roomId);
       
       if (wasPromoted) {
@@ -1279,7 +1320,7 @@ async function detectRoleChange(currentRole, roomId) {
         trackEvent('promoted_to_gm', {});
       }
     } else {
-      console.log('  - Local config exists, skipping inheritance check');
+      console.log('  - Local config exists with content, skipping inheritance check');
     }
   }
   
@@ -1396,13 +1437,23 @@ async function updateVaultStatusIndicator(roomId) {
     const sizeKB = Math.round(configSize / 1024);
     const fitsInMetadata = configSize < MAX_METADATA_SIZE;
     
+    // Verificar si está en metadata
+    let inMetadata = false;
+    try {
+      const metadata = await OBR.room.getMetadata();
+      inMetadata = !!(metadata && metadata[FULL_CONFIG_KEY]);
+    } catch (e) {}
+    
     // Actualizar UI según el estado
     if (fitsInMetadata) {
-      statusIcon.textContent = '✅';
-      statusText.textContent = `${sizeKB} KB (Syncable)`;
+      statusIcon.textContent = inMetadata ? '✅' : '⚠️';
+      statusText.textContent = `${sizeKB} KB (${inMetadata ? 'Synced' : 'Syncable'})`;
       statusDetails.innerHTML = `
         <strong>${pageCount} pages</strong> in <strong>${categoryCount} folders</strong><br>
-        Your vault can be automatically inherited by co-GMs when promoted.
+        ${inMetadata 
+          ? 'Your vault is synced and can be inherited by co-GMs.' 
+          : 'Your vault can be synced. Try saving again to enable inheritance.'
+        }
       `;
     } else {
       statusIcon.textContent = '⚠️';
@@ -1419,6 +1470,72 @@ async function updateVaultStatusIndicator(roomId) {
     statusDetails.textContent = 'Could not determine vault status.';
   }
 }
+
+/**
+ * Función de debug para diagnosticar herencia de vault
+ * Disponible globalmente para testing
+ */
+window.debugVaultInheritance = async function() {
+  console.log('');
+  console.log('╔════════════════════════════════════════════╗');
+  console.log('║  🔧 VAULT INHERITANCE DEBUG REPORT        ║');
+  console.log('╚════════════════════════════════════════════╝');
+  console.log('');
+  
+  try {
+    const role = await getRoleFromOBR();
+    const roomId = OBR.room.id || await OBR.room.getId();
+    const localConfig = getPagesJSONFromLocalStorage(roomId);
+    const metadata = await OBR.room.getMetadata();
+    
+    console.log('📊 Current Status:');
+    console.log('  - Role:', role);
+    console.log('  - Room ID:', roomId);
+    console.log('  - Last saved role:', localStorage.getItem(LAST_ROLE_KEY) || 'none');
+    console.log('');
+    
+    console.log('💾 Local Storage:');
+    console.log('  - Has config:', !!localConfig);
+    console.log('  - Pages:', localConfig ? countPages(localConfig) : 0);
+    console.log('  - Size:', localConfig ? Math.round(getConfigSize(localConfig) / 1024) + ' KB' : 'n/a');
+    console.log('');
+    
+    console.log('☁️  Room Metadata:');
+    console.log('  - Keys:', metadata ? Object.keys(metadata).join(', ') : 'none');
+    console.log('  - Has FULL_CONFIG:', !!(metadata && metadata[FULL_CONFIG_KEY]));
+    if (metadata && metadata[FULL_CONFIG_KEY]) {
+      const fullConfig = metadata[FULL_CONFIG_KEY];
+      console.log('  - Full config pages:', countPages(fullConfig));
+      console.log('  - Full config size:', Math.round(getConfigSize(fullConfig) / 1024) + ' KB');
+    }
+    console.log('');
+    
+    console.log('🚫 Inheritance Flags:');
+    const inheritanceKey = `${INHERITANCE_DECLINED_KEY_PREFIX}${roomId}`;
+    console.log('  - Declined key:', inheritanceKey);
+    console.log('  - Is declined:', localStorage.getItem(inheritanceKey) === 'true');
+    console.log('');
+    
+    console.log('💡 Recommendations:');
+    if (role === 'GM' && (!localConfig || countPages(localConfig) === 0)) {
+      if (metadata && metadata[FULL_CONFIG_KEY]) {
+        console.log('  ✅ You can inherit a vault! Open Settings and click "Check for inherited vault"');
+      } else {
+        console.log('  ⚠️  No vault available to inherit.');
+      }
+    } else if (role === 'GM' && localConfig && countPages(localConfig) > 0) {
+      console.log('  ℹ️  You already have a vault configured.');
+    } else if (role === 'PLAYER') {
+      console.log('  ℹ️  You need to be promoted to GM to check vault inheritance.');
+    }
+    console.log('');
+    
+  } catch (e) {
+    console.error('❌ Error generating debug report:', e);
+  }
+};
+
+console.log('💡 Debug helper available: Call window.debugVaultInheritance() in console for detailed info');
 
 // Función para obtener todas las configuraciones de rooms (para debugging)
 function getAllRoomConfigs() {
@@ -8402,6 +8519,38 @@ async function showSettings() {
       const feedbackUrl = 'https://www.notion.so/DM-Panel-Roadmap-2d8d4856c90e8088825df40c3be24393?source=copy_link';
       window.open(feedbackUrl, '_blank', 'noopener,noreferrer');
       trackEvent('feedback_opened', {
+        source: 'settings'
+      });
+    });
+  }
+  
+  // Check inheritance button - evitar múltiples listeners
+  const checkInheritanceBtn = document.getElementById('check-inheritance-btn');
+  if (checkInheritanceBtn && !checkInheritanceBtn.dataset.listenerAdded) {
+    checkInheritanceBtn.dataset.listenerAdded = 'true';
+    checkInheritanceBtn.addEventListener('click', async () => {
+      console.log('🔄 Manual inheritance check triggered from Settings');
+      
+      // Cambiar texto del botón
+      const originalText = checkInheritanceBtn.textContent;
+      checkInheritanceBtn.textContent = '🔄 Checking...';
+      checkInheritanceBtn.disabled = true;
+      
+      // Resetear el flag de "ya rechazado"
+      const inheritanceKey = `${INHERITANCE_DECLINED_KEY_PREFIX}${roomId}`;
+      localStorage.removeItem(inheritanceKey);
+      console.log('  - Removed inheritance declined flag');
+      
+      // Forzar verificación de herencia
+      await checkVaultInheritance(roomId);
+      
+      // Restaurar botón
+      setTimeout(() => {
+        checkInheritanceBtn.textContent = originalText;
+        checkInheritanceBtn.disabled = false;
+      }, 2000);
+      
+      trackEvent('manual_inheritance_check', {
         source: 'settings'
       });
     });
