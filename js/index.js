@@ -38,7 +38,20 @@ async function initDebugMode() {
 let cachedUserRole = null;
 let roleCheckPromise = null;
 
-// Función para obtener el rol del usuario (con caché)
+// Función para obtener el rol del usuario SIN caché (para detección de cambios)
+async function getRoleFromOBR() {
+  try {
+    if (typeof OBR !== 'undefined' && OBR.player && OBR.player.getRole) {
+      const role = await OBR.player.getRole();
+      return role; // Devuelve 'GM' o 'PLAYER' (string)
+    }
+  } catch (e) {
+    console.warn('Error getting role from OBR:', e);
+  }
+  return null;
+}
+
+// Función para obtener el rol del usuario (con caché, devuelve boolean)
 async function getUserRole() {
   if (cachedUserRole !== null) {
     return cachedUserRole;
@@ -50,8 +63,8 @@ async function getUserRole() {
   
   roleCheckPromise = (async () => {
     try {
-      if (typeof OBR !== 'undefined' && OBR.player && OBR.player.getRole) {
-        const role = await OBR.player.getRole();
+      const role = await getRoleFromOBR();
+      if (role) {
         cachedUserRole = role === 'GM';
         return cachedUserRole;
       }
@@ -1240,22 +1253,33 @@ async function detectRoleChange(currentRole, roomId) {
   const lastRole = localStorage.getItem(LAST_ROLE_KEY);
   const isGM = currentRole === 'GM';
   
-  // Guardar rol actual
+  console.log('🔍 [VAULT INHERITANCE - Role Detection]');
+  console.log('  - Current role:', currentRole);
+  console.log('  - Last role:', lastRole || '(first time)');
+  console.log('  - Room ID:', roomId);
+  
+  // Guardar rol actual para próxima vez
   localStorage.setItem(LAST_ROLE_KEY, currentRole);
   
-  // Detectar promoción: era Player (o null), ahora es GM
-  const wasPromoted = lastRole && lastRole !== 'GM' && isGM;
+  // Detectar promoción: era Player y ahora es GM
+  const wasPromoted = lastRole === 'PLAYER' && isGM;
   
-  if (wasPromoted) {
-    log('🎖️ Usuario promovido a GM');
-    trackEvent('promoted_to_gm', {});
-    
-    // Verificar si ya tiene configuración para esta room
+  // SIEMPRE verificar herencia si es GM y no tiene config local
+  // (incluso en primera apertura)
+  if (isGM) {
     const hasLocalConfig = getPagesJSONFromLocalStorage(roomId) !== null;
+    console.log('  - Has local config:', hasLocalConfig);
     
-    // Si no tiene configuración local, intentar heredar
     if (!hasLocalConfig) {
+      console.log('  - No local config, checking vault inheritance...');
       await checkVaultInheritance(roomId);
+      
+      if (wasPromoted) {
+        console.log('🎖️ Usuario promovido a GM');
+        trackEvent('promoted_to_gm', {});
+      }
+    } else {
+      console.log('  - Local config exists, skipping inheritance check');
     }
   }
   
@@ -1267,17 +1291,24 @@ async function detectRoleChange(currentRole, roomId) {
  * @param {string} roomId - ID de la room
  */
 async function checkVaultInheritance(roomId) {
+  console.log('📋 [VAULT INHERITANCE - Check]');
+  
   // Verificar si el usuario ya rechazó la herencia
   const inheritanceKey = `${INHERITANCE_DECLINED_KEY_PREFIX}${roomId}`;
   const alreadyDeclined = localStorage.getItem(inheritanceKey) === 'true';
   
+  console.log('  - Inheritance key:', inheritanceKey);
+  console.log('  - Already declined:', alreadyDeclined);
+  
   if (alreadyDeclined) {
-    log('ℹ️ Usuario ya rechazó herencia de vault para esta room');
+    console.log('ℹ️ Usuario ya rechazó herencia de vault para esta room');
     return;
   }
   
   try {
     const metadata = await OBR.room.getMetadata();
+    console.log('  - Metadata keys:', metadata ? Object.keys(metadata) : 'null');
+    console.log('  - FULL_CONFIG_KEY:', FULL_CONFIG_KEY);
     
     // Verificar si hay configuración completa disponible
     if (metadata && metadata[FULL_CONFIG_KEY]) {
@@ -1285,18 +1316,25 @@ async function checkVaultInheritance(roomId) {
       const configSize = getConfigSize(fullConfig);
       const pageCount = countPages(fullConfig);
       
-      log('✅ Config completa encontrada en metadata');
+      console.log('✅ Config completa encontrada en metadata');
+      console.log('  - Size:', Math.round(configSize / 1024), 'KB');
+      console.log('  - Pages:', pageCount);
+      console.log('  - About to show inheritance banner...');
       
       // Mostrar banner de herencia
       showVaultInheritanceBanner(fullConfig, configSize, pageCount, roomId);
     } else {
       // No hay config completa, mostrar opción de usar default o importar
-      log('⚠️ No hay config completa disponible');
+      console.log('⚠️ No hay config completa disponible en metadata');
+      console.log('  - metadata exists:', !!metadata);
+      console.log('  - FULL_CONFIG_KEY in metadata:', metadata && FULL_CONFIG_KEY in metadata);
+      console.log('  - About to show no-vault banner...');
       trackEvent('vault_not_available_for_inheritance', {});
       showNoVaultAvailableBanner(roomId);
     }
   } catch (e) {
-    console.error('Error al verificar herencia de vault:', e);
+    console.error('❌ Error al verificar herencia de vault:', e);
+    console.error('  - Stack:', e.stack);
   }
 }
 
@@ -3864,11 +3902,12 @@ initDebugMode();
 try {
   OBR.onReady(async () => {
     try {
-      // Inicializar analytics y verificar rol EN PARALELO
-      const [, isGM] = await Promise.all([
-        initMixpanel(),
-        getUserRole()
-      ]);
+      // NUEVO: Obtener rol sin caché para detectar cambios
+      const currentRole = await getRoleFromOBR();
+      const isGM = currentRole === 'GM';
+      
+      // Inicializar analytics en paralelo
+      await initMixpanel();
       
       if (isGM) {
         log('✅ Owlbear SDK listo');
@@ -3947,11 +3986,14 @@ try {
         log('✅ Room ID final que se usará:', roomId);
       }
       
-      // NUEVO: Detectar cambio de rol (promoción a GM)
-      if (isGM) {
-        const role = await OBR.player.getRole();
-        await detectRoleChange(role, roomId);
+      // NUEVO: Detectar cambio de rol (promoción a GM) - ANTES de cualquier otra lógica
+      if (isGM && currentRole) {
+        log('🔍 Detectando posible cambio de rol...');
+        await detectRoleChange(currentRole, roomId);
       }
+      
+      // Ahora cachear el rol para el resto de la sesión
+      cachedUserRole = isGM;
       
       // Verificar si estamos en modo modal (abierto desde el botón de abrir en modal)
       const urlParams = new URLSearchParams(window.location.search);
@@ -8876,6 +8918,11 @@ function showVaultSizeWarning(vaultSize) {
  * @param {string} roomId - ID de la room
  */
 function showVaultInheritanceBanner(fullConfig, configSize, pageCount, roomId) {
+  console.log('🎯 [VAULT INHERITANCE - Showing Banner]');
+  console.log('  - Config:', fullConfig ? 'exists' : 'null');
+  console.log('  - Size:', Math.round(configSize / 1024), 'KB');
+  console.log('  - Pages:', pageCount);
+  
   const banner = document.createElement('div');
   banner.id = 'vault-inheritance-banner';
   banner.style.cssText = `
@@ -8986,6 +9033,9 @@ function showVaultInheritanceBanner(fullConfig, configSize, pageCount, roomId) {
  * @param {string} roomId - ID de la room
  */
 function showNoVaultAvailableBanner(roomId) {
+  console.log('🎯 [VAULT INHERITANCE - Showing No-Vault Banner]');
+  console.log('  - Room ID:', roomId);
+  
   const banner = document.createElement('div');
   banner.id = 'no-vault-banner';
   banner.style.cssText = `
