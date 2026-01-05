@@ -356,8 +356,7 @@
   /* Formulario con separación visual (borde superior) */
   .form--separated {
     padding-top: var(--spacing-xl);
-    margin-top: var(--spacing-xl);
-    border-top: 1px solid var(--color-border-subtle);
+    margin-top: calc(var(--spacing-xl) + var(--spacing-lg));
   }
   
   /* ==========================================================================
@@ -1673,7 +1672,6 @@
   gap: var(--spacing-md);
   padding: var(--spacing-md);
   border-radius: var(--radius-md);
-  margin: var(--spacing-sm) 0 var(--spacing-md) 0;
 }
 
 /* Same style for both Master GM and Co-GM */

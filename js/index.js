@@ -8363,8 +8363,15 @@ async function showSettings() {
   
   // Mostrar botón "Ver JSON" solo si es tu cuenta (DEBUG_MODE activado)
   // Esto se controla desde Netlify Environment Variables (DEBUG_MODE=true)
+  const viewJsonContainer = viewJsonBtn ? viewJsonBtn.parentElement : null;
   if (viewJsonBtn && DEBUG_MODE) {
     viewJsonBtn.classList.remove('hidden');
+    if (viewJsonContainer) {
+      viewJsonContainer.style.display = '';
+    }
+  } else if (viewJsonContainer) {
+    // Ocultar el contenedor completo para que no ocupe espacio
+    viewJsonContainer.style.display = 'none';
   }
   
   if (tokenInput) {
@@ -8417,11 +8424,18 @@ async function showSettings() {
         // Actualizar el modo debug con el nuevo token
         await initDebugMode();
         // Actualizar visibilidad del botón "Ver JSON" si es necesario
+        const viewJsonContainer = viewJsonBtn ? viewJsonBtn.parentElement : null;
         if (viewJsonBtn) {
           if (DEBUG_MODE) {
             viewJsonBtn.classList.remove('hidden');
+            if (viewJsonContainer) {
+              viewJsonContainer.style.display = '';
+            }
           } else {
             viewJsonBtn.classList.add('hidden');
+            if (viewJsonContainer) {
+              viewJsonContainer.style.display = 'none';
+            }
           }
         }
         closeSettings();
@@ -8449,8 +8463,12 @@ async function showSettings() {
           // Actualizar el modo debug después de eliminar el token
           await initDebugMode();
           // Ocultar el botón "Ver JSON" si ya no es tu cuenta
+          const viewJsonContainer = viewJsonBtn ? viewJsonBtn.parentElement : null;
           if (viewJsonBtn) {
             viewJsonBtn.classList.add('hidden');
+            if (viewJsonContainer) {
+              viewJsonContainer.style.display = 'none';
+            }
           }
           alert('Token deleted. Server token will be used.');
           closeSettings();
@@ -8699,13 +8717,55 @@ async function showSettings() {
             console.warn('No se pudo obtener roomId:', e);
           }
         }
-        const config = getPagesJSON(currentRoomId) || await getDefaultJSON();
+        
+        // Para Co-GM, obtener config desde metadata; para Master GM, desde localStorage
+        let config;
+        if (isCoGMGlobal) {
+          try {
+            const metadata = await OBR.room.getMetadata();
+            config = metadata ? metadata[FULL_CONFIG_KEY] : null;
+            if (!config) {
+              throw new Error('No vault available in metadata');
+            }
+          } catch (e) {
+            console.error('Error obteniendo vault para Co-GM:', e);
+            alert('❌ Error: Could not retrieve vault from Master GM');
+            return;
+          }
+        } else {
+          config = getPagesJSON(currentRoomId) || await getDefaultJSON();
+        }
+        
         const jsonStr = JSON.stringify(config, null, 2);
         const blob = new Blob([jsonStr], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `notion-pages-config-${currentRoomId ? getFriendlyRoomId(currentRoomId) : 'default'}.json`;
+        
+        // Crear nombre de archivo user-friendly
+        let fileName;
+        if (currentRoomId && currentRoomId !== 'default') {
+          // Intentar obtener nombre de la room (si está disponible en OBR)
+          let roomName = null;
+          try {
+            // OBR no tiene método directo para obtener nombre, usar fecha + roomId abreviado
+            const date = new Date();
+            const dateStr = date.toISOString().split('T')[0]; // YYYY-MM-DD
+            const shortRoomId = currentRoomId.substring(0, 8); // Primeros 8 caracteres
+            fileName = `gm-vault-${dateStr}-${shortRoomId}.json`;
+          } catch (e) {
+            // Fallback: usar solo fecha
+            const date = new Date();
+            const dateStr = date.toISOString().split('T')[0];
+            fileName = `gm-vault-${dateStr}.json`;
+          }
+        } else {
+          const date = new Date();
+          const dateStr = date.toISOString().split('T')[0];
+          fileName = `gm-vault-default-${dateStr}.json`;
+        }
+        
+        a.download = fileName;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
