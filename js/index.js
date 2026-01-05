@@ -828,6 +828,12 @@ let ownerHeartbeatInterval = null;
 // Variable global para indicar si el usuario es Co-GM (solo lectura)
 let isCoGMGlobal = false;
 
+// Variable para almacenar el último rol conocido
+let lastKnownRole = null;
+
+// Intervalo para detectar cambios de rol
+let roleCheckInterval = null;
+
 /**
  * Verifica el estado de ownership del vault
  * @returns {Promise<{hasOwner: boolean, ownerInfo: object|null, isStale: boolean, isMe: boolean}>}
@@ -1023,9 +1029,51 @@ function getConfigSize(config) {
   }
 }
 
-// Detener heartbeat al cerrar la ventana
+/**
+ * Inicia la detección periódica de cambios de rol
+ * Detecta promoción/revocación de GM y recarga la vista automáticamente
+ */
+function startRoleChangeDetection() {
+  // Cancelar intervalo previo si existe
+  if (roleCheckInterval) {
+    clearInterval(roleCheckInterval);
+  }
+  
+  // Verificar cada 3 segundos
+  roleCheckInterval = setInterval(async () => {
+    try {
+      const currentRole = await OBR.player.getRole();
+      
+      if (lastKnownRole !== null && currentRole !== lastKnownRole) {
+        console.log(`🔄 Role change detected: ${lastKnownRole} → ${currentRole}`);
+        
+        // Recargar la extensión para aplicar los cambios
+        window.location.reload();
+      }
+      
+      lastKnownRole = currentRole;
+    } catch (e) {
+      // Ignorar errores de conexión
+    }
+  }, 3000);
+  
+  console.log('👁️ Role change detection started');
+}
+
+/**
+ * Detiene la detección de cambios de rol
+ */
+function stopRoleChangeDetection() {
+  if (roleCheckInterval) {
+    clearInterval(roleCheckInterval);
+    roleCheckInterval = null;
+  }
+}
+
+// Detener heartbeat y detección de rol al cerrar la ventana
 window.addEventListener('beforeunload', () => {
   stopOwnerHeartbeat();
+  stopRoleChangeDetection();
 });
 
 // Canal de broadcast para sincronizar lista de páginas visibles
@@ -3161,7 +3209,9 @@ async function renderTable(tableBlock) {
 }
 
 // Función para mostrar imagen en modal usando Owlbear SDK
-async function showImageModal(imageUrl, caption) {
+// @param {boolean} showShareButton - Si true, muestra el botón de share (default: true)
+//                                    Pasar false cuando la imagen es recibida por broadcast
+async function showImageModal(imageUrl, caption, showShareButton = true) {
   try {
     // Asegurarse de que imageUrl sea una URL absoluta
     let absoluteImageUrl = imageUrl;
@@ -3188,12 +3238,15 @@ async function showImageModal(imageUrl, caption) {
     if (caption) {
       viewerUrl.searchParams.set('caption', encodeURIComponent(caption));
     }
+    // Pasar parámetro para mostrar/ocultar share button
+    viewerUrl.searchParams.set('share', showShareButton ? 'true' : 'false');
     
     log('🔍 Abriendo modal de imagen:', {
       imageUrl: absoluteImageUrl,
       viewerUrl: viewerUrl.toString(),
       baseUrl: baseUrl,
-      currentLocation: window.location.href
+      currentLocation: window.location.href,
+      showShareButton: showShareButton
     });
     
     // Abrir modal usando Owlbear SDK (modal grande fuera del popup)
@@ -4197,6 +4250,10 @@ try {
       
       // Configurar listener para sincronización en tiempo real
       setupRoomMetadataListener(roomId);
+      
+      // Iniciar detección de cambios de rol (promoción/revocación)
+      lastKnownRole = isGM ? 'GM' : 'PLAYER';
+      startRoleChangeDetection();
 
       // Solo mostrar logs de debug si es GM
       if (isGM) {
@@ -4340,8 +4397,8 @@ try {
       OBR.broadcast.onMessage('com.dmscreen/showImage', async (event) => {
         const { url, caption } = event.data;
         if (url) {
-          // Abrir la imagen en modal para este jugador
-          await showImageModal(url, caption);
+          // Abrir la imagen en modal para este jugador (sin botón de share porque es recibido por broadcast)
+          await showImageModal(url, caption, false);
         }
       });
       
@@ -5619,6 +5676,13 @@ async function editPageFromHeader(page, pageCategoryPath, roomId, currentUrl, cu
       const pageList = document.getElementById("page-list");
       const urlChanged = oldUrl !== data.url;
       const nameChanged = oldName !== data.name;
+      
+      // Actualizar el dataset del botón de menú contextual si existe
+      const contextMenuBtn = document.getElementById("page-context-menu-button-header");
+      if (contextMenuBtn) {
+        contextMenuBtn.dataset.currentUrl = data.url;
+        contextMenuBtn.dataset.currentName = data.name;
+      }
       
       if (urlChanged && notionContainer && !notionContainer.classList.contains('hidden')) {
         // La URL cambió y estamos viendo la página, recargar contenido
@@ -7659,53 +7723,64 @@ async function loadPageContent(url, name, selector = null, blockTypes = null) {
         contextMenuButton.id = "page-context-menu-button-header";
         contextMenuButton.className = "icon-button hidden";
         
-        // Configurar menú contextual
+        // Guardar referencia a URL y nombre actuales (se actualizará si se edita)
+        contextMenuButton.dataset.currentUrl = url;
+        contextMenuButton.dataset.currentName = name;
+        
+        // Configurar menú contextual - obtiene datos frescos en cada click
         contextMenuButton.addEventListener('click', async (e) => {
           e.stopPropagation();
           const rect = contextMenuButton.getBoundingClientRect();
-          const pageCategoryPath = pageInfo.pageCategoryPath;
-          const parent = navigateConfigPath(config, pageCategoryPath);
-          const pageIndex = parent && parent.pages ? parent.pages.findIndex(p => p.name === pageInfo.page.name && p.url === pageInfo.page.url) : -1;
-          const combinedOrder = getCombinedOrder(parent);
-          const currentPos = combinedOrder.findIndex(o => o.type === 'page' && o.index === pageIndex);
-          const canMoveUp = currentPos > 0;
-          const canMoveDown = currentPos !== -1 && currentPos < combinedOrder.length - 1;
+          
+          // Obtener datos actualizados del título (puede haber cambiado)
+          const pageTitleEl = document.getElementById("page-title");
+          const currentName = pageTitleEl ? pageTitleEl.textContent : contextMenuButton.dataset.currentName;
+          const currentUrl = contextMenuButton.dataset.currentUrl;
+          
+          // Obtener configuración fresca
+          let freshRoomId = null;
+          try {
+            freshRoomId = OBR.room.id || await OBR.room.getId();
+          } catch (e) {}
+          
+          const freshConfig = getPagesJSON(freshRoomId) || await getDefaultJSON();
+          const freshPageInfo = findPageInConfig(freshConfig, currentUrl, currentName);
+          
+          if (!freshPageInfo) {
+            console.warn('Page not found in config for context menu');
+            return;
+          }
+          
+          const pageCategoryPath = freshPageInfo.pageCategoryPath;
           
           // Verificar si es una página de Notion para mostrar opción de recargar
-          const isNotionPage = isNotionUrl(url);
+          const isNotionPage = isNotionUrl(currentUrl);
           
+          // Menú contextual simplificado para header (sin move up/down ni duplicate)
           const menuItems = [
             { 
               icon: 'img/icon-edit.svg', 
               text: 'Edit', 
               action: async () => {
-                await editPageFromHeader(pageInfo.page, pageCategoryPath, roomId, url, name);
+                await editPageFromHeader(freshPageInfo.page, pageCategoryPath, freshRoomId, currentUrl, currentName);
               }
             },
-            { 
-              icon: 'img/icon-clone.svg', 
-              text: 'Duplicate', 
-              action: async () => {
-                await duplicatePageFromPageList(pageInfo.page, pageCategoryPath, roomId);
-              }
-            },
-            { separator: true },
           ];
           
           // Agregar opción de recargar si es Notion
           if (isNotionPage) {
+            menuItems.push({ separator: true });
             menuItems.push({
               icon: 'img/icon-reload.svg',
               text: 'Reload content',
               action: async () => {
                 // Obtener blockTypes si existen
-                const blockTypes = pageInfo.page.blockTypes || null;
-                const pageTitle = document.getElementById("page-title");
-                const pageName = pageTitle ? pageTitle.textContent : name;
+                const blockTypes = freshPageInfo.page.blockTypes || null;
+                const pageName = currentName;
                 trackPageReloaded(pageName);
                 
                 // Limpiar caché de esta página ANTES de recargar
-                const pageId = extractNotionPageId(url);
+                const pageId = extractNotionPageId(currentUrl);
                 if (pageId) {
                   const cacheKey = CACHE_PREFIX + pageId;
                   localStorage.removeItem(cacheKey);
@@ -7715,36 +7790,13 @@ async function loadPageContent(url, name, selector = null, blockTypes = null) {
                 // Recargar el contenido
                 const notionContainer = document.getElementById("notion-container");
                 if (notionContainer) {
-                  await loadNotionContent(url, notionContainer, true, blockTypes);
+                  await loadNotionContent(currentUrl, notionContainer, true, blockTypes);
                 }
               }
             });
-            menuItems.push({ separator: true });
           }
           
-          // Agregar opciones de mover si es posible
-          if (canMoveUp || canMoveDown) {
-            if (canMoveUp) {
-              menuItems.push({
-                icon: 'img/icon-arrow.svg',
-                text: 'Move up',
-                action: async () => {
-                  await movePageUp(pageInfo.page, pageCategoryPath, roomId);
-                }
-              });
-            }
-            if (canMoveDown) {
-              menuItems.push({
-                icon: 'img/icon-arrow.svg',
-                text: 'Move down',
-                action: async () => {
-                  await movePageDown(pageInfo.page, pageCategoryPath, roomId);
-                }
-              });
-            }
-            menuItems.push({ separator: true });
-          }
-          
+          menuItems.push({ separator: true });
           menuItems.push({
             icon: 'img/icon-trash.svg',
             text: 'Delete',
@@ -7916,80 +7968,106 @@ async function loadPageContent(url, name, selector = null, blockTypes = null) {
 }
 
 // ============================================
-// BANNERS PARA CO-GM
+// TOAST PARA CO-GM
 // ============================================
 
+// Variable para el timeout del toast
+let coGMToastTimeout = null;
+
 /**
- * Muestra el banner de Co-GM (solo lectura)
+ * Muestra un toast de Co-GM (estilo flotante)
  * @param {object} ownershipInfo - Información del ownership
  */
 function showCoGMBanner(ownershipInfo) {
-  // Eliminar banner existente si hay
-  const existingBanner = document.getElementById('cogm-banner');
-  if (existingBanner) {
-    existingBanner.remove();
+  // Eliminar toast existente si hay
+  const existingToast = document.getElementById('cogm-toast');
+  if (existingToast) {
+    existingToast.remove();
   }
   
-  const banner = document.createElement('div');
-  banner.id = 'cogm-banner';
-  banner.className = 'cogm-banner';
+  // Cancelar timeout anterior
+  if (coGMToastTimeout) {
+    clearTimeout(coGMToastTimeout);
+  }
+  
+  const toast = document.createElement('div');
+  toast.id = 'cogm-toast';
+  toast.className = 'cogm-toast';
   
   const ownerName = ownershipInfo?.ownerInfo?.playerName || 'Master GM';
   
-  banner.innerHTML = `
-    <div class="cogm-banner-content">
-      <span class="cogm-banner-icon">👁️</span>
-      <div class="cogm-banner-text">
+  toast.innerHTML = `
+    <div class="cogm-toast-content">
+      <span class="cogm-toast-icon">👁️</span>
+      <div class="cogm-toast-text">
         <strong>Viewing ${ownerName}'s vault</strong>
-        <span class="cogm-banner-hint">Read-only • You can share content with players</span>
+        <span class="cogm-toast-hint">Read-only mode</span>
       </div>
+      <button class="cogm-toast-close" onclick="this.parentElement.parentElement.remove()">✕</button>
     </div>
   `;
   
-  // Insertar al principio del body
-  const container = document.querySelector('.container');
-  if (container) {
-    container.insertBefore(banner, container.firstChild);
-  } else {
-    document.body.insertBefore(banner, document.body.firstChild);
+  document.body.appendChild(toast);
+  
+  // Animación de entrada
+  requestAnimationFrame(() => {
+    toast.classList.add('cogm-toast--visible');
+  });
+  
+  // Auto-ocultar después de 5 segundos
+  coGMToastTimeout = setTimeout(() => {
+    hideCoGMToast();
+  }, 5000);
+}
+
+/**
+ * Oculta el toast del Co-GM
+ */
+function hideCoGMToast() {
+  const toast = document.getElementById('cogm-toast');
+  if (toast) {
+    toast.classList.remove('cogm-toast--visible');
+    setTimeout(() => {
+      toast.remove();
+    }, 300);
   }
 }
 
 /**
- * Muestra el banner de Master GM desconectado
+ * Muestra el toast de Master GM desconectado
  * @param {object} ownershipInfo - Información del ownership
  */
 function showMasterGMDisconnectedBanner(ownershipInfo) {
-  // Eliminar banner existente si hay
-  const existingBanner = document.getElementById('cogm-banner');
-  if (existingBanner) {
-    existingBanner.remove();
+  // Eliminar toast existente si hay
+  const existingToast = document.getElementById('cogm-toast');
+  if (existingToast) {
+    existingToast.remove();
   }
   
-  const banner = document.createElement('div');
-  banner.id = 'cogm-banner';
-  banner.className = 'cogm-banner cogm-banner-warning';
+  const toast = document.createElement('div');
+  toast.id = 'cogm-toast';
+  toast.className = 'cogm-toast cogm-toast--warning';
   
   const ownerName = ownershipInfo?.ownerInfo?.playerName || 'Master GM';
   const minutesInactive = ownershipInfo?.minutesInactive || 0;
   
-  banner.innerHTML = `
-    <div class="cogm-banner-content">
-      <span class="cogm-banner-icon">⚠️</span>
-      <div class="cogm-banner-text">
+  toast.innerHTML = `
+    <div class="cogm-toast-content">
+      <span class="cogm-toast-icon">⚠️</span>
+      <div class="cogm-toast-text">
         <strong>${ownerName} disconnected</strong>
-        <span class="cogm-banner-hint">Inactive for ${minutesInactive}m • Export vault from Settings if needed</span>
+        <span class="cogm-toast-hint">Inactive ${minutesInactive}m • Export vault if needed</span>
       </div>
+      <button class="cogm-toast-close" onclick="this.parentElement.parentElement.remove()">✕</button>
     </div>
   `;
   
-  // Insertar al principio del body
-  const container = document.querySelector('.container');
-  if (container) {
-    container.insertBefore(banner, container.firstChild);
-  } else {
-    document.body.insertBefore(banner, document.body.firstChild);
-  }
+  document.body.appendChild(toast);
+  
+  // Animación de entrada (no auto-ocultar este)
+  requestAnimationFrame(() => {
+    toast.classList.add('cogm-toast--visible');
+  });
 }
 
 // Función para mostrar configuración de token
@@ -8086,94 +8164,125 @@ async function showSettings() {
   const isGM = await getUserRole();
   
   // ============================================
-  // VAULT STATUS SECTION (para GMs)
+  // CONFIGURAR SETTINGS SEGÚN ROL
   // ============================================
-  // Eliminar sección anterior si existe
-  const existingVaultStatus = document.getElementById('vault-status-section');
+  
+  // Obtener info del vault según rol
+  let vaultConfig = null;
+  let pageCount = 0;
+  let categoryCount = 0;
+  let configSize = 0;
+  let canSync = false;
+  let ownershipInfo = null;
+  
+  if (isGM) {
+    ownershipInfo = await checkVaultOwnership();
+    
+    if (isCoGMGlobal) {
+      // Co-GM: obtener config desde metadata
+      try {
+        const metadata = await OBR.room.getMetadata();
+        vaultConfig = metadata ? metadata[FULL_CONFIG_KEY] : null;
+      } catch (e) {
+        console.warn('Error getting metadata for Co-GM:', e);
+      }
+    } else {
+      // Master GM: obtener config desde localStorage
+      vaultConfig = getPagesJSONFromLocalStorage(roomId);
+    }
+    
+    pageCount = countPages(vaultConfig || { categories: [] });
+    categoryCount = countCategories(vaultConfig || { categories: [] });
+    configSize = getConfigSize(vaultConfig || { categories: [] });
+    canSync = configSize < MAX_METADATA_SIZE;
+  }
+  
+  // Ocultar/mostrar secciones según rol
+  const allForms = document.querySelectorAll('#settings-container .form');
+  const notionTokenForm = allForms[0]; // Primera sección: Notion Token
+  const exportVaultForm = allForms[1]; // Segunda sección: Export vault
+  const feedbackForm = allForms[2]; // Tercera sección: Feedback
+  
+  if (!isGM) {
+    // Player: solo mostrar feedback
+    if (notionTokenForm) notionTokenForm.style.display = 'none';
+    if (exportVaultForm) exportVaultForm.style.display = 'none';
+    if (feedbackForm) feedbackForm.style.display = '';
+  } else if (isCoGMGlobal) {
+    // Co-GM: ocultar Notion Token, mostrar Export vault (con vault status) y Feedback
+    if (notionTokenForm) notionTokenForm.style.display = 'none';
+    if (exportVaultForm) exportVaultForm.style.display = '';
+    if (feedbackForm) feedbackForm.style.display = '';
+  } else {
+    // Master GM: mostrar todas las secciones
+    allForms.forEach(form => {
+      form.style.display = '';
+    });
+  }
+  
+  // ============================================
+  // VAULT STATUS (integrado en Export vault section)
+  // ============================================
+  // Eliminar vault status anterior si existe
+  const existingVaultStatus = document.getElementById('vault-status-box');
   if (existingVaultStatus) {
     existingVaultStatus.remove();
   }
   
-  // Añadir sección de Vault Status para GMs
-  if (isGM) {
-    const settingsContent = document.querySelector('#settings-container .settings__content');
-    if (settingsContent) {
-      const vaultStatusSection = document.createElement('div');
-      vaultStatusSection.id = 'vault-status-section';
-      vaultStatusSection.className = 'form form--separated';
-      
-      // Obtener info del vault
-      const localConfig = getPagesJSONFromLocalStorage(roomId);
-      const pageCount = countPages(localConfig || { categories: [] });
-      const categoryCount = countCategories(localConfig || { categories: [] });
-      const configSize = getConfigSize(localConfig || { categories: [] });
-      const canSync = configSize < MAX_METADATA_SIZE;
-      
-      // Obtener info de ownership
-      const ownershipInfo = await checkVaultOwnership();
-      
-      if (isCoGMGlobal) {
-        // Co-GM: modo solo lectura
-        const masterGMName = ownershipInfo?.ownerInfo?.playerName || 'Master GM';
-        vaultStatusSection.innerHTML = `
-          <label class="form__label">Vault Status</label>
-          <div class="vault-status vault-status--readonly">
-            <div class="vault-status__icon">👁️</div>
-            <div class="vault-status__info">
-              <span class="vault-status__title">Read-only mode</span>
-              <span class="vault-status__detail">Viewing ${masterGMName}'s vault</span>
-              <span class="vault-status__detail">${pageCount} pages in ${categoryCount} folders</span>
-            </div>
+  if (isGM && exportVaultForm) {
+    const vaultStatusBox = document.createElement('div');
+    vaultStatusBox.id = 'vault-status-box';
+    
+    if (isCoGMGlobal) {
+      // Co-GM: modo solo lectura
+      const masterGMName = ownershipInfo?.ownerInfo?.playerName || 'Master GM';
+      vaultStatusBox.innerHTML = `
+        <div class="vault-status vault-status--cogm">
+          <div class="vault-status__icon">👁️</div>
+          <div class="vault-status__info">
+            <span class="vault-status__title">Read-only mode</span>
+            <span class="vault-status__detail">Viewing ${masterGMName}'s vault</span>
+            <span class="vault-status__detail">${pageCount} pages in ${categoryCount} folders</span>
           </div>
-          <p class="settings__description">
-            You can share content with players but cannot edit the vault.
-          </p>
-        `;
-      } else {
-        // Master GM: mostrar info completa
-        const syncStatus = canSync 
-          ? `<span class="vault-status__sync vault-status__sync--ok">✅ Synced for Co-GM</span>`
-          : `<span class="vault-status__sync vault-status__sync--warn">⚠️ Too large for Co-GM sync</span>`;
-        
-        vaultStatusSection.innerHTML = `
-          <label class="form__label">Vault Status</label>
-          <div class="vault-status vault-status--master">
-            <div class="vault-status__icon">👑</div>
-            <div class="vault-status__info">
-              <span class="vault-status__title">Master GM</span>
-              <span class="vault-status__detail">${(configSize / 1024).toFixed(1)} KB • ${pageCount} pages • ${categoryCount} folders</span>
-              ${syncStatus}
-            </div>
-          </div>
-          <p class="settings__description">
-            Your changes sync automatically to Co-GMs (if vault < 16KB).
-          </p>
-        `;
-      }
+        </div>
+      `;
+    } else {
+      // Master GM: mostrar info completa con recomendación de backup
+      const syncMessage = canSync 
+        ? `<span class="vault-status__sync vault-status__sync--ok">✅ Can sync to Co-GM</span>`
+        : `<span class="vault-status__sync vault-status__sync--warn">⚠️ Too large to sync (>16KB)</span>`;
       
-      // Insertar al principio del settings content
-      settingsContent.insertBefore(vaultStatusSection, settingsContent.firstChild);
+      vaultStatusBox.innerHTML = `
+        <div class="vault-status vault-status--master">
+          <div class="vault-status__icon">👑</div>
+          <div class="vault-status__info">
+            <span class="vault-status__title">Master GM</span>
+            <span class="vault-status__detail">${(configSize / 1024).toFixed(1)} KB • ${pageCount} pages • ${categoryCount} folders</span>
+            ${syncMessage}
+          </div>
+        </div>
+      `;
     }
-  }
-  
-  // Ocultar secciones que no son de feedback para players
-  const allForms = document.querySelectorAll('#settings-container .form');
-  
-  if (!isGM) {
-    // Si es player, ocultar todas las secciones excepto feedback (última)
-    allForms.forEach((form, index) => {
-      // La última sección es feedback, las demás se ocultan
-      if (index < allForms.length - 1) {
-        form.style.display = 'none';
+    
+    // Insertar vault status al principio del form de export
+    const exportLabel = exportVaultForm.querySelector('.form__label');
+    if (exportLabel) {
+      exportLabel.insertAdjacentElement('afterend', vaultStatusBox);
+    } else {
+      exportVaultForm.insertBefore(vaultStatusBox, exportVaultForm.firstChild);
+    }
+    
+    // Actualizar descripción del export según rol
+    const exportDescription = exportVaultForm.querySelector('.settings__description');
+    if (exportDescription) {
+      if (isCoGMGlobal) {
+        exportDescription.textContent = 'You can download a copy of the vault. Share content with players using the eye button on pages.';
       } else {
-        form.style.display = '';
+        exportDescription.textContent = canSync
+          ? 'Save and reuse your GM Vault. It\'s recommended to make regular backups. Your vault syncs automatically to Co-GMs.'
+          : 'Save and reuse your GM Vault. Your vault is too large (>16KB) to sync with Co-GMs. Make regular backups.';
       }
-    });
-  } else {
-    // Si es GM, mostrar todas las secciones
-    allForms.forEach(form => {
-      form.style.display = '';
-    });
+    }
   }
   
   const currentToken = getUserToken() || '';
