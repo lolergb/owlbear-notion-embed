@@ -3464,11 +3464,27 @@ async function attachImageClickHandlers() {
   
   // Manejar imágenes normales y cover (tanto las de Notion como las que acabamos de convertir)
   const images = document.querySelectorAll('.notion-image-clickable, .notion-cover-image');
-  images.forEach(img => {
+  log('🔍 Imágenes con clase notion-image-clickable encontradas:', images.length);
+  
+  images.forEach((img, index) => {
+    // Verificar que la imagen no esté dentro de un iframe
+    const isInIframe = img.ownerDocument !== document;
+    if (isInIframe) {
+      log('⚠️ Imagen dentro de iframe detectada, usando postMessage');
+      // Si está en iframe, necesitaríamos usar postMessage (no implementado aún)
+      return;
+    }
+    
+    // Asegurarse de que la imagen sea clickeable (pointer-events)
+    img.style.cursor = 'pointer';
+    
     // Click handler para abrir modal
-    img.addEventListener('click', () => {
+    img.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
       const imageUrl = img.getAttribute('data-image-url') || img.src;
       const caption = img.getAttribute('data-image-caption') || img.alt || '';
+      log('🖼️ Click en imagen:', imageUrl.substring(0, 50));
       showImageModal(imageUrl, caption);
     });
     
@@ -6543,7 +6559,7 @@ function getLinkType(url) {
     const pathname = urlObj.pathname.toLowerCase();
     
     // Detectar localhost (servidor local de Obsidian plugin u otros)
-    if (hostname === 'localhost' || hostname === '127.0.0.1') {
+    if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname.endsWith('.trycloudflare.com')) {
       return { type: 'localhost', icon: 'icon-link.svg' };
     }
     
@@ -7470,7 +7486,19 @@ function isLocalhostUrl(url) {
   if (!url || typeof url !== 'string') return false;
   try {
     const urlObj = new URL(url);
-    return urlObj.hostname === 'localhost' || urlObj.hostname === '127.0.0.1';
+    // Detectar localhost directo
+    if (urlObj.hostname === 'localhost' || urlObj.hostname === '127.0.0.1') {
+      return true;
+    }
+    // Detectar URLs de cloudflared (túneles HTTPS para localhost)
+    if (urlObj.hostname.endsWith('.trycloudflare.com')) {
+      return true;
+    }
+    // Detectar URLs que vienen del plugin de Obsidian (patrón /pages/)
+    if (urlObj.pathname.startsWith('/pages/')) {
+      return true;
+    }
+    return false;
   } catch (e) {
     return false;
   }
@@ -7703,7 +7731,13 @@ async function loadPageContent(url, name, selector = null, blockTypes = null) {
     pageTitle.textContent = name;
     
     // Detectar si es un archivo HTML de demo local
-    log('🔍 Verificando URL:', url, '| isDemoHtmlFile:', isDemoHtmlFile(url), '| isNotionUrl:', isNotionUrl(url), '| isLocalhostUrl:', isLocalhostUrl(url));
+    const isLocalhost = isLocalhostUrl(url);
+    log('🔍 Verificando URL:', url);
+    log('   - isDemoHtmlFile:', isDemoHtmlFile(url));
+    log('   - isNotionUrl:', isNotionUrl(url));
+    log('   - isLocalhostUrl:', isLocalhost);
+    log('   - hostname:', new URL(url).hostname);
+    
     if (isDemoHtmlFile(url)) {
       // Es un archivo HTML de demo → cargar directamente
       log('📄 Archivo HTML de demo detectado, cargando contenido local');
