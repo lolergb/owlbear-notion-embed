@@ -5092,9 +5092,10 @@ function renderCategory(category, parentElement, level = 0, roomId = null, categ
           },
         ];
         
-        // Agregar opción de recargar si es Notion
+        // Agregar opción de recargar si es Notion o localhost
         const isNotionPage = isNotionUrl(page.url);
-        if (isNotionPage) {
+        const isLocalhost = isLocalhostUrl(page.url);
+        if (isNotionPage || isLocalhost) {
           menuItems.push({
             icon: 'img/icon-reload.svg',
             text: 'Reload content',
@@ -5103,20 +5104,26 @@ function renderCategory(category, parentElement, level = 0, roomId = null, categ
               const blockTypes = page.blockTypes || null;
               trackPageReloaded(page.name);
               
-              // Limpiar caché de esta página ANTES de recargar
-              const pageId = extractNotionPageId(page.url);
-              if (pageId) {
-                const cacheKey = CACHE_PREFIX + pageId;
-                localStorage.removeItem(cacheKey);
-                log('🗑️ Caché limpiado para recarga:', pageId);
+              // Limpiar caché de esta página ANTES de recargar (solo para Notion)
+              if (isNotionPage) {
+                const pageId = extractNotionPageId(page.url);
+                if (pageId) {
+                  const cacheKey = CACHE_PREFIX + pageId;
+                  localStorage.removeItem(cacheKey);
+                  log('🗑️ Caché limpiado para recarga:', pageId);
+                }
               }
               
               // Recargar el contenido si estamos viendo esta página
               const notionContainer = document.getElementById("notion-container");
               const pageTitle = document.getElementById("page-title");
               if (notionContainer && !notionContainer.classList.contains('hidden') && pageTitle && pageTitle.textContent === page.name) {
-                await loadNotionContent(page.url, notionContainer, true, blockTypes);
-              } else {
+                if (isNotionPage) {
+                  await loadNotionContent(page.url, notionContainer, true, blockTypes);
+                } else if (isLocalhost) {
+                  await loadLocalhostContent(page.url, notionContainer);
+                }
+              } else if (isNotionPage) {
                 // Si no estamos viendo la página, solo recargar la lista
                 const pageList = document.getElementById("page-list");
                 if (pageList) {
@@ -7737,15 +7744,17 @@ async function loadLocalhostContent(url, container) {
       }
     }
     
-    // Copiar estilos si existen
+    // Copiar estilos del plugin de Obsidian si existen (preservar estilos originales)
     const styles = doc.querySelectorAll('style');
     styles.forEach(style => {
       const styleElement = document.createElement('style');
       styleElement.textContent = style.textContent;
+      styleElement.setAttribute('data-source', 'obsidian-plugin');
       document.head.appendChild(styleElement);
     });
     
-    // Aplicar estilos de Notion al contenido cargado
+    // Aplicar clases de Notion al contenido cargado (complementa, no reemplaza)
+    // Esto permite que los estilos de Notion se apliquen mientras preservamos los del plugin
     applyNotionStyles(contentDiv);
     
     // Esperar un momento para que el DOM se actualice antes de procesar imágenes
@@ -8118,8 +8127,9 @@ async function loadPageContent(url, name, selector = null, blockTypes = null) {
           
           const pageCategoryPath = freshPageInfo.pageCategoryPath;
           
-          // Verificar si es una página de Notion para mostrar opción de recargar
+          // Verificar si es una página de Notion o localhost para mostrar opción de recargar
           const isNotionPage = isNotionUrl(currentUrl);
+          const isLocalhost = isLocalhostUrl(currentUrl);
           
           // Menú contextual simplificado para header (sin move up/down ni duplicate)
           const menuItems = [
@@ -8132,8 +8142,8 @@ async function loadPageContent(url, name, selector = null, blockTypes = null) {
             },
           ];
           
-          // Agregar opción de recargar si es Notion
-          if (isNotionPage) {
+          // Agregar opción de recargar si es Notion o localhost
+          if (isNotionPage || isLocalhost) {
             menuItems.push({ separator: true });
             menuItems.push({
               icon: 'img/icon-reload.svg',
@@ -8144,18 +8154,24 @@ async function loadPageContent(url, name, selector = null, blockTypes = null) {
                 const pageName = currentName;
                 trackPageReloaded(pageName);
                 
-                // Limpiar caché de esta página ANTES de recargar
-                const pageId = extractNotionPageId(currentUrl);
-                if (pageId) {
-                  const cacheKey = CACHE_PREFIX + pageId;
-                  localStorage.removeItem(cacheKey);
-                  log('🗑️ Caché limpiado para recarga:', pageId);
+                // Limpiar caché de esta página ANTES de recargar (solo para Notion)
+                if (isNotionPage) {
+                  const pageId = extractNotionPageId(currentUrl);
+                  if (pageId) {
+                    const cacheKey = CACHE_PREFIX + pageId;
+                    localStorage.removeItem(cacheKey);
+                    log('🗑️ Caché limpiado para recarga:', pageId);
+                  }
                 }
                 
                 // Recargar el contenido
                 const notionContainer = document.getElementById("notion-container");
                 if (notionContainer) {
-                  await loadNotionContent(currentUrl, notionContainer, true, blockTypes);
+                  if (isNotionPage) {
+                    await loadNotionContent(currentUrl, notionContainer, true, blockTypes);
+                  } else if (isLocalhost) {
+                    await loadLocalhostContent(currentUrl, notionContainer);
+                  }
                 }
               }
             });
