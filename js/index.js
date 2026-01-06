@@ -6430,6 +6430,11 @@ function getLinkType(url) {
     const hostname = urlObj.hostname.toLowerCase();
     const pathname = urlObj.pathname.toLowerCase();
     
+    // Detectar localhost (servidor local de Obsidian plugin u otros)
+    if (hostname === 'localhost' || hostname === '127.0.0.1') {
+      return { type: 'localhost', icon: 'icon-link.svg' };
+    }
+    
     // Detectar tipos de links
     if (hostname.includes('notion.so') || hostname.includes('notion.site')) {
       return { type: 'notion', icon: 'icon-notion.svg' };
@@ -7348,6 +7353,17 @@ function isDemoHtmlFile(url) {
   return url.includes('/content-demo/') && url.endsWith('.html');
 }
 
+// Función para detectar si es una URL de localhost (servidor local de Obsidian plugin u otros)
+function isLocalhostUrl(url) {
+  if (!url || typeof url !== 'string') return false;
+  try {
+    const urlObj = new URL(url);
+    return urlObj.hostname === 'localhost' || urlObj.hostname === '127.0.0.1';
+  } catch (e) {
+    return false;
+  }
+}
+
 // Función para obtener la URL base de la app (para resolver URLs relativas correctamente)
 function getAppBaseUrl() {
   // Usar el origen de la ventana actual, o la URL de Netlify como fallback
@@ -7441,6 +7457,81 @@ async function loadDemoHtmlContent(url, container) {
   }
 }
 
+// Función para cargar contenido HTML desde localhost (servidor local de Obsidian plugin u otros)
+async function loadLocalhostContent(url, container) {
+  const contentDiv = container.querySelector('#notion-content');
+  
+  if (!contentDiv) {
+    console.error('No se encontró el contenedor de contenido');
+    return;
+  }
+  
+  // Usar la función centralizada para gestionar visibilidad
+  setNotionDisplayMode(container, 'content');
+  
+  // Mostrar loading
+  contentDiv.innerHTML = `
+    <div class="empty-state notion-loading">
+      <div class="empty-state-icon">⏳</div>
+      <p class="empty-state-text">Loading content from local server...</p>
+    </div>
+  `;
+  
+  try {
+    log('🌐 Cargando contenido desde localhost:', url);
+    
+    // Obtener el HTML del servidor local
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Error loading from localhost: ${response.status}`);
+    }
+    
+    const html = await response.text();
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, 'text/html');
+    
+    // Intentar extraer el contenido del div #notion-content (compatibilidad con formato GM Vault)
+    const notionContent = doc.querySelector('#notion-content');
+    
+    if (notionContent) {
+      // Si tiene estructura GM Vault, usar solo el contenido
+      contentDiv.innerHTML = notionContent.innerHTML;
+    } else {
+      // Si no tiene estructura GM Vault, usar el body completo
+      const bodyContent = doc.body;
+      if (bodyContent) {
+        contentDiv.innerHTML = bodyContent.innerHTML;
+      } else {
+        contentDiv.innerHTML = html;
+      }
+    }
+    
+    // Copiar estilos si existen
+    const styles = doc.querySelectorAll('style');
+    styles.forEach(style => {
+      const styleElement = document.createElement('style');
+      styleElement.textContent = style.textContent;
+      document.head.appendChild(styleElement);
+    });
+    
+    // Agregar event listeners a las imágenes para abrirlas en modal
+    await attachImageClickHandlers();
+    
+    log('✅ Contenido de localhost cargado correctamente');
+  } catch (error) {
+    console.error('Error al cargar contenido de localhost:', error);
+    contentDiv.innerHTML = `
+      <div class="empty-state notion-loading">
+        <div class="empty-state-icon">❌</div>
+        <p class="empty-state-text">Error loading content from local server: ${error.message}</p>
+        <p class="empty-state-hint" style="font-size: 12px; margin-top: 8px; opacity: 0.7;">
+          Make sure the local server is running at ${url}
+        </p>
+      </div>
+    `;
+  }
+}
+
 // Función centralizada para ocultar todos los botones de página del header
 function hidePageHeaderButtons() {
   const refreshButton = document.getElementById("refresh-page-button");
@@ -7467,6 +7558,8 @@ async function loadPageContent(url, name, selector = null, blockTypes = null) {
   let pageType = 'unknown';
   if (isDemoHtmlFile(url)) {
     pageType = 'demo';
+  } else if (isLocalhostUrl(url)) {
+    pageType = 'localhost';
   } else if (isNotionUrl(url)) {
     pageType = 'notion';
   } else {
@@ -7495,7 +7588,7 @@ async function loadPageContent(url, name, selector = null, blockTypes = null) {
     pageTitle.textContent = name;
     
     // Detectar si es un archivo HTML de demo local
-    log('🔍 Verificando URL:', url, '| isDemoHtmlFile:', isDemoHtmlFile(url), '| isNotionUrl:', isNotionUrl(url));
+    log('🔍 Verificando URL:', url, '| isDemoHtmlFile:', isDemoHtmlFile(url), '| isNotionUrl:', isNotionUrl(url), '| isLocalhostUrl:', isLocalhostUrl(url));
     if (isDemoHtmlFile(url)) {
       // Es un archivo HTML de demo → cargar directamente
       log('📄 Archivo HTML de demo detectado, cargando contenido local');
@@ -7507,6 +7600,17 @@ async function loadPageContent(url, name, selector = null, blockTypes = null) {
       }
       
       await loadDemoHtmlContent(url, notionContainer);
+    } else if (isLocalhostUrl(url)) {
+      // Es una URL de localhost (servidor local de Obsidian plugin u otros) → cargar directamente
+      log('🏠 URL de localhost detectada, cargando contenido del servidor local');
+      
+      // Ocultar botón de recargar si existe
+      let refreshButton = document.getElementById("refresh-page-button");
+      if (refreshButton) {
+        refreshButton.classList.add("hidden");
+      }
+      
+      await loadLocalhostContent(url, notionContainer);
     } else if (isNotionUrl(url)) {
       // Es una URL de Notion → usar la API
       log('📝 URL de Notion detectada, usando API');
