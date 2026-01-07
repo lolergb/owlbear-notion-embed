@@ -645,6 +645,276 @@ function hasUserToken() {
   return getUserToken() !== null;
 }
 
+// ============================================
+// IMPORTACIÓN DESDE NOTION
+// ============================================
+
+/**
+ * Obtiene la URL base del proxy de Notion
+ */
+function getNotionProxyUrl() {
+  // En desarrollo local, usar localhost
+  // En producción, usar la URL de Netlify
+  const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+  if (isLocalhost) {
+    return '/.netlify/functions/notion-api';
+  }
+  // En producción (Netlify)
+  return '/.netlify/functions/notion-api';
+}
+
+/**
+ * Busca todas las páginas disponibles para la integración de Notion
+ */
+async function searchNotionPages() {
+  const token = getUserToken();
+  if (!token) {
+    throw new Error('No Notion token configured. Please configure your token first.');
+  }
+
+  const proxyUrl = getNotionProxyUrl();
+  const response = await fetch(`${proxyUrl}?type=search&token=${encodeURIComponent(token)}`);
+  
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.error || `Search failed: ${response.status}`);
+  }
+
+  const data = await response.json();
+  return data.results || [];
+}
+
+/**
+ * Obtiene los bloques hijos de una página de Notion
+ */
+async function getNotionPageChildren(pageId) {
+  const token = getUserToken();
+  if (!token) {
+    throw new Error('No Notion token configured');
+  }
+
+  const proxyUrl = getNotionProxyUrl();
+  const response = await fetch(`${proxyUrl}?type=children&pageId=${pageId}&token=${encodeURIComponent(token)}`);
+  
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.error || `Failed to get children: ${response.status}`);
+  }
+
+  const data = await response.json();
+  return data.results || [];
+}
+
+/**
+ * Obtiene información de una página de Notion
+ */
+async function getNotionPageInfo(pageId) {
+  const token = getUserToken();
+  if (!token) {
+    throw new Error('No Notion token configured');
+  }
+
+  const proxyUrl = getNotionProxyUrl();
+  const response = await fetch(`${proxyUrl}?type=page&pageId=${pageId}&token=${encodeURIComponent(token)}`);
+  
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.error || `Failed to get page: ${response.status}`);
+  }
+
+  return await response.json();
+}
+
+/**
+ * Extrae el título de una página de Notion desde sus propiedades
+ */
+function extractNotionPageTitle(page) {
+  // Intentar obtener el título desde las propiedades
+  if (page.properties) {
+    // El título suele estar en 'title' o 'Name'
+    const titleProp = page.properties.title || page.properties.Title || page.properties.Name || page.properties.name;
+    if (titleProp && titleProp.title && titleProp.title.length > 0) {
+      return titleProp.title.map(t => t.plain_text).join('');
+    }
+  }
+  
+  // Fallback: usar el ID
+  return page.id.substring(0, 8);
+}
+
+/**
+ * Extrae el ID de página de una URL de Notion
+ */
+function extractNotionPageId(url) {
+  // Formatos soportados:
+  // https://www.notion.so/workspace/Page-Title-abc123def456...
+  // https://notion.so/Page-Title-abc123def456...
+  // https://www.notion.so/abc123def456...
+  // abc123def456... (ID directo)
+  
+  // Limpiar la URL
+  url = url.trim();
+  
+  // Si ya es un ID (32 caracteres hex sin guiones, o con guiones)
+  const idRegex = /^[a-f0-9]{32}$/i;
+  const idWithDashesRegex = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
+  
+  if (idRegex.test(url)) {
+    return url;
+  }
+  if (idWithDashesRegex.test(url)) {
+    return url.replace(/-/g, '');
+  }
+  
+  // Extraer de URL
+  // El ID está al final, después del último guión del título
+  const urlMatch = url.match(/([a-f0-9]{32})(?:\?|$)/i);
+  if (urlMatch) {
+    return urlMatch[1];
+  }
+  
+  // Intentar extraer ID con guiones de la URL
+  const urlMatchDashes = url.match(/([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})(?:\?|$)/i);
+  if (urlMatchDashes) {
+    return urlMatchDashes[1].replace(/-/g, '');
+  }
+  
+  // Último intento: buscar 32 caracteres hexadecimales en cualquier parte
+  const anyIdMatch = url.match(/[a-f0-9]{32}/i);
+  if (anyIdMatch) {
+    return anyIdMatch[0];
+  }
+  
+  return null;
+}
+
+/**
+ * Construye la URL de Notion para una página
+ */
+function buildNotionPageUrl(pageId) {
+  return `https://www.notion.so/${pageId}`;
+}
+
+/**
+ * Escanea recursivamente una página de Notion y construye la estructura del vault
+ * @param {string} pageId - ID de la página raíz
+ * @param {function} onProgress - Callback para mostrar progreso
+ * @returns {Promise<Object>} - Estructura del vault
+ */
+async function scanNotionPageRecursive(pageId, onProgress) {
+  const scannedPages = new Set();
+  
+  async function scanPage(id, depth = 0) {
+    if (scannedPages.has(id)) {
+      return null; // Evitar ciclos
+    }
+    scannedPages.add(id);
+    
+    if (onProgress) {
+      onProgress(`Scanning... (${scannedPages.size} pages)`);
+    }
+    
+    // Obtener información de la página
+    const pageInfo = await getNotionPageInfo(id);
+    const title = extractNotionPageTitle(pageInfo);
+    
+    // Obtener hijos
+    const children = await getNotionPageChildren(id);
+    
+    // Filtrar solo las subpáginas (child_page blocks)
+    const childPages = children.filter(block => block.type === 'child_page');
+    
+    if (childPages.length === 0) {
+      // Es una página hoja (sin subpáginas) → es una "page" en el vault
+      return {
+        type: 'page',
+        name: title,
+        url: buildNotionPageUrl(id),
+        id: id
+      };
+    } else {
+      // Tiene subpáginas → es una "category" en el vault
+      const category = {
+        type: 'category',
+        name: title,
+        pages: [],
+        categories: []
+      };
+      
+      // Escanear subpáginas recursivamente
+      for (const childPage of childPages) {
+        const childId = childPage.id.replace(/-/g, '');
+        const childResult = await scanPage(childId, depth + 1);
+        
+        if (childResult) {
+          if (childResult.type === 'page') {
+            category.pages.push({
+              name: childResult.name,
+              url: childResult.url
+            });
+          } else if (childResult.type === 'category') {
+            category.categories.push(childResult);
+          }
+        }
+      }
+      
+      return category;
+    }
+  }
+  
+  const rootResult = await scanPage(pageId);
+  
+  if (!rootResult) {
+    throw new Error('Failed to scan root page');
+  }
+  
+  // Construir el JSON final del vault
+  if (rootResult.type === 'page') {
+    // Si la raíz es una página sin hijos, crear una categoría con ella
+    return {
+      categories: [{
+        name: rootResult.name,
+        pages: [{
+          name: rootResult.name,
+          url: rootResult.url
+        }]
+      }]
+    };
+  } else {
+    // Limpiar la estructura (remover campos internos)
+    function cleanCategory(cat) {
+      const cleaned = { name: cat.name };
+      if (cat.pages && cat.pages.length > 0) {
+        cleaned.pages = cat.pages;
+      }
+      if (cat.categories && cat.categories.length > 0) {
+        cleaned.categories = cat.categories.map(c => cleanCategory(c));
+      }
+      return cleaned;
+    }
+    
+    return {
+      categories: [cleanCategory(rootResult)]
+    };
+  }
+}
+
+/**
+ * Importa la estructura de páginas desde Notion
+ */
+async function importFromNotion(pageId, onProgress) {
+  if (!pageId) {
+    throw new Error('No page ID provided');
+  }
+  
+  const vault = await scanNotionPageRecursive(pageId, onProgress);
+  return vault;
+}
+
+// ============================================
+// FIN IMPORTACIÓN DESDE NOTION
+// ============================================
+
 // Función para mostrar un ID de room más amigable (solo primeros caracteres)
 function getFriendlyRoomId(roomId) {
   if (!roomId || roomId === 'default') {
@@ -8595,17 +8865,20 @@ async function showSettings() {
   // Ocultar/mostrar secciones según rol
   const allForms = document.querySelectorAll('#settings-container .form');
   const notionTokenForm = allForms[0]; // Primera sección: Notion Token
-  const exportVaultForm = allForms[1]; // Segunda sección: Export vault
-  const feedbackForm = allForms[2]; // Tercera sección: Feedback
+  const notionImportForm = allForms[1]; // Segunda sección: Import from Notion
+  const exportVaultForm = allForms[2]; // Tercera sección: Export vault
+  const feedbackForm = allForms[3]; // Cuarta sección: Feedback
   
   if (!isGM) {
     // Player: solo mostrar feedback
     if (notionTokenForm) notionTokenForm.style.display = 'none';
+    if (notionImportForm) notionImportForm.style.display = 'none';
     if (exportVaultForm) exportVaultForm.style.display = 'none';
     if (feedbackForm) feedbackForm.style.display = '';
   } else if (isCoGMGlobal) {
-    // Co-GM: ocultar Notion Token, mostrar Export vault (con vault status) y Feedback
+    // Co-GM: ocultar Notion Token e Import, mostrar Export vault (con vault status) y Feedback
     if (notionTokenForm) notionTokenForm.style.display = 'none';
+    if (notionImportForm) notionImportForm.style.display = 'none';
     if (exportVaultForm) exportVaultForm.style.display = '';
     if (feedbackForm) feedbackForm.style.display = '';
   } else {
@@ -8834,6 +9107,163 @@ async function showSettings() {
   
   // El back-button ya tiene un listener que maneja el cierre de settings-container
   // No necesitamos agregar otro listener aquí
+  
+  // ============================================
+  // NOTION IMPORT FUNCTIONALITY
+  // ============================================
+  const importNotionBtn = document.getElementById('import-notion-btn');
+  const notionImportStatus = document.getElementById('notion-import-status');
+  const notionPageSelector = document.getElementById('notion-page-selector');
+  const notionPageSelect = document.getElementById('notion-page-select');
+  const notionImportSelectedBtn = document.getElementById('notion-import-selected-btn');
+  const notionCancelBtn = document.getElementById('notion-cancel-btn');
+  const notionUrlFallback = document.getElementById('notion-url-fallback');
+  const notionUrlInput = document.getElementById('notion-url-input');
+  const notionImportUrlBtn = document.getElementById('notion-import-url-btn');
+  
+  // Función para mostrar estado
+  function showImportStatus(message, isError = false) {
+    if (notionImportStatus) {
+      notionImportStatus.textContent = message;
+      notionImportStatus.style.display = 'block';
+      notionImportStatus.style.color = isError ? '#ff6b6b' : '#888';
+    }
+  }
+  
+  // Función para ocultar todo y resetear
+  function resetImportUI() {
+    if (notionImportStatus) notionImportStatus.style.display = 'none';
+    if (notionPageSelector) notionPageSelector.style.display = 'none';
+    if (notionUrlFallback) notionUrlFallback.style.display = 'none';
+    if (notionPageSelect) notionPageSelect.innerHTML = '<option value="">-- Select a page --</option>';
+    if (notionUrlInput) notionUrlInput.value = '';
+  }
+  
+  // Función para importar y guardar el vault
+  async function performImport(pageId) {
+    try {
+      showImportStatus('Importing from Notion...');
+      
+      const vault = await importFromNotion(pageId, (progress) => {
+        showImportStatus(progress);
+      });
+      
+      // Guardar el vault
+      const savedOk = await savePagesJSON(vault, roomId);
+      
+      if (savedOk) {
+        showImportStatus('✅ Import complete! Reloading...');
+        
+        // Recargar la lista de páginas
+        setTimeout(() => {
+          resetImportUI();
+          closeSettings();
+          // Recargar la página para mostrar el nuevo contenido
+          location.reload();
+        }, 1500);
+      } else {
+        showImportStatus('❌ Error saving vault', true);
+      }
+    } catch (error) {
+      console.error('Import error:', error);
+      showImportStatus(`❌ ${error.message}`, true);
+    }
+  }
+  
+  // Botón principal de importar desde Notion
+  if (importNotionBtn && !importNotionBtn.dataset.listenerAdded) {
+    importNotionBtn.dataset.listenerAdded = 'true';
+    importNotionBtn.addEventListener('click', async () => {
+      // Verificar que hay token
+      if (!hasUserToken()) {
+        showImportStatus('❌ Please configure your Notion token first', true);
+        return;
+      }
+      
+      try {
+        showImportStatus('Searching for available pages...');
+        resetImportUI();
+        if (notionImportStatus) notionImportStatus.style.display = 'block';
+        
+        // Buscar páginas disponibles
+        const pages = await searchNotionPages();
+        
+        if (pages.length === 0) {
+          showImportStatus('No pages found. Make sure you have shared pages with your integration.', true);
+          // Mostrar fallback de URL
+          if (notionUrlFallback) notionUrlFallback.style.display = 'block';
+          return;
+        }
+        
+        // Llenar el selector con las páginas encontradas
+        if (notionPageSelect) {
+          notionPageSelect.innerHTML = '<option value="">-- Select a page --</option>';
+          pages.forEach(page => {
+            const title = extractNotionPageTitle(page);
+            const option = document.createElement('option');
+            option.value = page.id.replace(/-/g, '');
+            option.textContent = title;
+            notionPageSelect.appendChild(option);
+          });
+        }
+        
+        showImportStatus(`Found ${pages.length} pages. Select a root page to import:`);
+        if (notionPageSelector) notionPageSelector.style.display = 'block';
+        if (notionUrlFallback) notionUrlFallback.style.display = 'block';
+        
+      } catch (error) {
+        console.error('Search error:', error);
+        showImportStatus(`❌ ${error.message}`, true);
+        // Mostrar fallback de URL en caso de error
+        if (notionUrlFallback) notionUrlFallback.style.display = 'block';
+      }
+    });
+  }
+  
+  // Botón de importar página seleccionada
+  if (notionImportSelectedBtn && !notionImportSelectedBtn.dataset.listenerAdded) {
+    notionImportSelectedBtn.dataset.listenerAdded = 'true';
+    notionImportSelectedBtn.addEventListener('click', async () => {
+      const selectedPageId = notionPageSelect ? notionPageSelect.value : '';
+      if (!selectedPageId) {
+        showImportStatus('Please select a page first', true);
+        return;
+      }
+      await performImport(selectedPageId);
+    });
+  }
+  
+  // Botón de cancelar
+  if (notionCancelBtn && !notionCancelBtn.dataset.listenerAdded) {
+    notionCancelBtn.dataset.listenerAdded = 'true';
+    notionCancelBtn.addEventListener('click', () => {
+      resetImportUI();
+    });
+  }
+  
+  // Botón de importar desde URL
+  if (notionImportUrlBtn && !notionImportUrlBtn.dataset.listenerAdded) {
+    notionImportUrlBtn.dataset.listenerAdded = 'true';
+    notionImportUrlBtn.addEventListener('click', async () => {
+      const url = notionUrlInput ? notionUrlInput.value.trim() : '';
+      if (!url) {
+        showImportStatus('Please enter a Notion page URL', true);
+        return;
+      }
+      
+      const pageId = extractNotionPageId(url);
+      if (!pageId) {
+        showImportStatus('Invalid Notion URL. Please paste a valid page URL.', true);
+        return;
+      }
+      
+      await performImport(pageId);
+    });
+  }
+  
+  // ============================================
+  // FIN NOTION IMPORT FUNCTIONALITY
+  // ============================================
   
   // Ver JSON - evitar múltiples listeners
   if (viewJsonBtn && !viewJsonBtn.dataset.listenerAdded) {
