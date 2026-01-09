@@ -185,7 +185,11 @@ export class ExtensionController {
     try {
       const pageId = page.getNotionPageId();
       
-      if (page.isNotionPage() && pageId) {
+      // Detectar tipo de contenido en orden de prioridad
+      if (this._isDemoHtmlFile(page.url)) {
+        // Archivos HTML de demo se cargan directamente (no en iframe)
+        await this._renderDemoHtmlPage(page);
+      } else if (page.isNotionPage() && pageId) {
         await this._renderNotionPage(page, pageId);
       } else if (page.isImage()) {
         this._renderImagePage(page);
@@ -1216,6 +1220,106 @@ export class ExtensionController {
         </iframe>
       </div>
     `;
+  }
+
+  /**
+   * Detecta si es un archivo HTML de demo local
+   * @private
+   */
+  _isDemoHtmlFile(url) {
+    if (!url || typeof url !== 'string') return false;
+    return url.includes('/content-demo/') && url.endsWith('.html');
+  }
+
+  /**
+   * Obtiene la URL base de la app
+   * @private
+   */
+  _getAppBaseUrl() {
+    const currentOrigin = window.location.origin;
+    if (currentOrigin.includes('localhost') || currentOrigin.includes('127.0.0.1')) {
+      return currentOrigin;
+    }
+    if (currentOrigin.includes('owlbear-gm-vault.netlify.app')) {
+      return currentOrigin;
+    }
+    // Si estamos en un iframe (Owlbear), usar URL de Netlify
+    return 'https://owlbear-gm-vault.netlify.app';
+  }
+
+  /**
+   * Resuelve una URL relativa a absoluta
+   * @private
+   */
+  _resolveAppUrl(url) {
+    if (!url) return url;
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      return url;
+    }
+    const baseUrl = this._getAppBaseUrl();
+    if (url.startsWith('/')) {
+      return baseUrl + url;
+    }
+    return baseUrl + '/' + url;
+  }
+
+  /**
+   * Renderiza una página HTML de demo (cargando contenido directamente)
+   * @private
+   */
+  async _renderDemoHtmlPage(page) {
+    const notionContent = document.getElementById('notion-content');
+    if (!notionContent) return;
+
+    log('📄 Cargando archivo HTML de demo:', page.url);
+
+    try {
+      // Resolver URL a absoluta
+      const absoluteUrl = this._resolveAppUrl(page.url);
+      log('📄 URL absoluta:', absoluteUrl);
+
+      // Fetch del HTML
+      const response = await fetch(absoluteUrl);
+      if (!response.ok) {
+        throw new Error(`Error loading demo HTML: ${response.status}`);
+      }
+
+      const html = await response.text();
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(html, 'text/html');
+
+      // Extraer solo el contenido del div #notion-content
+      const demoContent = doc.querySelector('#notion-content');
+
+      if (demoContent) {
+        notionContent.innerHTML = demoContent.innerHTML;
+
+        // Copiar estilos si existen
+        const styles = doc.querySelectorAll('style');
+        styles.forEach(style => {
+          const styleElement = document.createElement('style');
+          styleElement.textContent = style.textContent;
+          document.head.appendChild(styleElement);
+        });
+
+        // Attach event handlers para imágenes
+        this._attachImageHandlers(notionContent);
+      } else {
+        // Si no hay #notion-content, usar todo el body
+        const body = doc.querySelector('body');
+        notionContent.innerHTML = body ? body.innerHTML : html;
+        this._attachImageHandlers(notionContent);
+      }
+
+      log('✅ Contenido HTML de demo cargado correctamente');
+    } catch (e) {
+      logError('Error cargando HTML de demo:', e);
+      notionContent.innerHTML = `
+        <div class="error-container">
+          <p class="error-message">Error loading demo content: ${e.message}</p>
+        </div>
+      `;
+    }
   }
 
   /**
