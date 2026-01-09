@@ -108,6 +108,7 @@ export class UIRenderer {
     const categoryDiv = document.createElement('div');
     categoryDiv.className = 'category-group';
     categoryDiv.dataset.level = level;
+    categoryDiv.dataset.categoryName = category.name;
 
     // === TÍTULO CON BOTÓN DE COLAPSAR ===
     const titleContainer = document.createElement('div');

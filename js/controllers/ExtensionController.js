@@ -163,11 +163,13 @@ export class ExtensionController {
     const pageList = document.getElementById('page-list');
     const backButton = document.getElementById('back-button');
     const pageTitle = document.getElementById('page-title');
+    const buttonContainer = document.querySelector('.button-container');
     
     if (notionContainer) notionContainer.classList.remove('hidden');
     if (pageList) pageList.classList.add('hidden');
     if (backButton) backButton.classList.remove('hidden');
     if (pageTitle) pageTitle.textContent = page.name;
+    if (buttonContainer) buttonContainer.classList.add('hidden');
 
     // Mostrar loading
     const notionContent = document.getElementById('notion-content');
@@ -376,6 +378,9 @@ export class ExtensionController {
 
     // Configurar botón back
     this._setupBackButton();
+    
+    // Crear botones del header
+    this._createHeaderButtons();
   }
 
   /**
@@ -404,6 +409,7 @@ export class ExtensionController {
     const backButton = document.getElementById('back-button');
     const notionContent = document.getElementById('notion-content');
     const notionIframe = document.getElementById('notion-iframe');
+    const buttonContainer = document.querySelector('.button-container');
 
     const isSettingsVisible = settingsContainer && !settingsContainer.classList.contains('hidden');
     const isNotionContainerVisible = notionContainer && !notionContainer.classList.contains('hidden');
@@ -429,6 +435,201 @@ export class ExtensionController {
     if (pageList) pageList.classList.remove('hidden');
     if (backButton) backButton.classList.add('hidden');
     if (pageTitle) pageTitle.textContent = 'GM vault';
+    if (buttonContainer) buttonContainer.classList.remove('hidden');
+  }
+
+  /**
+   * Crea los botones del header (settings, add, collapse)
+   * @private
+   */
+  _createHeaderButtons() {
+    const header = document.getElementById('header');
+    if (!header) return;
+
+    // Verificar si ya existen
+    if (document.querySelector('.button-container')) return;
+
+    const buttonContainer = document.createElement('div');
+    buttonContainer.className = 'button-container';
+
+    // Botón Settings
+    const settingsButton = document.createElement('button');
+    settingsButton.className = 'icon-button';
+    settingsButton.title = 'Settings';
+    settingsButton.innerHTML = '<img src="img/icon-json.svg" alt="Settings" class="icon-button-icon">';
+    settingsButton.addEventListener('click', () => this._showSettings());
+
+    // Botón Collapse All
+    const collapseAllButton = document.createElement('button');
+    collapseAllButton.className = 'icon-button';
+    collapseAllButton.id = 'collapse-all-button';
+    collapseAllButton.title = 'Collapse all folders';
+    collapseAllButton.dataset.collapsed = 'false';
+    collapseAllButton.innerHTML = '<img src="img/icon-collapse-false.svg" alt="Collapse all" class="icon-button-icon">';
+    collapseAllButton.addEventListener('click', () => this._toggleCollapseAll(collapseAllButton));
+
+    // Agregar botones base
+    buttonContainer.appendChild(settingsButton);
+    buttonContainer.appendChild(collapseAllButton);
+
+    // Botón Add (solo para GM)
+    if (this.isGM) {
+      const addButton = document.createElement('button');
+      addButton.className = 'icon-button';
+      addButton.title = 'Add folder or page';
+      addButton.innerHTML = '<img src="img/icon-add.svg" alt="Add" class="icon-button-icon">';
+      addButton.addEventListener('click', (e) => this._showAddMenu(addButton));
+      buttonContainer.appendChild(addButton);
+    }
+
+    header.appendChild(buttonContainer);
+  }
+
+  /**
+   * Muestra el panel de settings
+   * @private
+   */
+  _showSettings() {
+    const settingsContainer = document.getElementById('settings-container');
+    const pageList = document.getElementById('page-list');
+    const notionContainer = document.getElementById('notion-container');
+    const backButton = document.getElementById('back-button');
+    const pageTitle = document.getElementById('page-title');
+    const buttonContainer = document.querySelector('.button-container');
+
+    if (pageList) pageList.classList.add('hidden');
+    if (notionContainer) notionContainer.classList.add('hidden');
+    if (settingsContainer) settingsContainer.classList.remove('hidden');
+    if (backButton) backButton.classList.remove('hidden');
+    if (pageTitle) pageTitle.textContent = 'Settings';
+    if (buttonContainer) buttonContainer.classList.add('hidden');
+  }
+
+  /**
+   * Toggle collapse/expand all folders
+   * @private
+   */
+  _toggleCollapseAll(button) {
+    const isCollapsed = button.dataset.collapsed === 'true';
+    const newState = !isCollapsed;
+    
+    const icon = button.querySelector('img');
+    if (icon) {
+      icon.src = newState ? 'img/icon-collapse-false.svg' : 'img/icon-collapse-true.svg';
+    }
+    button.dataset.collapsed = newState.toString();
+    button.title = newState ? 'Expand all folders' : 'Collapse all folders';
+
+    // Colapsar/expandir todas las carpetas
+    const categories = document.querySelectorAll('.category-group');
+    categories.forEach(categoryDiv => {
+      const contentContainer = categoryDiv.querySelector('.category-content');
+      const collapseBtn = categoryDiv.querySelector('.category-collapse-button img');
+      const categoryName = categoryDiv.dataset.categoryName;
+      const level = categoryDiv.dataset.level;
+
+      if (contentContainer && collapseBtn) {
+        if (newState) {
+          contentContainer.style.display = 'none';
+          collapseBtn.src = 'img/folder-close.svg';
+        } else {
+          contentContainer.style.display = 'block';
+          collapseBtn.src = 'img/folder-open.svg';
+        }
+
+        if (categoryName) {
+          const collapseStateKey = `category-collapsed-${categoryName}-level-${level}`;
+          localStorage.setItem(collapseStateKey, newState.toString());
+        }
+      }
+    });
+  }
+
+  /**
+   * Muestra el menú de añadir
+   * @private
+   */
+  _showAddMenu(button) {
+    const rect = button.getBoundingClientRect();
+    
+    // Crear menú contextual simple
+    const existingMenu = document.querySelector('.context-menu');
+    if (existingMenu) existingMenu.remove();
+
+    const menu = document.createElement('div');
+    menu.className = 'context-menu';
+    menu.style.cssText = `position: fixed; left: ${rect.right + 8}px; top: ${rect.bottom + 8}px; z-index: 1000;`;
+
+    const items = [
+      { icon: 'img/folder-close.svg', text: 'Add folder', action: () => this._addCategory() },
+      { icon: 'img/icon-page.svg', text: 'Add page', action: () => this._addPage() }
+    ];
+
+    items.forEach(item => {
+      const menuItem = document.createElement('button');
+      menuItem.className = 'context-menu-item';
+      menuItem.innerHTML = `<img src="${item.icon}" alt="" class="context-menu-icon"><span>${item.text}</span>`;
+      menuItem.addEventListener('click', () => {
+        item.action();
+        menu.remove();
+      });
+      menu.appendChild(menuItem);
+    });
+
+    document.body.appendChild(menu);
+
+    // Cerrar al hacer click fuera
+    const closeHandler = (e) => {
+      if (!menu.contains(e.target) && e.target !== button) {
+        menu.remove();
+        document.removeEventListener('click', closeHandler);
+      }
+    };
+    setTimeout(() => document.addEventListener('click', closeHandler), 0);
+  }
+
+  /**
+   * Añade una nueva categoría
+   * @private
+   */
+  async _addCategory() {
+    const name = prompt('Category name:');
+    if (!name) return;
+
+    if (!this.config.categories) this.config.categories = [];
+    this.config.categories.push({ name, pages: [], categories: [] });
+    await this.saveConfig(this.config);
+  }
+
+  /**
+   * Añade una nueva página
+   * @private
+   */
+  async _addPage() {
+    // Mostrar modal para añadir página
+    this.modalManager.showPrompt({
+      title: 'Add Page',
+      fields: [
+        { name: 'name', label: 'Page name', type: 'text', required: true },
+        { name: 'url', label: 'URL', type: 'text', required: true }
+      ],
+      onConfirm: async (values) => {
+        if (!values.name || !values.url) return;
+        
+        // Añadir a la primera categoría o crear una
+        if (!this.config.categories || this.config.categories.length === 0) {
+          this.config.categories = [{ name: 'Pages', pages: [], categories: [] }];
+        }
+        
+        this.config.categories[0].pages.push({
+          name: values.name,
+          url: values.url,
+          visibleToPlayers: false
+        });
+        
+        await this.saveConfig(this.config);
+      }
+    });
   }
 
   /**
