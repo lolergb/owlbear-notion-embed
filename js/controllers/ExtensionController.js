@@ -353,6 +353,195 @@ export class ExtensionController {
   }
 
   /**
+   * Maneja el movimiento de una página
+   * @param {Object} page - Página a mover
+   * @param {Array} categoryPath - Ruta de categorías
+   * @param {number} pageIndex - Índice de la página
+   * @param {string} direction - 'up' o 'down'
+   * @private
+   */
+  async _handlePageMove(page, categoryPath, pageIndex, direction) {
+    if (!this.config || !this.isGM) return;
+
+    log(`↕️ Moviendo página ${direction}:`, page.name);
+
+    // Navegar a la categoría correcta
+    let currentLevel = this.config;
+    for (const catName of categoryPath) {
+      const cat = (currentLevel.categories || []).find(c => c.name === catName);
+      if (cat) {
+        currentLevel = cat;
+      } else {
+        logError('No se encontró la categoría:', catName);
+        return;
+      }
+    }
+
+    const pages = currentLevel.pages || [];
+    const currentIndex = pages.findIndex(p => p.name === page.name);
+    
+    if (currentIndex === -1) {
+      logError('No se encontró la página:', page.name);
+      return;
+    }
+
+    // Calcular nuevo índice
+    let newIndex;
+    if (direction === 'up') {
+      newIndex = currentIndex - 1;
+    } else {
+      newIndex = currentIndex + 1;
+    }
+
+    // Verificar límites
+    if (newIndex < 0 || newIndex >= pages.length) {
+      log('No se puede mover más en esa dirección');
+      return;
+    }
+
+    // Intercambiar posiciones
+    [pages[currentIndex], pages[newIndex]] = [pages[newIndex], pages[currentIndex]];
+    
+    await this.saveConfig(this.config);
+  }
+
+  /**
+   * Muestra un formulario modal
+   * @param {string} title - Título del modal
+   * @param {Array} fields - Campos del formulario
+   * @param {Function} onSubmit - Callback al enviar
+   * @private
+   */
+  _showModalForm(title, fields, onSubmit, onCancel = null) {
+    // Crear overlay
+    const overlay = document.createElement('div');
+    overlay.id = 'modal-overlay';
+    overlay.className = 'modal';
+
+    // Crear modal
+    const modal = document.createElement('div');
+    modal.className = 'modal__content';
+
+    // Generar HTML del formulario
+    const fieldsHtml = fields.map(field => {
+      if (field.type === 'checkbox') {
+        return `
+          <div class="form__field" data-field-name="${field.name}">
+            <label class="form__checkbox-label">
+              <input 
+                type="checkbox" 
+                id="field-${field.name}" 
+                name="${field.name}"
+                class="checkbox"
+                ${field.value ? 'checked' : ''}
+              />
+              <span>${field.label}</span>
+            </label>
+          </div>
+        `;
+      } else if (field.type === 'select') {
+        return `
+          <div class="form__field" data-field-name="${field.name}">
+            <label class="form__label">${field.label}${field.required ? ' *' : ''}</label>
+            <select 
+              id="field-${field.name}" 
+              name="${field.name}"
+              class="select"
+              ${field.required ? 'required' : ''}
+            >
+              ${(field.options || []).map(opt => 
+                `<option value="${opt.value}" ${field.value === opt.value ? 'selected' : ''}>${opt.label}</option>`
+              ).join('')}
+            </select>
+          </div>
+        `;
+      } else if (field.type === 'textarea') {
+        return `
+          <div class="form__field" data-field-name="${field.name}">
+            <label class="form__label">${field.label}${field.required ? ' *' : ''}</label>
+            <textarea 
+              id="field-${field.name}" 
+              name="${field.name}"
+              class="textarea"
+              ${field.required ? 'required' : ''}
+              placeholder="${field.placeholder || ''}"
+            >${field.value || ''}</textarea>
+          </div>
+        `;
+      } else {
+        return `
+          <div class="form__field" data-field-name="${field.name}">
+            <label class="form__label">${field.label}${field.required ? ' *' : ''}</label>
+            <input 
+              type="${field.type || 'text'}" 
+              id="field-${field.name}" 
+              name="${field.name}"
+              class="input"
+              ${field.required ? 'required' : ''}
+              placeholder="${field.placeholder || ''}"
+              value="${field.value || ''}"
+            />
+          </div>
+        `;
+      }
+    }).join('');
+
+    modal.innerHTML = `
+      <h2 class="modal__title">${title}</h2>
+      <form id="modal-form" class="form">
+        ${fieldsHtml}
+        <div class="form__actions">
+          <button type="button" id="modal-cancel" class="btn btn--ghost btn--flex">Cancel</button>
+          <button type="submit" id="modal-submit" class="btn btn--primary btn--flex">Save</button>
+        </div>
+      </form>
+    `;
+
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
+
+    const form = modal.querySelector('#modal-form');
+    const cancelBtn = modal.querySelector('#modal-cancel');
+
+    const close = () => {
+      overlay.remove();
+      if (onCancel) onCancel();
+    };
+
+    // Cerrar al hacer click fuera
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) close();
+    });
+
+    cancelBtn.addEventListener('click', close);
+
+    // Manejar submit
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const formData = {};
+      fields.forEach(field => {
+        const input = modal.querySelector(`#field-${field.name}`);
+        if (input) {
+          if (field.type === 'checkbox') {
+            formData[field.name] = input.checked;
+          } else {
+            formData[field.name] = input.value.trim();
+          }
+        }
+      });
+      
+      overlay.remove();
+      if (onSubmit) onSubmit(formData);
+    });
+
+    // Focus en primer campo
+    const firstInput = modal.querySelector('input[type="text"], input[type="url"], textarea');
+    if (firstInput) {
+      setTimeout(() => firstInput.focus(), 100);
+    }
+  }
+
+  /**
    * Limpia recursos al cerrar
    */
   cleanup() {
@@ -885,6 +1074,12 @@ export class ExtensionController {
       },
       onPageDelete: (page, categoryPath, pageIndex) => {
         this._handlePageDelete(page, categoryPath, pageIndex);
+      },
+      onPageMove: (page, categoryPath, pageIndex, direction) => {
+        this._handlePageMove(page, categoryPath, pageIndex, direction);
+      },
+      onShowModal: (type, options) => {
+        this._showModalForm(options.title, options.fields, options.onSubmit);
       }
     });
   }
@@ -1121,8 +1316,95 @@ export class ExtensionController {
    * @private
    */
   async _renderImagePage(page) {
-    // Las imágenes se abren directamente en modal de OBR
-    await this._showImageModal(page.url, page.name, true);
+    // Mostrar imagen en content con opción de ampliar y compartir
+    this._setNotionDisplayMode('notion');
+    
+    const notionContent = document.getElementById('notion-content');
+    if (!notionContent) return;
+
+    // Convertir URL si es de Google Drive
+    let imageUrl = page.url;
+    if (page.url.includes('drive.google.com') && page.url.includes('/file/d/')) {
+      const match = page.url.match(/\/file\/d\/([^/]+)/);
+      if (match) {
+        imageUrl = `https://drive.google.com/thumbnail?id=${match[1]}&sz=w2000`;
+      }
+    }
+
+    // Asegurar URL absoluta
+    let absoluteImageUrl = imageUrl;
+    if (imageUrl && !imageUrl.match(/^https?:\/\//i)) {
+      try {
+        absoluteImageUrl = new URL(imageUrl, window.location.origin).toString();
+      } catch (e) {
+        absoluteImageUrl = imageUrl;
+      }
+    }
+
+    const caption = page.name || '';
+    const escapedCaption = caption.replace(/"/g, '&quot;');
+
+    // Agregar clase centered-content
+    notionContent.classList.add('centered-content');
+    
+    // HTML similar al original
+    notionContent.innerHTML = `
+      <div class="image-viewer-container" style="
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 100%;
+        padding: var(--spacing-lg);
+        margin-top: var(--spacing-xl);
+        gap: var(--spacing-lg);
+        position: relative;
+      ">
+        <div style="position: relative; display: inline-block;">
+          <img 
+            src="${absoluteImageUrl}" 
+            alt="${caption || 'Imagen'}"
+            class="notion-image-clickable"
+            data-image-url="${absoluteImageUrl}"
+            data-image-caption="${escapedCaption}"
+            style="
+              max-width: 100%;
+              max-height: calc(100vh - 150px);
+              object-fit: contain;
+              border-radius: var(--radius-lg);
+              cursor: pointer;
+              transition: transform var(--transition-normal);
+            "
+          />
+          ${this.isGM ? `
+            <button class="notion-image-share-button share-button" 
+                    data-image-url="${absoluteImageUrl}" 
+                    data-image-caption="${escapedCaption}"
+                    title="Show to players">
+              <img src="img/icon-players.svg" alt="Share" />
+            </button>
+          ` : ''}
+        </div>
+        <p style="color: var(--color-text-secondary); font-size: var(--font-size-sm);">Click on the image to view it full size</p>
+      </div>
+    `;
+    
+    // Handler para abrir en modal al hacer click
+    const img = notionContent.querySelector('img.notion-image-clickable');
+    if (img) {
+      img.addEventListener('click', () => {
+        this._showImageModal(absoluteImageUrl, caption);
+      });
+    }
+
+    // Handler para botón de share
+    const shareBtn = notionContent.querySelector('.notion-image-share-button');
+    if (shareBtn) {
+      shareBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this._shareImageToPlayers(absoluteImageUrl, caption);
+      });
+    }
   }
 
   /**
