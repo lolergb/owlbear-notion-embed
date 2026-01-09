@@ -17,10 +17,11 @@ export class UIRenderer {
     this.storageService = null;
     // Referencia al NotionService
     this.notionService = null;
-    // Callback para cuando se hace clic en una página
+    // Callbacks
     this.onPageClick = null;
-    // Callback para cuando se cambia visibilidad
     this.onVisibilityChange = null;
+    this.onPageEdit = null;
+    this.onPageDelete = null;
     // Es GM?
     this.isGM = true;
   }
@@ -36,9 +37,11 @@ export class UIRenderer {
   /**
    * Establece callbacks de eventos
    */
-  setCallbacks({ onPageClick, onVisibilityChange }) {
+  setCallbacks({ onPageClick, onVisibilityChange, onPageEdit, onPageDelete }) {
     if (onPageClick) this.onPageClick = onPageClick;
     if (onVisibilityChange) this.onVisibilityChange = onVisibilityChange;
+    if (onPageEdit) this.onPageEdit = onPageEdit;
+    if (onPageDelete) this.onPageDelete = onPageDelete;
   }
 
   /**
@@ -217,7 +220,7 @@ export class UIRenderer {
       visibilityButton.className = 'page-visibility-button';
       visibilityButton.innerHTML = `<img src="img/${page.visibleToPlayers ? 'icon-eye-open' : 'icon-eye-close'}.svg" alt="Visibility">`;
       visibilityButton.title = page.visibleToPlayers ? 'Visible to players' : 'Hidden from players';
-      visibilityButton.style.cssText = 'position: absolute; right: 8px; top: 50%; transform: translateY(-50%); opacity: 0; transition: opacity 0.2s;';
+      visibilityButton.style.cssText = 'position: absolute; right: 32px; top: 50%; transform: translateY(-50%); opacity: 0; transition: opacity 0.2s; background: transparent; border: none; cursor: pointer; padding: 4px;';
       
       visibilityButton.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -226,15 +229,32 @@ export class UIRenderer {
         }
       });
 
+      // Botón de menú contextual (editar/eliminar)
+      const contextMenuButton = document.createElement('button');
+      contextMenuButton.className = 'page-context-menu-button';
+      contextMenuButton.innerHTML = '<img src="img/icon-dots.svg" alt="Menu">';
+      contextMenuButton.title = 'Options';
+      contextMenuButton.style.cssText = 'position: absolute; right: 8px; top: 50%; transform: translateY(-50%); opacity: 0; transition: opacity 0.2s; background: transparent; border: none; cursor: pointer; padding: 4px;';
+      
+      contextMenuButton.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this._showPageContextMenu(contextMenuButton, page, categoryPath, pageIndex);
+      });
+
       button.style.position = 'relative';
       button.appendChild(visibilityButton);
+      button.appendChild(contextMenuButton);
 
-      // Mostrar botón en hover
+      // Mostrar botones en hover
       button.addEventListener('mouseenter', () => {
         visibilityButton.style.opacity = '1';
+        contextMenuButton.style.opacity = '1';
       });
       button.addEventListener('mouseleave', () => {
-        visibilityButton.style.opacity = '0';
+        if (!button.classList.contains('context-menu-open')) {
+          visibilityButton.style.opacity = '0';
+          contextMenuButton.style.opacity = '0';
+        }
       });
     }
 
@@ -288,6 +308,116 @@ export class UIRenderer {
       }
     } catch (e) {
       // Ignorar errores de carga de icono
+    }
+  }
+
+  /**
+   * Muestra el menú contextual de una página
+   * @private
+   */
+  _showPageContextMenu(button, page, categoryPath, pageIndex) {
+    // Cerrar menú anterior
+    const existingMenu = document.querySelector('.context-menu');
+    if (existingMenu) existingMenu.remove();
+
+    // Marcar botón como activo
+    const pageButton = button.closest('.page-button');
+    if (pageButton) pageButton.classList.add('context-menu-open');
+
+    const rect = button.getBoundingClientRect();
+    
+    const menu = document.createElement('div');
+    menu.className = 'context-menu';
+    menu.style.cssText = `
+      position: fixed;
+      left: ${rect.right + 8}px;
+      top: ${rect.top}px;
+      z-index: 1000;
+      background: var(--color-bg-secondary, #2a2a2a);
+      border: 1px solid var(--color-border, #444);
+      border-radius: 8px;
+      padding: 4px 0;
+      min-width: 120px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    `;
+
+    const items = [
+      { icon: 'img/icon-edit.svg', text: 'Edit', action: () => this._editPage(page, categoryPath, pageIndex) },
+      { icon: 'img/icon-delete.svg', text: 'Delete', action: () => this._deletePage(page, categoryPath, pageIndex) }
+    ];
+
+    items.forEach(item => {
+      const menuItem = document.createElement('button');
+      menuItem.className = 'context-menu-item';
+      menuItem.style.cssText = `
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        width: 100%;
+        padding: 8px 12px;
+        background: transparent;
+        border: none;
+        color: var(--color-text-primary, #fff);
+        cursor: pointer;
+        font-size: 14px;
+        text-align: left;
+      `;
+      menuItem.innerHTML = `<img src="${item.icon}" alt="" style="width: 16px; height: 16px; opacity: 0.7;"><span>${item.text}</span>`;
+      
+      menuItem.addEventListener('mouseenter', () => {
+        menuItem.style.background = 'var(--color-bg-hover, #3a3a3a)';
+      });
+      menuItem.addEventListener('mouseleave', () => {
+        menuItem.style.background = 'transparent';
+      });
+      
+      menuItem.addEventListener('click', () => {
+        item.action();
+        menu.remove();
+        if (pageButton) pageButton.classList.remove('context-menu-open');
+      });
+      menu.appendChild(menuItem);
+    });
+
+    document.body.appendChild(menu);
+
+    // Cerrar al hacer click fuera
+    const closeHandler = (e) => {
+      if (!menu.contains(e.target) && e.target !== button) {
+        menu.remove();
+        if (pageButton) pageButton.classList.remove('context-menu-open');
+        document.removeEventListener('click', closeHandler);
+      }
+    };
+    setTimeout(() => document.addEventListener('click', closeHandler), 0);
+  }
+
+  /**
+   * Edita una página
+   * @private
+   */
+  _editPage(page, categoryPath, pageIndex) {
+    const newName = prompt('Page name:', page.name);
+    if (!newName || newName === page.name) return;
+    
+    const newUrl = prompt('URL:', page.url);
+    if (!newUrl) return;
+
+    // Callback para notificar cambio
+    if (this.onPageEdit) {
+      this.onPageEdit(page, categoryPath, pageIndex, { name: newName, url: newUrl });
+    }
+  }
+
+  /**
+   * Elimina una página
+   * @private
+   */
+  _deletePage(page, categoryPath, pageIndex) {
+    if (!confirm(`Delete "${page.name}"?`)) return;
+    
+    if (this.onPageDelete) {
+      this.onPageDelete(page, categoryPath, pageIndex);
     }
   }
 }

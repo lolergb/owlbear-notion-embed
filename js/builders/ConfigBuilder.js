@@ -14,7 +14,14 @@ import { log } from '../utils/logger.js';
  */
 export class ConfigBuilder {
   constructor(config = null) {
-    this.config = config ? config.clone() : new Config();
+    if (!config) {
+      this.config = new Config();
+    } else if (config instanceof Config) {
+      this.config = config.clone();
+    } else {
+      // Es un objeto JSON plano, convertir a Config
+      this.config = Config.fromJSON(config);
+    }
   }
 
   /**

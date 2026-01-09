@@ -279,6 +279,80 @@ export class ExtensionController {
   }
 
   /**
+   * Maneja cambio de visibilidad desde el UI
+   * @private
+   */
+  async _handleVisibilityChange(page, categoryPath, pageIndex, visible) {
+    await this._updatePageVisibility(page, categoryPath, pageIndex, visible);
+  }
+
+  /**
+   * Maneja edición de página desde el UI
+   * @private
+   */
+  async _handlePageEdit(page, categoryPath, pageIndex, newData) {
+    if (!this.config || !this.isGM) return;
+
+    log('✏️ Editando página:', page.name, '->', newData);
+
+    // Navegar a la categoría correcta
+    let currentLevel = this.config;
+    for (const catName of categoryPath) {
+      const cat = (currentLevel.categories || []).find(c => c.name === catName);
+      if (cat) {
+        currentLevel = cat;
+      } else {
+        logError('No se encontró la categoría:', catName);
+        return;
+      }
+    }
+
+    // Encontrar y actualizar la página
+    const pages = currentLevel.pages || [];
+    const pageToUpdate = pages.find(p => p.name === page.name);
+    if (pageToUpdate) {
+      if (newData.name) pageToUpdate.name = newData.name;
+      if (newData.url) pageToUpdate.url = newData.url;
+      
+      await this.saveConfig(this.config);
+    } else {
+      logError('No se encontró la página:', page.name);
+    }
+  }
+
+  /**
+   * Maneja eliminación de página desde el UI
+   * @private
+   */
+  async _handlePageDelete(page, categoryPath, pageIndex) {
+    if (!this.config || !this.isGM) return;
+
+    log('🗑️ Eliminando página:', page.name);
+
+    // Navegar a la categoría correcta
+    let currentLevel = this.config;
+    for (const catName of categoryPath) {
+      const cat = (currentLevel.categories || []).find(c => c.name === catName);
+      if (cat) {
+        currentLevel = cat;
+      } else {
+        logError('No se encontró la categoría:', catName);
+        return;
+      }
+    }
+
+    // Encontrar y eliminar la página
+    const pages = currentLevel.pages || [];
+    const pageIndexInArray = pages.findIndex(p => p.name === page.name);
+    if (pageIndexInArray !== -1) {
+      pages.splice(pageIndexInArray, 1);
+      await this.saveConfig(this.config);
+    } else {
+      logError('No se encontró la página:', page.name);
+    }
+  }
+
+  /**
    * Limpia recursos al cerrar
    */
   cleanup() {
@@ -797,19 +871,16 @@ export class ExtensionController {
     // Conectar UI Renderer con Event Handlers
     this.uiRenderer.setCallbacks({
       onPageClick: (page, categoryPath, pageIndex) => {
-        this.eventHandlers.handlePageClick(page, categoryPath, pageIndex);
+        this.openPage(page);
       },
       onVisibilityChange: (page, categoryPath, pageIndex, visible) => {
-        this.eventHandlers.handleVisibilityChange(page, categoryPath, pageIndex, visible);
+        this._handleVisibilityChange(page, categoryPath, pageIndex, visible);
       },
-      onPageEdit: (page, categoryPath, pageIndex) => {
-        this.eventHandlers.handlePageEdit(page, categoryPath, pageIndex);
+      onPageEdit: (page, categoryPath, pageIndex, newData) => {
+        this._handlePageEdit(page, categoryPath, pageIndex, newData);
       },
       onPageDelete: (page, categoryPath, pageIndex) => {
-        this.eventHandlers.handlePageDelete(page, categoryPath, pageIndex);
-      },
-      onAddPage: (categoryPath) => {
-        this.eventHandlers.handleAddPage(categoryPath);
+        this._handlePageDelete(page, categoryPath, pageIndex);
       }
     });
   }
