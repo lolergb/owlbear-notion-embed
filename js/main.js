@@ -8,43 +8,47 @@
 
 import OBR from "https://esm.sh/@owlbear-rodeo/sdk@3.1.0";
 import { ExtensionController } from './controllers/ExtensionController.js';
-import { log, logError } from './utils/logger.js';
 
 // Instancia global del controlador
 let extensionController = null;
 
-/**
- * Inicializa la aplicación
- */
-async function init() {
-  log('🚀 Iniciando GM Vault (versión modular)...');
-  
-  try {
-    // Crear controlador
-    extensionController = new ExtensionController();
+console.log('🚀 GM Vault: Cargando módulos...');
+
+// Esperar a que OBR SDK esté listo
+try {
+  OBR.onReady(async () => {
+    console.log('✅ OBR SDK listo, inicializando GM Vault...');
     
-    // Inicializar con OBR SDK
-    await extensionController.init(OBR, {
-      pagesContainer: '#pages-list',
-      contentContainer: '#content-area'
-    });
-    
-    log('✅ GM Vault inicializado correctamente');
-  } catch (e) {
-    logError('❌ Error iniciando GM Vault:', e);
-    
-    // Mostrar error en la UI
-    const container = document.getElementById('pages-list');
-    if (container) {
-      container.innerHTML = `
-        <div class="error-container">
-          <h3>Error</h3>
-          <p>Failed to initialize GM Vault: ${e.message}</p>
-          <button onclick="window.location.reload()">Retry</button>
-        </div>
-      `;
+    try {
+      // Crear controlador
+      extensionController = new ExtensionController();
+      
+      // Inicializar con OBR SDK (ya está listo)
+      await extensionController.init(OBR, {
+        pagesContainer: '#page-list',
+        contentContainer: '#notion-content'
+      });
+      
+      console.log('✅ GM Vault inicializado correctamente');
+    } catch (e) {
+      console.error('❌ Error iniciando GM Vault:', e);
+      
+      // Mostrar error en la UI
+      const container = document.getElementById('page-list');
+      if (container) {
+        container.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-state-icon">🚨</div>
+            <p class="empty-state-text">Error loading extension</p>
+            <p class="empty-state-hint">${e.message}</p>
+            <button onclick="window.location.reload()">Retry</button>
+          </div>
+        `;
+      }
     }
-  }
+  });
+} catch (error) {
+  console.error('❌ Error crítico al cargar OBR SDK:', error);
 }
 
 // Limpiar al cerrar
@@ -60,7 +64,4 @@ window.gmVault = {
   getConfig: () => extensionController?.getConfig(),
   version: '2.0.0-modular'
 };
-
-// Iniciar aplicación
-init();
 

@@ -70,13 +70,19 @@ export class ExtensionController {
 
   /**
    * Inicializa la extensión
-   * @param {Object} OBR - Referencia al SDK de Owlbear Rodeo
+   * @param {Object} OBR - Referencia al SDK de Owlbear Rodeo (ya debe estar listo)
    * @param {Object} options - Opciones de inicialización
    */
   async init(OBR, options = {}) {
-    log('🚀 Inicializando ExtensionController...');
+    console.log('🚀 Inicializando ExtensionController...');
     
     this.OBR = OBR;
+    
+    // Debug: verificar estructura de OBR
+    console.log('📦 OBR disponible:', !!OBR);
+    console.log('📦 OBR.room:', OBR?.room);
+    console.log('📦 OBR.player:', OBR?.player);
+    console.log('📦 OBR keys:', OBR ? Object.keys(OBR) : 'N/A');
     
     // Configurar referencias
     setOBRReference(OBR);
@@ -88,39 +94,37 @@ export class ExtensionController {
     // Inicializar modo debug
     await initDebugMode();
 
-    // Esperar a que OBR esté listo
-    await OBR.onReady(async () => {
-      log('✅ OBR SDK listo');
-      
-      // Obtener información del jugador y room
-      await this._fetchPlayerInfo();
-      
-      // Obtener configuración
-      await this._loadConfig();
-      
-      // Configurar UI
-      this._setupUI(options);
-      
-      // Configurar event handlers
-      this._setupEventHandlers();
-      
-      // Configurar broadcast (si es GM)
-      if (this.isGM) {
-        this._setupGMBroadcast();
-        this._startHeartbeat();
-      } else {
-        this._setupPlayerBroadcast();
-      }
-      
-      // Iniciar detección de cambio de rol
-      this._startRoleChangeDetection();
-      
-      // Renderizar UI inicial
-      await this.render();
-      
-      this.isInitialized = true;
-      log('✅ ExtensionController inicializado correctamente');
-    });
+    // OBR ya está listo (main.js espera a onReady antes de llamar init)
+    console.log('✅ Configurando extensión...');
+    
+    // Obtener información del jugador y room
+    await this._fetchPlayerInfo();
+    
+    // Obtener configuración
+    await this._loadConfig();
+    
+    // Configurar UI
+    this._setupUI(options);
+    
+    // Configurar event handlers
+    this._setupEventHandlers();
+    
+    // Configurar broadcast (si es GM)
+    if (this.isGM) {
+      this._setupGMBroadcast();
+      this._startHeartbeat();
+    } else {
+      this._setupPlayerBroadcast();
+    }
+    
+    // Iniciar detección de cambio de rol
+    this._startRoleChangeDetection();
+    
+    // Renderizar UI inicial
+    await this.render();
+    
+    this.isInitialized = true;
+    log('✅ ExtensionController inicializado correctamente');
   }
 
   /**
@@ -374,9 +378,28 @@ export class ExtensionController {
    */
   async _fetchPlayerInfo() {
     try {
-      this.roomId = await this.OBR.room.getId();
-      this.playerId = await this.OBR.player.getId();
-      this.playerName = await this.OBR.player.getName();
+      // Verificar que OBR está disponible
+      if (!this.OBR || !this.OBR.room || !this.OBR.player) {
+        throw new Error('OBR SDK no disponible');
+      }
+
+      // Intentar obtener roomId (puede ser propiedad o método)
+      if (this.OBR.room.id) {
+        this.roomId = this.OBR.room.id;
+      } else if (typeof this.OBR.room.getId === 'function') {
+        this.roomId = await this.OBR.room.getId();
+      } else {
+        this.roomId = 'default';
+      }
+
+      // Obtener info del jugador
+      if (typeof this.OBR.player.getId === 'function') {
+        this.playerId = await this.OBR.player.getId();
+      }
+      if (typeof this.OBR.player.getName === 'function') {
+        this.playerName = await this.OBR.player.getName();
+      }
+      
       this.isGM = await getUserRole();
       
       this.storageService.setRoomId(this.roomId);
@@ -389,6 +412,7 @@ export class ExtensionController {
       });
     } catch (e) {
       logError('Error obteniendo info del jugador:', e);
+      this.roomId = 'default';
       this.isGM = true; // Asumir GM por defecto
     }
   }
