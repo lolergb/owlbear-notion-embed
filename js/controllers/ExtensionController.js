@@ -7,6 +7,9 @@
 import { log, logError, setOBRReference, setGetTokenFunction, initDebugMode, getUserRole } from '../utils/logger.js';
 import { filterVisiblePages } from '../utils/helpers.js';
 
+// Models
+import { Page } from '../models/Page.js';
+
 // Services
 import { CacheService } from '../services/CacheService.js';
 import { StorageService } from '../services/StorageService.js';
@@ -147,38 +150,57 @@ export class ExtensionController {
    * Abre una página de contenido
    * @param {Object} page - Página a abrir
    */
-  async openPage(page) {
+  async openPage(pageData) {
     if (!this.contentContainer) return;
+
+    // Convertir objeto plano a instancia Page si es necesario
+    const page = pageData instanceof Page ? pageData : Page.fromJSON(pageData);
 
     log('📖 Abriendo página:', page.name);
 
+    // Mostrar el contenedor de Notion y ocultar la lista
+    const notionContainer = document.getElementById('notion-container');
+    const pageList = document.getElementById('page-list');
+    const backButton = document.getElementById('back-button');
+    const pageTitle = document.getElementById('page-title');
+    
+    if (notionContainer) notionContainer.classList.remove('hidden');
+    if (pageList) pageList.classList.add('hidden');
+    if (backButton) backButton.classList.remove('hidden');
+    if (pageTitle) pageTitle.textContent = page.name;
+
     // Mostrar loading
-    this.contentContainer.innerHTML = `
-      <div class="loading-container">
-        <div class="loading-spinner"></div>
-        <p>Loading ${page.name}...</p>
-      </div>
-    `;
+    const notionContent = document.getElementById('notion-content');
+    if (notionContent) {
+      notionContent.innerHTML = `
+        <div class="loading-container">
+          <div class="loading-spinner"></div>
+          <p>Loading ${page.name}...</p>
+        </div>
+      `;
+    }
 
     try {
-      const pageId = page.getNotionPageId ? page.getNotionPageId() : null;
+      const pageId = page.getNotionPageId();
       
-      if (page.isNotionPage && page.isNotionPage() && pageId) {
+      if (page.isNotionPage() && pageId) {
         await this._renderNotionPage(page, pageId);
-      } else if (page.isImage && page.isImage()) {
+      } else if (page.isImage()) {
         this._renderImagePage(page);
-      } else if (page.isGoogleDoc && page.isGoogleDoc()) {
+      } else if (page.isGoogleDoc()) {
         this._renderGoogleDocPage(page);
       } else {
         this._renderExternalPage(page);
       }
     } catch (e) {
       logError('Error al abrir página:', e);
-      this.contentContainer.innerHTML = `
-        <div class="error-container">
-          <p class="error-message">Error loading page: ${e.message}</p>
-        </div>
-      `;
+      if (notionContent) {
+        notionContent.innerHTML = `
+          <div class="error-container">
+            <p class="error-message">Error loading page: ${e.message}</p>
+          </div>
+        `;
+      }
     }
   }
 
@@ -214,6 +236,44 @@ export class ExtensionController {
    */
   getConfig() {
     return this.config;
+  }
+
+  /**
+   * Actualiza la visibilidad de una página
+   * @param {Object} page - Página a actualizar
+   * @param {Array} categoryPath - Ruta de categorías
+   * @param {number} pageIndex - Índice de la página
+   * @param {boolean} newVisibility - Nueva visibilidad
+   * @private
+   */
+  async _updatePageVisibility(page, categoryPath, pageIndex, newVisibility) {
+    if (!this.config || !this.isGM) return;
+
+    log('👁️ Actualizando visibilidad de página:', page.name, '->', newVisibility);
+
+    // Navegar a la categoría correcta y actualizar la página
+    let currentLevel = this.config;
+    for (const catName of categoryPath) {
+      const cat = (currentLevel.categories || []).find(c => c.name === catName);
+      if (cat) {
+        currentLevel = cat;
+      } else {
+        logError('No se encontró la categoría:', catName);
+        return;
+      }
+    }
+
+    // Encontrar y actualizar la página
+    const pages = currentLevel.pages || [];
+    const pageToUpdate = pages.find(p => p.name === page.name);
+    if (pageToUpdate) {
+      pageToUpdate.visibleToPlayers = newVisibility;
+      
+      // Guardar y re-renderizar
+      await this.saveConfig(this.config);
+    } else {
+      logError('No se encontró la página:', page.name);
+    }
   }
 
   /**
@@ -288,7 +348,8 @@ export class ExtensionController {
 
     // UI Renderer
     this.uiRenderer.setDependencies({
-      storageService: this.storageService
+      storageService: this.storageService,
+      notionService: this.notionService
     });
   }
 
@@ -302,7 +363,7 @@ export class ExtensionController {
       ? (typeof options.pagesContainer === 'string' 
         ? document.querySelector(options.pagesContainer) 
         : options.pagesContainer)
-      : document.getElementById('pages-list');
+      : document.getElementById('page-list');
     
     this.contentContainer = options.contentContainer
       ? (typeof options.contentContainer === 'string'
@@ -312,6 +373,62 @@ export class ExtensionController {
 
     // Modal Manager
     this.modalManager.init(document.body);
+
+    // Configurar botón back
+    this._setupBackButton();
+  }
+
+  /**
+   * Configura el botón de volver
+   * @private
+   */
+  _setupBackButton() {
+    const backButton = document.getElementById('back-button');
+    if (!backButton || backButton.dataset.listenerAdded) return;
+
+    backButton.addEventListener('click', () => {
+      this._goBackToList();
+    });
+    backButton.dataset.listenerAdded = 'true';
+  }
+
+  /**
+   * Vuelve a la lista de páginas
+   * @private
+   */
+  _goBackToList() {
+    const settingsContainer = document.getElementById('settings-container');
+    const notionContainer = document.getElementById('notion-container');
+    const pageList = document.getElementById('page-list');
+    const pageTitle = document.getElementById('page-title');
+    const backButton = document.getElementById('back-button');
+    const notionContent = document.getElementById('notion-content');
+    const notionIframe = document.getElementById('notion-iframe');
+
+    const isSettingsVisible = settingsContainer && !settingsContainer.classList.contains('hidden');
+    const isNotionContainerVisible = notionContainer && !notionContainer.classList.contains('hidden');
+
+    if (isSettingsVisible) {
+      // Cerrar settings
+      settingsContainer.classList.add('hidden');
+    } else if (isNotionContainerVisible) {
+      // Volver a la lista desde notion-container
+      notionContainer.classList.add('hidden');
+      if (notionContent) {
+        notionContent.innerHTML = '';
+        notionContent.style.display = '';
+      }
+      // Limpiar iframe
+      if (notionIframe) {
+        notionIframe.src = 'about:blank';
+        notionIframe.style.display = '';
+      }
+    }
+
+    // Restaurar vista principal
+    if (pageList) pageList.classList.remove('hidden');
+    if (backButton) backButton.classList.add('hidden');
+    if (pageTitle) pageTitle.textContent = 'GM vault';
   }
 
   /**
@@ -534,21 +651,22 @@ export class ExtensionController {
    * @private
    */
   async _renderNotionPage(page, pageId) {
+    const notionContent = document.getElementById('notion-content');
+    if (!notionContent) return;
+
     const blocks = await this.notionService.fetchBlocks(pageId);
     const html = await this.notionRenderer.renderBlocks(blocks, page.blockTypes);
     
-    this.contentContainer.innerHTML = `
-      <div class="notion-content">
-        <h1 class="page-title">${page.name}</h1>
-        ${html}
-      </div>
+    notionContent.innerHTML = `
+      <h1 class="page-title">${page.name}</h1>
+      ${html}
     `;
 
     // Guardar HTML en caché
     this.cacheService.saveHtmlToLocalCache(pageId, html);
 
     // Attach event handlers para imágenes
-    this._attachImageHandlers();
+    this._attachImageHandlers(notionContent);
   }
 
   /**
@@ -556,14 +674,17 @@ export class ExtensionController {
    * @private
    */
   _renderImagePage(page) {
-    this.contentContainer.innerHTML = `
-      <div class="image-page">
-        <h1 class="page-title">${page.name}</h1>
-        <div class="image-container">
-          <img src="${page.url}" alt="${page.name}" />
-        </div>
+    const notionContent = document.getElementById('notion-content');
+    if (!notionContent) return;
+
+    notionContent.innerHTML = `
+      <h1 class="page-title">${page.name}</h1>
+      <div class="image-container">
+        <img src="${page.url}" alt="${page.name}" class="notion-image-clickable" data-image-url="${page.url}" />
       </div>
     `;
+    
+    this._attachImageHandlers(notionContent);
   }
 
   /**
@@ -571,6 +692,9 @@ export class ExtensionController {
    * @private
    */
   _renderGoogleDocPage(page) {
+    const notionContent = document.getElementById('notion-content');
+    if (!notionContent) return;
+
     // Convertir URL de Google Docs a embed
     let embedUrl = page.url;
     if (embedUrl.includes('/edit')) {
@@ -579,32 +703,37 @@ export class ExtensionController {
       embedUrl = embedUrl + '/preview';
     }
 
-    this.contentContainer.innerHTML = `
-      <div class="google-doc-page">
-        <iframe src="${embedUrl}" frameborder="0"></iframe>
-      </div>
+    notionContent.innerHTML = `
+      <iframe src="${embedUrl}" frameborder="0" style="width: 100%; height: 100%; min-height: 500px;"></iframe>
     `;
   }
 
   /**
-   * Renderiza una página externa
+   * Renderiza una página externa (iframe)
    * @private
    */
   _renderExternalPage(page) {
-    this.contentContainer.innerHTML = `
-      <div class="external-page">
-        <h1 class="page-title">${page.name}</h1>
-        <iframe src="${page.url}" frameborder="0"></iframe>
-      </div>
-    `;
+    const notionContainer = document.getElementById('notion-container');
+    const notionIframe = document.getElementById('notion-iframe');
+    const notionContent = document.getElementById('notion-content');
+    
+    if (notionIframe && notionContent) {
+      // Usar iframe para páginas externas
+      notionIframe.src = page.url;
+      notionIframe.style.display = 'block';
+      notionContent.style.display = 'none';
+    }
   }
 
   /**
    * Attach event handlers para imágenes
    * @private
    */
-  _attachImageHandlers() {
-    const images = this.contentContainer.querySelectorAll('.notion-image-clickable');
+  _attachImageHandlers(container = null) {
+    const targetContainer = container || document.getElementById('notion-content');
+    if (!targetContainer) return;
+
+    const images = targetContainer.querySelectorAll('.notion-image-clickable');
     
     images.forEach(img => {
       img.addEventListener('click', () => {
@@ -614,7 +743,7 @@ export class ExtensionController {
       });
     });
 
-    const shareButtons = this.contentContainer.querySelectorAll('.notion-image-share-button');
+    const shareButtons = targetContainer.querySelectorAll('.notion-image-share-button');
     
     shareButtons.forEach(btn => {
       btn.addEventListener('click', (e) => {

@@ -2,9 +2,10 @@
  * @fileoverview Renderizador de UI para categorías y páginas
  * 
  * Genera el HTML para la navegación de categorías y páginas.
+ * Compatible con el CSS existente (app.css)
  */
 
-import { generateColorFromString, getInitial } from '../utils/helpers.js';
+import { generateColorFromString, getInitial, extractNotionPageId } from '../utils/helpers.js';
 import { log } from '../utils/logger.js';
 
 /**
@@ -14,211 +15,60 @@ export class UIRenderer {
   constructor() {
     // Referencia al StorageService
     this.storageService = null;
+    // Referencia al NotionService
+    this.notionService = null;
     // Callback para cuando se hace clic en una página
     this.onPageClick = null;
     // Callback para cuando se cambia visibilidad
     this.onVisibilityChange = null;
-    // Callback para editar página
-    this.onPageEdit = null;
-    // Callback para eliminar página
-    this.onPageDelete = null;
-    // Callback para añadir página
-    this.onAddPage = null;
+    // Es GM?
+    this.isGM = true;
   }
 
   /**
    * Inyecta dependencias
-   * @param {Object} deps - Dependencias
    */
-  setDependencies({ storageService }) {
+  setDependencies({ storageService, notionService }) {
     if (storageService) this.storageService = storageService;
+    if (notionService) this.notionService = notionService;
   }
 
   /**
    * Establece callbacks de eventos
    */
-  setCallbacks({ onPageClick, onVisibilityChange, onPageEdit, onPageDelete, onAddPage }) {
+  setCallbacks({ onPageClick, onVisibilityChange }) {
     if (onPageClick) this.onPageClick = onPageClick;
     if (onVisibilityChange) this.onVisibilityChange = onVisibilityChange;
-    if (onPageEdit) this.onPageEdit = onPageEdit;
-    if (onPageDelete) this.onPageDelete = onPageDelete;
-    if (onAddPage) this.onAddPage = onAddPage;
   }
 
   /**
    * Verifica si una categoría tiene contenido visible para players
-   * @param {Object} category - Categoría a verificar
-   * @returns {boolean}
    */
   hasVisibleContentForPlayers(category) {
-    // Verificar páginas visibles en esta categoría
     if (category.pages && category.pages.some(p => p.visibleToPlayers === true)) {
       return true;
     }
-    
-    // Verificar subcategorías recursivamente
     if (category.categories) {
       return category.categories.some(subcat => this.hasVisibleContentForPlayers(subcat));
     }
-    
     return false;
   }
 
   /**
-   * Renderiza una categoría completa
-   * @param {Object} category - Categoría a renderizar
-   * @param {HTMLElement} parentElement - Elemento padre
-   * @param {number} level - Nivel de anidamiento
-   * @param {string} roomId - ID del room
-   * @param {Array} categoryPath - Ruta de la categoría
-   * @param {boolean} isGM - Si el usuario es GM
-   */
-  renderCategory(category, parentElement, level = 0, roomId = null, categoryPath = [], isGM = true) {
-    // Si es jugador, verificar contenido visible
-    if (!isGM && !this.hasVisibleContentForPlayers(category)) {
-      return;
-    }
-
-    const hasPages = category.pages && category.pages.length > 0;
-    const hasSubcategories = category.categories && category.categories.length > 0;
-
-    // Filtrar páginas válidas
-    let categoryPages = hasPages ? category.pages.filter(page => 
-      page.url && 
-      !page.url.includes('...') && 
-      (page.url.startsWith('http') || page.url.startsWith('/'))
-    ) : [];
-
-    // Si es jugador, filtrar solo páginas visibles
-    if (!isGM) {
-      categoryPages = categoryPages.filter(page => page.visibleToPlayers === true);
-    }
-
-    if (!category.name) return;
-
-    // Crear contenedor de categoría
-    const categoryDiv = document.createElement('div');
-    categoryDiv.className = 'category-group';
-    categoryDiv.dataset.categoryName = category.name;
-    categoryDiv.dataset.level = Math.min(level, 5);
-    categoryDiv.dataset.categoryPath = JSON.stringify(categoryPath);
-
-    // Crear título con botón de colapsar
-    const titleContainer = this._createCategoryTitle(category, level, categoryPath, isGM);
-    categoryDiv.appendChild(titleContainer);
-
-    // Crear contenido de la categoría
-    const contentDiv = document.createElement('div');
-    contentDiv.className = 'category-content';
-
-    // Verificar estado colapsado
-    const collapseStateKey = `category-collapsed-${category.name}-level-${level}`;
-    const isCollapsed = localStorage.getItem(collapseStateKey) === 'true';
-    if (isCollapsed) {
-      contentDiv.classList.add('collapsed');
-      categoryDiv.classList.add('collapsed');
-    }
-
-    // Renderizar páginas
-    if (categoryPages.length > 0) {
-      const pagesContainer = document.createElement('div');
-      pagesContainer.className = 'pages-container';
-
-      categoryPages.forEach((page, pageIndex) => {
-        const pageElement = this.renderPage(page, roomId, [...categoryPath, category.name], pageIndex, isGM);
-        if (pageElement) {
-          pagesContainer.appendChild(pageElement);
-        }
-      });
-
-      contentDiv.appendChild(pagesContainer);
-    }
-
-    // Botón de añadir página (solo para GM)
-    if (isGM) {
-      const addButton = this._createAddButton([...categoryPath, category.name]);
-      contentDiv.appendChild(addButton);
-    }
-
-    // Renderizar subcategorías
-    if (hasSubcategories) {
-      category.categories.forEach(subcat => {
-        this.renderCategory(subcat, contentDiv, level + 1, roomId, [...categoryPath, category.name], isGM);
-      });
-    }
-
-    categoryDiv.appendChild(contentDiv);
-    parentElement.appendChild(categoryDiv);
-  }
-
-  /**
-   * Renderiza una página individual
-   * @param {Object} page - Página a renderizar
-   * @param {string} roomId - ID del room
-   * @param {Array} categoryPath - Ruta de la categoría
-   * @param {number} pageIndex - Índice de la página
-   * @param {boolean} isGM - Si el usuario es GM
-   * @returns {HTMLElement}
-   */
-  renderPage(page, roomId, categoryPath, pageIndex, isGM = true) {
-    const pageItem = document.createElement('div');
-    pageItem.className = 'page-item';
-    pageItem.dataset.categoryPath = JSON.stringify(categoryPath);
-    pageItem.dataset.pageIndex = pageIndex;
-    pageItem.dataset.pageName = page.name;
-    pageItem.dataset.pageUrl = page.url;
-
-    // Icono de página
-    const pageIcon = this._createPageIcon(page);
-    pageItem.appendChild(pageIcon);
-
-    // Nombre de página
-    const pageName = document.createElement('span');
-    pageName.className = 'page-name';
-    pageName.textContent = page.name;
-    pageItem.appendChild(pageName);
-
-    // Indicador de tipo de bloque (si aplica)
-    if (page.blockTypes && page.blockTypes.length > 0) {
-      const blockTypeIndicator = document.createElement('span');
-      blockTypeIndicator.className = 'block-type-indicator';
-      blockTypeIndicator.textContent = `(${page.blockTypes.join(', ')})`;
-      blockTypeIndicator.title = 'Filtered blocks: ' + page.blockTypes.join(', ');
-      pageItem.appendChild(blockTypeIndicator);
-    }
-
-    // Controles de página (solo GM)
-    if (isGM) {
-      const controls = this._createPageControls(page, categoryPath, pageIndex);
-      pageItem.appendChild(controls);
-    }
-
-    // Click para abrir página
-    pageItem.addEventListener('click', (e) => {
-      // Ignorar clicks en controles
-      if (e.target.closest('.page-controls') || e.target.closest('.icon-button')) {
-        return;
-      }
-      if (this.onPageClick) {
-        this.onPageClick(page, categoryPath, pageIndex);
-      }
-    });
-
-    return pageItem;
-  }
-
-  /**
    * Renderiza todas las categorías desde config
-   * @param {Object} config - Configuración del vault
-   * @param {HTMLElement} container - Contenedor
-   * @param {string} roomId - ID del room
-   * @param {boolean} isGM - Si el usuario es GM
    */
   renderAllCategories(config, container, roomId, isGM = true) {
+    this.isGM = isGM;
     container.innerHTML = '';
 
     if (!config || !config.categories || config.categories.length === 0) {
-      container.innerHTML = '<p class="empty-message">No pages configured. Click + to add your first page.</p>';
+      container.innerHTML = `
+        <div class="empty-state">
+          <div class="empty-state-icon">📚</div>
+          <p class="empty-state-text">No pages configured</p>
+          <p class="empty-state-hint">Click + to add your first page</p>
+        </div>
+      `;
       return;
     }
 
@@ -227,18 +77,41 @@ export class UIRenderer {
     });
   }
 
-  // ============================================
-  // MÉTODOS PRIVADOS
-  // ============================================
-
   /**
-   * Crea el título de una categoría con controles
-   * @private
+   * Renderiza una categoría completa
    */
-  _createCategoryTitle(category, level, categoryPath, isGM) {
+  renderCategory(category, parentElement, level = 0, roomId = null, categoryPath = [], isGM = true) {
+    // Si es jugador, verificar contenido visible
+    if (!isGM && !this.hasVisibleContentForPlayers(category)) {
+      return;
+    }
+
+    if (!category.name) return;
+
+    // Filtrar páginas válidas
+    let categoryPages = (category.pages || []).filter(page => 
+      page.url && 
+      !page.url.includes('...') && 
+      (page.url.startsWith('http') || page.url.startsWith('/'))
+    );
+
+    // Si es jugador, filtrar solo páginas visibles
+    if (!isGM) {
+      categoryPages = categoryPages.filter(page => page.visibleToPlayers === true);
+    }
+
+    const hasPages = categoryPages.length > 0;
+    const hasSubcategories = category.categories && category.categories.length > 0;
+    const hasContent = hasPages || hasSubcategories;
+
+    // Crear contenedor de categoría (usa clases del CSS original)
+    const categoryDiv = document.createElement('div');
+    categoryDiv.className = 'category-group';
+    categoryDiv.dataset.level = level;
+
+    // === TÍTULO CON BOTÓN DE COLAPSAR ===
     const titleContainer = document.createElement('div');
     titleContainer.className = 'category-title-container';
-    titleContainer.dataset.categoryPath = JSON.stringify(categoryPath);
 
     // Botón de colapsar
     const collapseButton = document.createElement('button');
@@ -252,20 +125,6 @@ export class UIRenderer {
     collapseIcon.src = isCollapsed ? 'img/folder-close.svg' : 'img/folder-open.svg';
     collapseIcon.alt = isCollapsed ? 'Expand' : 'Collapse';
     collapseButton.appendChild(collapseIcon);
-
-    // Click para colapsar
-    collapseButton.addEventListener('click', () => {
-      const categoryDiv = titleContainer.parentElement;
-      const contentDiv = categoryDiv.querySelector('.category-content');
-      const newCollapsed = !categoryDiv.classList.contains('collapsed');
-      
-      categoryDiv.classList.toggle('collapsed', newCollapsed);
-      contentDiv.classList.toggle('collapsed', newCollapsed);
-      collapseIcon.src = newCollapsed ? 'img/folder-close.svg' : 'img/folder-open.svg';
-      
-      localStorage.setItem(collapseStateKey, newCollapsed);
-    });
-
     titleContainer.appendChild(collapseButton);
 
     // Título
@@ -275,151 +134,161 @@ export class UIRenderer {
     categoryTitle.textContent = category.name;
     titleContainer.appendChild(categoryTitle);
 
-    // Botón de visibilidad (solo GM)
-    if (isGM) {
-      const isCategoryVisible = this.hasVisibleContentForPlayers(category);
-      const visibilityButton = document.createElement('button');
-      visibilityButton.className = 'category-visibility-button icon-button';
+    categoryDiv.appendChild(titleContainer);
+
+    // === CONTENIDO ===
+    const contentContainer = document.createElement('div');
+    contentContainer.className = 'category-content';
+    contentContainer.style.display = isCollapsed ? 'none' : 'block';
+
+    // Renderizar páginas
+    categoryPages.forEach((page, pageIndex) => {
+      const pageButton = this._createPageButton(page, roomId, [...categoryPath, category.name], pageIndex, isGM);
+      contentContainer.appendChild(pageButton);
+    });
+
+    // Renderizar subcategorías
+    if (hasSubcategories) {
+      category.categories.forEach(subcat => {
+        this.renderCategory(subcat, contentContainer, level + 1, roomId, [...categoryPath, category.name], isGM);
+      });
+    }
+
+    categoryDiv.appendChild(contentContainer);
+
+    // === EVENT LISTENERS ===
+    // Click para colapsar/expandir
+    titleContainer.addEventListener('click', (e) => {
+      if (e.target.closest('button')) return;
       
-      const visibilityIcon = document.createElement('img');
-      visibilityIcon.src = isCategoryVisible ? 'img/icon-eye-open.svg' : 'img/icon-eye-close.svg';
-      visibilityIcon.className = 'icon-button-icon';
-      visibilityButton.appendChild(visibilityIcon);
-      visibilityButton.title = isCategoryVisible ? 'Has visible pages' : 'No visible pages';
-      visibilityButton.style.opacity = isCategoryVisible ? '1' : '0';
+      const newIsCollapsed = contentContainer.style.display !== 'none';
+      contentContainer.style.display = newIsCollapsed ? 'none' : 'block';
+      collapseIcon.src = newIsCollapsed ? 'img/folder-close.svg' : 'img/folder-open.svg';
+      localStorage.setItem(collapseStateKey, newIsCollapsed);
+    });
 
-      titleContainer.appendChild(visibilityButton);
+    parentElement.appendChild(categoryDiv);
+  }
+
+  /**
+   * Crea un botón de página (compatible con CSS original)
+   * @private
+   */
+  _createPageButton(page, roomId, categoryPath, pageIndex, isGM) {
+    const button = document.createElement('button');
+    button.className = 'page-button';
+    button.dataset.pageIndex = pageIndex;
+    button.dataset.pageName = page.name;
+    button.dataset.pageUrl = page.url;
+
+    // Generar color e inicial del placeholder
+    const placeholderColor = generateColorFromString(page.name);
+    const placeholderInitial = getInitial(page.name);
+
+    // Determinar icono de tipo de link
+    let linkIconHtml = '';
+    if (page.url.includes('notion.so') || page.url.includes('notion.site')) {
+      linkIconHtml = '<img src="img/icon-notion.svg" alt="Notion" class="page-link-icon">';
+    } else if (page.url.includes('dndbeyond.com')) {
+      linkIconHtml = '<img src="img/icon-dnd.svg" alt="D&D Beyond" class="page-link-icon">';
+    } else if (page.url.includes('youtube.com') || page.url.includes('youtu.be')) {
+      linkIconHtml = '<img src="img/icon-youtube.svg" alt="YouTube" class="page-link-icon">';
+    } else if (page.url.includes('drive.google.com') || page.url.includes('docs.google.com')) {
+      linkIconHtml = '<img src="img/icon-gdocs.svg" alt="Google Docs" class="page-link-icon">';
     }
 
-    return titleContainer;
-  }
+    // Indicador de visible para players
+    const visibleIndicator = page.visibleToPlayers ? ' <span style="opacity:0.6">(Player)</span>' : '';
 
-  /**
-   * Crea el icono de una página
-   * @private
-   */
-  _createPageIcon(page) {
-    const pageIcon = document.createElement('span');
-    pageIcon.className = 'page-icon';
+    // HTML del botón
+    button.innerHTML = `
+      <div class="page-button-inner">
+        <div class="page-icon-placeholder" style="background: ${placeholderColor};">${placeholderInitial}</div>
+        <div class="page-name-text">${page.name}${visibleIndicator}</div>
+        ${linkIconHtml}
+      </div>
+    `;
 
-    if (page.icon) {
-      if (page.icon.type === 'emoji') {
-        pageIcon.textContent = page.icon.emoji || '📄';
-      } else if (page.icon.type === 'external' && page.icon.external?.url) {
-        const iconImg = document.createElement('img');
-        iconImg.src = page.icon.external.url;
-        iconImg.className = 'page-icon-image';
-        iconImg.onerror = () => { pageIcon.textContent = '📄'; iconImg.remove(); };
-        pageIcon.appendChild(iconImg);
-      }
-    } else {
-      // Icono generado por color
-      const color = generateColorFromString(page.name);
-      const initial = getInitial(page.name);
-      pageIcon.style.backgroundColor = color;
-      pageIcon.style.color = 'white';
-      pageIcon.textContent = initial;
-      pageIcon.className = 'page-icon page-icon-generated';
+    // Botones de acción (solo GM)
+    if (isGM) {
+      // Botón de visibilidad
+      const visibilityButton = document.createElement('button');
+      visibilityButton.className = 'page-visibility-button';
+      visibilityButton.innerHTML = `<img src="img/${page.visibleToPlayers ? 'icon-eye-open' : 'icon-eye-close'}.svg" alt="Visibility">`;
+      visibilityButton.title = page.visibleToPlayers ? 'Visible to players' : 'Hidden from players';
+      visibilityButton.style.cssText = 'position: absolute; right: 8px; top: 50%; transform: translateY(-50%); opacity: 0; transition: opacity 0.2s;';
+      
+      visibilityButton.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (this.onVisibilityChange) {
+          this.onVisibilityChange(page, categoryPath, pageIndex, !page.visibleToPlayers);
+        }
+      });
+
+      button.style.position = 'relative';
+      button.appendChild(visibilityButton);
+
+      // Mostrar botón en hover
+      button.addEventListener('mouseenter', () => {
+        visibilityButton.style.opacity = '1';
+      });
+      button.addEventListener('mouseleave', () => {
+        visibilityButton.style.opacity = '0';
+      });
     }
 
-    return pageIcon;
+    // Click para abrir página
+    button.addEventListener('click', (e) => {
+      if (e.target.closest('.page-visibility-button')) return;
+      
+      if (this.onPageClick) {
+        this.onPageClick(page, categoryPath, pageIndex);
+      }
+    });
+
+    // Intentar cargar icono real de Notion
+    const pageId = extractNotionPageId(page.url);
+    if (pageId && this.notionService) {
+      this._loadPageIcon(button, pageId, page.name, linkIconHtml);
+    }
+
+    return button;
   }
 
   /**
-   * Crea los controles de una página
+   * Carga el icono real de una página de Notion
    * @private
    */
-  _createPageControls(page, categoryPath, pageIndex) {
-    const controls = document.createElement('div');
-    controls.className = 'page-controls';
+  async _loadPageIcon(button, pageId, pageName, linkIconHtml) {
+    try {
+      const pageInfo = await this.notionService.fetchPageInfo(pageId);
+      if (pageInfo && pageInfo.icon) {
+        let iconHtml = '';
+        if (pageInfo.icon.type === 'emoji') {
+          iconHtml = `<span class="page-icon-emoji">${pageInfo.icon.emoji || '📄'}</span>`;
+        } else if (pageInfo.icon.type === 'external' && pageInfo.icon.external?.url) {
+          iconHtml = `<img src="${pageInfo.icon.external.url}" alt="${pageName}" class="page-icon-image" />`;
+        } else if (pageInfo.icon.type === 'file' && pageInfo.icon.file?.url) {
+          iconHtml = `<img src="${pageInfo.icon.file.url}" alt="${pageName}" class="page-icon-image" />`;
+        }
 
-    // Botón de visibilidad
-    const visibilityButton = document.createElement('button');
-    visibilityButton.className = 'icon-button visibility-button';
-    visibilityButton.title = page.visibleToPlayers ? 'Visible to players (click to hide)' : 'Hidden from players (click to show)';
-    
-    const visibilityIcon = document.createElement('img');
-    visibilityIcon.src = page.visibleToPlayers ? 'img/icon-eye-open.svg' : 'img/icon-eye-close.svg';
-    visibilityIcon.className = 'icon-button-icon';
-    visibilityButton.appendChild(visibilityIcon);
-
-    visibilityButton.addEventListener('click', (e) => {
-      e.stopPropagation();
-      if (this.onVisibilityChange) {
-        this.onVisibilityChange(page, categoryPath, pageIndex, !page.visibleToPlayers);
+        if (iconHtml) {
+          const inner = button.querySelector('.page-button-inner');
+          if (inner) {
+            inner.innerHTML = `
+              <div style="display: flex; align-items: center; gap: var(--spacing-md); width: 100%;">
+                ${iconHtml}
+                <div class="page-name" style="flex: 1; text-align: left;">${pageName}</div>
+                ${linkIconHtml}
+              </div>
+            `;
+          }
+        }
       }
-    });
-
-    controls.appendChild(visibilityButton);
-
-    // Botón de editar
-    const editButton = document.createElement('button');
-    editButton.className = 'icon-button edit-button';
-    editButton.title = 'Edit page';
-    
-    const editIcon = document.createElement('img');
-    editIcon.src = 'img/icon-edit.svg';
-    editIcon.className = 'icon-button-icon';
-    editButton.appendChild(editIcon);
-
-    editButton.addEventListener('click', (e) => {
-      e.stopPropagation();
-      if (this.onPageEdit) {
-        this.onPageEdit(page, categoryPath, pageIndex);
-      }
-    });
-
-    controls.appendChild(editButton);
-
-    // Botón de eliminar
-    const deleteButton = document.createElement('button');
-    deleteButton.className = 'icon-button delete-button';
-    deleteButton.title = 'Delete page';
-    
-    const deleteIcon = document.createElement('img');
-    deleteIcon.src = 'img/icon-delete.svg';
-    deleteIcon.className = 'icon-button-icon';
-    deleteButton.appendChild(deleteIcon);
-
-    deleteButton.addEventListener('click', (e) => {
-      e.stopPropagation();
-      if (this.onPageDelete) {
-        this.onPageDelete(page, categoryPath, pageIndex);
-      }
-    });
-
-    controls.appendChild(deleteButton);
-
-    return controls;
-  }
-
-  /**
-   * Crea el botón de añadir página
-   * @private
-   */
-  _createAddButton(categoryPath) {
-    const addButton = document.createElement('button');
-    addButton.className = 'add-page-button';
-    addButton.title = 'Add page to this category';
-    
-    const addIcon = document.createElement('img');
-    addIcon.src = 'img/icon-plus.svg';
-    addIcon.className = 'add-page-icon';
-    addButton.appendChild(addIcon);
-
-    const addText = document.createElement('span');
-    addText.textContent = 'Add page';
-    addButton.appendChild(addText);
-
-    addButton.addEventListener('click', () => {
-      if (this.onAddPage) {
-        this.onAddPage(categoryPath);
-      }
-    });
-
-    return addButton;
+    } catch (e) {
+      // Ignorar errores de carga de icono
+    }
   }
 }
 
 export default UIRenderer;
-
