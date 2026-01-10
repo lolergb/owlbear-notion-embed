@@ -1810,15 +1810,10 @@ export class ExtensionController {
     const exportVaultForm = allForms[1]; // Segunda sección: Export vault
     const feedbackForm = allForms[2]; // Tercera sección: Feedback
 
-    if (!this.isGM) {
-      // Player: solo mostrar feedback
+    if (!this.isGM || this.isCoGM) {
+      // Player o Co-GM: solo mostrar feedback/patreon (última sección)
       if (notionTokenForm) notionTokenForm.style.display = 'none';
       if (exportVaultForm) exportVaultForm.style.display = 'none';
-      if (feedbackForm) feedbackForm.style.display = '';
-    } else if (this.isCoGM) {
-      // Co-GM: ocultar Notion Token, mostrar Export vault y Feedback
-      if (notionTokenForm) notionTokenForm.style.display = 'none';
-      if (exportVaultForm) exportVaultForm.style.display = '';
       if (feedbackForm) feedbackForm.style.display = '';
     } else {
       // Master GM: mostrar todas las secciones
@@ -1827,7 +1822,7 @@ export class ExtensionController {
       });
     }
 
-    // Renderizar vault status box
+    // Renderizar vault status box (solo para Master GM)
     this._renderVaultStatusBox();
 
     // Configurar event listeners de settings (solo una vez)
@@ -1838,7 +1833,7 @@ export class ExtensionController {
    * Renderiza el vault status box en settings
    * @private
    */
-  async _renderVaultStatusBox() {
+  _renderVaultStatusBox() {
     // Eliminar vault status anterior si existe
     const existing = document.getElementById('vault-status-box');
     if (existing) existing.remove();
@@ -1869,37 +1864,20 @@ export class ExtensionController {
     const vaultStatusBox = document.createElement('div');
     vaultStatusBox.id = 'vault-status-box';
 
-    if (this.isCoGM) {
-      // Co-GM: modo solo lectura
-      const owner = await this.storageService.getVaultOwner();
-      const masterGMName = owner?.name || 'Master GM';
-      vaultStatusBox.innerHTML = `
-        <div class="vault-status vault-status--cogm">
-          <div class="vault-status__icon">👁️</div>
-          <div class="vault-status__info">
-            <span class="vault-status__title">Read-only mode</span>
-            <span class="vault-status__detail">Viewing ${masterGMName}'s vault</span>
-            <span class="vault-status__detail">${pageCount} pages in ${categoryCount} folders</span>
-          </div>
+    const syncMessage = canSync 
+      ? `<span class="vault-status__sync vault-status__sync--ok">✅ Can sync to Co-GM</span>`
+      : `<span class="vault-status__sync vault-status__sync--warn">⚠️ Too large to sync (>16KB)</span>`;
+
+    vaultStatusBox.innerHTML = `
+      <div class="vault-status vault-status--master">
+        <div class="vault-status__icon">👑</div>
+        <div class="vault-status__info">
+          <span class="vault-status__title">Master GM</span>
+          <span class="vault-status__detail">${(configSize / 1024).toFixed(1)} KB • ${pageCount} pages • ${categoryCount} folders</span>
+          ${syncMessage}
         </div>
-      `;
-    } else {
-      // Master GM: mostrar info completa con recomendación de backup
-      const syncMessage = canSync 
-        ? `<span class="vault-status__sync vault-status__sync--ok">✅ Can sync to Co-GM</span>`
-        : `<span class="vault-status__sync vault-status__sync--warn">⚠️ Too large to sync (>16KB)</span>`;
-      
-      vaultStatusBox.innerHTML = `
-        <div class="vault-status vault-status--master">
-          <div class="vault-status__icon">👑</div>
-          <div class="vault-status__info">
-            <span class="vault-status__title">Master GM</span>
-            <span class="vault-status__detail">${(configSize / 1024).toFixed(1)} KB • ${pageCount} pages • ${categoryCount} folders</span>
-            ${syncMessage}
-          </div>
-        </div>
-      `;
-    }
+      </div>
+    `;
 
     // Insertar vault status antes de la descripción
     const exportDescription = exportVaultForm.querySelector('.settings__description');
@@ -1935,11 +1913,6 @@ export class ExtensionController {
     // Mostrar versión enmascarada
     if (tokenMasked && currentToken) {
       tokenMasked.textContent = `Current: ${currentToken.substring(0, 8)}...${currentToken.slice(-4)}`;
-    }
-
-    // Ocultar botón "Load vault" para Co-GM (solo lectura)
-    if (loadJsonBtn && this.isCoGM) {
-      loadJsonBtn.style.display = 'none';
     }
 
     // Guardar token
@@ -2462,6 +2435,7 @@ export class ExtensionController {
       logError('Error obteniendo info del jugador:', e);
       this.roomId = 'default';
       this.isGM = true; // Asumir GM por defecto
+      this.isCoGM = false; // No es coGM por defecto
     }
   }
 
@@ -2491,6 +2465,8 @@ export class ExtensionController {
       
       if (this.isCoGM) {
         log('👁️ [Co-GM] Modo solo lectura - Master GM:', owner.name);
+      } else {
+        log('👑 [Master GM] Soy el vault owner o no hay owner activo');
       }
     } catch (e) {
       logError('Error detectando Co-GM:', e);
