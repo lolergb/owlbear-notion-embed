@@ -903,17 +903,9 @@ export class UIRenderer {
   _showEditPageModal(page, categoryPath, pageIndex) {
     if (this.onShowModal) {
       this.onShowModal('edit-page', {
-        title: 'Edit Page',
-        fields: [
-          { name: 'name', label: 'Name', type: 'text', value: page.name, required: true },
-          { name: 'url', label: 'URL', type: 'url', value: page.url, required: true },
-          { name: 'visibleToPlayers', label: 'Visible to players', type: 'checkbox', value: page.visibleToPlayers }
-        ],
-        onSubmit: (data) => {
-          if (this.onPageEdit) {
-            this.onPageEdit(page, categoryPath, pageIndex, data);
-          }
-        }
+        page,
+        categoryPath,
+        pageIndex
       });
     }
   }

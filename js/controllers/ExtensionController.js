@@ -720,27 +720,144 @@ export class ExtensionController {
   }
 
   /**
+   * Obtiene las opciones de carpetas para el selector
+   * @param {string[]} excludePath - Path a excluir (para evitar mover a sí mismo o subcarpetas)
+   * @returns {Array<{value: string, label: string}>}
+   * @private
+   */
+  _getFolderOptions(excludePath = []) {
+    const options = [{ value: '', label: '/ (Root)' }];
+    const excludePathStr = excludePath.join('/');
+
+    const addFolders = (categories, path = []) => {
+      if (!categories) return;
+      
+      for (const cat of categories) {
+        const currentPath = [...path, cat.name];
+        const currentPathStr = currentPath.join('/');
+        
+        // Excluir la carpeta actual y sus subcarpetas
+        if (excludePathStr && (currentPathStr === excludePathStr || currentPathStr.startsWith(excludePathStr + '/'))) {
+          continue;
+        }
+        
+        const indent = '  '.repeat(path.length);
+        options.push({
+          value: currentPath.join('/'),
+          label: `${indent}📁 ${cat.name}`
+        });
+        
+        // Recursivamente agregar subcarpetas
+        if (cat.categories && cat.categories.length > 0) {
+          addFolders(cat.categories, currentPath);
+        }
+      }
+    };
+
+    if (this.config && this.config.categories) {
+      addFolders(this.config.categories);
+    }
+
+    return options;
+  }
+
+  /**
+   * Mueve un elemento (página o categoría) a una nueva carpeta
+   * @param {Object} item - El elemento a mover
+   * @param {string[]} fromPath - Path actual del elemento
+   * @param {string} toPathStr - Nuevo path como string (e.g., "Folder1/Subfolder")
+   * @param {string} type - 'page' o 'category'
+   * @private
+   */
+  async _moveItemToFolder(item, fromPath, toPathStr, type) {
+    const toPath = toPathStr ? toPathStr.split('/') : [];
+    
+    // Obtener el nivel de origen (padre actual)
+    let fromLevel = this.config;
+    for (let i = 0; i < fromPath.length - (type === 'category' ? 1 : 0); i++) {
+      const catName = fromPath[i];
+      const cat = (fromLevel.categories || []).find(c => c.name === catName);
+      if (cat) fromLevel = cat;
+      else return false;
+    }
+
+    // Obtener el nivel de destino
+    let toLevel = this.config;
+    for (const catName of toPath) {
+      const cat = (toLevel.categories || []).find(c => c.name === catName);
+      if (cat) toLevel = cat;
+      else return false;
+    }
+
+    // Remover del origen
+    if (type === 'page') {
+      const pages = fromLevel.pages || [];
+      const pageIndex = pages.findIndex(p => p.name === item.name && p.url === item.url);
+      if (pageIndex === -1) return false;
+      pages.splice(pageIndex, 1);
+    } else {
+      const categories = fromLevel.categories || [];
+      const catIndex = categories.findIndex(c => c.name === item.name);
+      if (catIndex === -1) return false;
+      categories.splice(catIndex, 1);
+    }
+
+    // Agregar al destino
+    if (type === 'page') {
+      if (!toLevel.pages) toLevel.pages = [];
+      toLevel.pages.push(item);
+    } else {
+      if (!toLevel.categories) toLevel.categories = [];
+      toLevel.categories.push(item);
+    }
+
+    await this.saveConfig(this.config);
+    return true;
+  }
+
+  /**
    * Maneja editar una categoría
    * @private
    */
   _handleCategoryEdit(category, categoryPath) {
-    this._showModalForm('Edit Folder', [
-      { name: 'name', label: 'Name', type: 'text', value: category.name, required: true }
-    ], async (data) => {
-      if (!data.name || data.name === category.name) return;
-      
-      let currentLevel = this.config;
-      for (let i = 0; i < categoryPath.length - 1; i++) {
-        const catName = categoryPath[i];
-        const cat = (currentLevel.categories || []).find(c => c.name === catName);
-        if (cat) currentLevel = cat;
-        else return;
-      }
+    // Calcular el path actual de la carpeta (sin incluirse a sí misma)
+    const currentFolderPath = categoryPath.slice(0, -1);
+    const currentFolderPathStr = currentFolderPath.join('/');
+    
+    // Obtener opciones de carpetas, excluyendo esta carpeta y sus subcarpetas
+    const folderOptions = this._getFolderOptions(categoryPath);
 
-      const catIndex = (currentLevel.categories || []).findIndex(c => c.name === category.name);
-      if (catIndex !== -1) {
-        currentLevel.categories[catIndex].name = data.name;
-        await this.saveConfig(this.config);
+    this._showModalForm('Edit Folder', [
+      { name: 'name', label: 'Name', type: 'text', value: category.name, required: true },
+      { name: 'folder', label: 'Parent Folder', type: 'select', value: currentFolderPathStr, options: folderOptions }
+    ], async (data) => {
+      const nameChanged = data.name && data.name !== category.name;
+      const folderChanged = data.folder !== currentFolderPathStr;
+      
+      if (!nameChanged && !folderChanged) return;
+      
+      // Primero mover si cambió la carpeta
+      if (folderChanged) {
+        // Actualizar nombre antes de mover si cambió
+        if (nameChanged) {
+          category.name = data.name;
+        }
+        await this._moveItemToFolder(category, categoryPath, data.folder, 'category');
+      } else if (nameChanged) {
+        // Solo cambió el nombre
+        let currentLevel = this.config;
+        for (let i = 0; i < categoryPath.length - 1; i++) {
+          const catName = categoryPath[i];
+          const cat = (currentLevel.categories || []).find(c => c.name === catName);
+          if (cat) currentLevel = cat;
+          else return;
+        }
+
+        const catIndex = (currentLevel.categories || []).findIndex(c => c.name === category.name);
+        if (catIndex !== -1) {
+          currentLevel.categories[catIndex].name = data.name;
+          await this.saveConfig(this.config);
+        }
       }
     });
   }
@@ -1634,9 +1751,14 @@ export class ExtensionController {
       ? (Array.isArray(page.blockTypes) ? page.blockTypes.join(',') : page.blockTypes) 
       : '';
 
+    // Obtener opciones de carpetas
+    const folderOptions = this._getFolderOptions();
+    const currentFolderPathStr = this.currentCategoryPath.join('/');
+
     this._showModalForm('Edit Page', [
       { name: 'name', label: 'Name', type: 'text', value: page.name, required: true },
       { name: 'url', label: 'URL', type: 'url', value: page.url, required: true },
+      { name: 'folder', label: 'Folder', type: 'select', value: currentFolderPathStr, options: folderOptions },
       { name: 'blockTypes', label: 'Block filter (comma-separated)', type: 'text', value: currentBlockTypes, placeholder: 'e.g., paragraph,heading_1,image' },
       { name: 'visibleToPlayers', label: 'Visible to players', type: 'checkbox', value: page.visibleToPlayers }
     ], async (data) => {
@@ -1645,11 +1767,75 @@ export class ExtensionController {
         data.blockTypes = data.blockTypes.split(',').map(s => s.trim()).filter(s => s);
         if (data.blockTypes.length === 0) data.blockTypes = null;
       }
-      await this._handlePageEdit(page, this.currentCategoryPath, this.currentPageIndex, data);
-      // Actualizar título si cambió
-      const pageTitle = document.getElementById('page-title');
-      if (pageTitle && data.name) {
-        pageTitle.textContent = data.name;
+      
+      // Verificar si cambió la carpeta
+      const folderChanged = data.folder !== currentFolderPathStr;
+      
+      if (folderChanged) {
+        // Actualizar datos de la página antes de mover
+        if (data.name !== undefined) page.name = data.name;
+        if (data.url !== undefined) page.url = data.url;
+        if (data.blockTypes !== undefined) page.blockTypes = data.blockTypes;
+        if (data.visibleToPlayers !== undefined) page.visibleToPlayers = data.visibleToPlayers;
+        
+        // Mover a la nueva carpeta
+        await this._moveItemToFolder(page, this.currentCategoryPath, data.folder, 'page');
+        
+        // Volver a la lista ya que la página se movió
+        this._handleBack();
+      } else {
+        // Solo editar sin mover
+        await this._handlePageEdit(page, this.currentCategoryPath, this.currentPageIndex, data);
+        // Actualizar título si cambió
+        const pageTitle = document.getElementById('page-title');
+        if (pageTitle && data.name) {
+          pageTitle.textContent = data.name;
+        }
+      }
+    });
+  }
+
+  /**
+   * Muestra modal para editar página desde la lista (con selector de carpeta)
+   * @private
+   */
+  _showEditPageModalFromList(page, categoryPath, pageIndex) {
+    // Obtener opciones de carpetas
+    const folderOptions = this._getFolderOptions();
+    const currentFolderPathStr = categoryPath.join('/');
+
+    const currentBlockTypes = page.blockTypes 
+      ? (Array.isArray(page.blockTypes) ? page.blockTypes.join(',') : page.blockTypes) 
+      : '';
+
+    this._showModalForm('Edit Page', [
+      { name: 'name', label: 'Name', type: 'text', value: page.name, required: true },
+      { name: 'url', label: 'URL', type: 'url', value: page.url, required: true },
+      { name: 'folder', label: 'Folder', type: 'select', value: currentFolderPathStr, options: folderOptions },
+      { name: 'blockTypes', label: 'Block filter (comma-separated)', type: 'text', value: currentBlockTypes, placeholder: 'e.g., paragraph,heading_1,image' },
+      { name: 'visibleToPlayers', label: 'Visible to players', type: 'checkbox', value: page.visibleToPlayers }
+    ], async (data) => {
+      // Convertir blockTypes de string a array
+      if (data.blockTypes && typeof data.blockTypes === 'string') {
+        data.blockTypes = data.blockTypes.split(',').map(s => s.trim()).filter(s => s);
+        if (data.blockTypes.length === 0) data.blockTypes = null;
+      }
+      
+      // Verificar si cambió la carpeta
+      const folderChanged = data.folder !== currentFolderPathStr;
+      
+      if (folderChanged) {
+        // Actualizar datos de la página antes de mover
+        if (data.name !== undefined) page.name = data.name;
+        if (data.url !== undefined) page.url = data.url;
+        if (data.blockTypes !== undefined) page.blockTypes = data.blockTypes;
+        if (data.visibleToPlayers !== undefined) page.visibleToPlayers = data.visibleToPlayers;
+        
+        // Mover a la nueva carpeta
+        await this._moveItemToFolder(page, categoryPath, data.folder, 'page');
+      } else {
+        // Solo editar sin mover
+        await this._handlePageEdit(page, categoryPath, pageIndex, data);
       }
     });
   }
@@ -1812,13 +1998,17 @@ export class ExtensionController {
     const exportVaultForm = allForms[1]; // Segunda sección: Export vault
     const feedbackForm = allForms[2]; // Tercera sección: Feedback
 
+    log('⚙️ Settings - isGM:', this.isGM, '| isCoGM:', this.isCoGM);
+
     if (!this.isGM || this.isCoGM) {
       // Player o Co-GM: solo mostrar feedback/patreon (última sección)
+      log('⚙️ Mostrando settings para Player/Co-GM (solo feedback)');
       if (notionTokenForm) notionTokenForm.style.display = 'none';
       if (exportVaultForm) exportVaultForm.style.display = 'none';
       if (feedbackForm) feedbackForm.style.display = '';
     } else {
       // Master GM: mostrar todas las secciones
+      log('⚙️ Mostrando settings para Master GM (todas las secciones)');
       allForms.forEach(form => {
         form.style.display = '';
       });
@@ -2378,7 +2568,12 @@ export class ExtensionController {
         this._handleAddCategory(categoryPath, roomId);
       },
       onShowModal: (type, options) => {
-        this._showModalForm(options.title, options.fields, options.onSubmit);
+        if (type === 'edit-page' && options.page && options.categoryPath !== undefined) {
+          // Usar el modal de edición completo con selector de carpeta
+          this._showEditPageModalFromList(options.page, options.categoryPath, options.pageIndex);
+        } else {
+          this._showModalForm(options.title, options.fields, options.onSubmit);
+        }
       }
     });
   }
