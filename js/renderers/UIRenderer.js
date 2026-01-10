@@ -266,6 +266,10 @@ export class UIRenderer {
 
     // Botones de acción (solo GM)
     if (isGM) {
+      // Contenedor de botones de acción
+      const actionsContainer = document.createElement('div');
+      actionsContainer.className = 'page-button-actions';
+
       // Botón de compartir con players
       const shareButton = document.createElement('button');
       shareButton.className = 'page-share-button';
@@ -303,18 +307,16 @@ export class UIRenderer {
         this._showPageContextMenu(contextMenuButton, page, categoryPath, pageIndex);
       });
 
-      button.appendChild(shareButton);
-      button.appendChild(visibilityButton);
-      button.appendChild(contextMenuButton);
-      // Los estilos de hover se manejan con CSS (.page-button:hover .page-*-button)
+      actionsContainer.appendChild(shareButton);
+      actionsContainer.appendChild(visibilityButton);
+      actionsContainer.appendChild(contextMenuButton);
+      button.appendChild(actionsContainer);
     }
 
     // Click para abrir página
     button.addEventListener('click', (e) => {
       // Ignorar clicks en los botones de acción
-      if (e.target.closest('.page-share-button') || 
-          e.target.closest('.page-visibility-button') ||
-          e.target.closest('.page-context-menu-button')) return;
+      if (e.target.closest('.page-button-actions')) return;
       
       if (this.onPageClick) {
         this.onPageClick(page, categoryPath, pageIndex);

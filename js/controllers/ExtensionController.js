@@ -165,7 +165,7 @@ export class ExtensionController {
     if (pageTitle) pageTitle.textContent = name;
     
     // Crear un objeto Page temporal
-    const page = new Page({ name, url });
+    const page = new Page(name, url);
     
     // Mostrar loading
     this._setNotionDisplayMode('content');
@@ -1213,11 +1213,14 @@ export class ExtensionController {
 
   /**
    * Comparte la página actual con los jugadores según su tipo
-   * @param {Page} page - La página a compartir
+   * @param {Page|Object} page - La página a compartir
    * @private
    */
-  async _shareCurrentPageToPlayers(page) {
-    if (!page) return;
+  async _shareCurrentPageToPlayers(pageData) {
+    if (!pageData) return;
+
+    // Asegurar que tenemos una instancia de Page con los métodos necesarios
+    const page = pageData instanceof Page ? pageData : new Page(pageData.name, pageData.url, pageData);
 
     if (page.isVideo()) {
       // Para videos, construir la URL de embed
@@ -1966,12 +1969,41 @@ export class ExtensionController {
    * @private
    */
   async _addCategory() {
-    const name = prompt('Category name:');
-    if (!name) return;
-
-    if (!this.config.categories) this.config.categories = [];
-    this.config.categories.push({ name, pages: [], categories: [] });
-    await this.saveConfig(this.config);
+    // Obtener lista de carpetas para selector de padre
+    const folderOptions = this._getCategoryOptions();
+    
+    this._showModalForm('Add Folder', [
+      { name: 'name', label: 'Folder name', type: 'text', required: true, placeholder: 'Enter folder name' },
+      { 
+        name: 'parentFolder', 
+        label: 'Parent folder', 
+        type: 'select', 
+        options: [{ value: '', label: '— Root level —' }, ...folderOptions],
+        required: false 
+      }
+    ], async (data) => {
+      if (!data.name) return;
+      
+      const newCategory = { name: data.name, pages: [], categories: [] };
+      
+      if (!this.config.categories) this.config.categories = [];
+      
+      if (data.parentFolder) {
+        // Añadir dentro de una carpeta padre
+        const parent = this._findCategoryByPath(data.parentFolder.split('/'));
+        if (parent) {
+          if (!parent.categories) parent.categories = [];
+          parent.categories.push(newCategory);
+        } else {
+          this.config.categories.push(newCategory);
+        }
+      } else {
+        // Añadir a nivel raíz
+        this.config.categories.push(newCategory);
+      }
+      
+      await this.saveConfig(this.config);
+    });
   }
 
   /**
@@ -1979,30 +2011,93 @@ export class ExtensionController {
    * @private
    */
   async _addPage() {
-    // Mostrar modal para añadir página
-    this.modalManager.showPrompt({
-      title: 'Add Page',
-      fields: [
-        { name: 'name', label: 'Page name', type: 'text', required: true },
-        { name: 'url', label: 'URL', type: 'text', required: true }
-      ],
-      onConfirm: async (values) => {
-        if (!values.name || !values.url) return;
+    // Obtener lista de carpetas para selector
+    const folderOptions = this._getCategoryOptions();
+    
+    if (folderOptions.length === 0) {
+      // No hay carpetas, crear una por defecto primero
+      this._showModalForm('Add Page', [
+        { name: 'name', label: 'Page name', type: 'text', required: true, placeholder: 'Enter page name' },
+        { name: 'url', label: 'URL', type: 'text', required: true, placeholder: 'https://...' }
+      ], async (data) => {
+        if (!data.name || !data.url) return;
         
-        // Añadir a la primera categoría o crear una
         if (!this.config.categories || this.config.categories.length === 0) {
           this.config.categories = [{ name: 'Pages', pages: [], categories: [] }];
         }
         
         this.config.categories[0].pages.push({
-          name: values.name,
-          url: values.url,
+          name: data.name,
+          url: data.url,
           visibleToPlayers: false
         });
         
         await this.saveConfig(this.config);
+      });
+      return;
+    }
+    
+    this._showModalForm('Add Page', [
+      { name: 'name', label: 'Page name', type: 'text', required: true, placeholder: 'Enter page name' },
+      { name: 'url', label: 'URL', type: 'text', required: true, placeholder: 'https://...' },
+      { 
+        name: 'parentFolder', 
+        label: 'Folder', 
+        type: 'select', 
+        options: folderOptions,
+        required: true 
+      }
+    ], async (data) => {
+      if (!data.name || !data.url || !data.parentFolder) return;
+      
+      const parent = this._findCategoryByPath(data.parentFolder.split('/'));
+      if (parent) {
+        if (!parent.pages) parent.pages = [];
+        parent.pages.push({
+          name: data.name,
+          url: data.url,
+          visibleToPlayers: false
+        });
+        await this.saveConfig(this.config);
       }
     });
+  }
+
+  /**
+   * Obtiene opciones de carpetas para selectores
+   * @private
+   */
+  _getCategoryOptions(categories = null, path = '') {
+    const options = [];
+    const cats = categories || (this.config?.categories || []);
+    
+    for (const cat of cats) {
+      const fullPath = path ? `${path}/${cat.name}` : cat.name;
+      options.push({ value: fullPath, label: path ? `${path} / ${cat.name}` : cat.name });
+      
+      if (cat.categories && cat.categories.length > 0) {
+        options.push(...this._getCategoryOptions(cat.categories, fullPath));
+      }
+    }
+    
+    return options;
+  }
+
+  /**
+   * Encuentra una categoría por su path
+   * @private
+   */
+  _findCategoryByPath(pathParts) {
+    let current = { categories: this.config.categories };
+    
+    for (const part of pathParts) {
+      if (!current.categories) return null;
+      const found = current.categories.find(c => c.name === part);
+      if (!found) return null;
+      current = found;
+    }
+    
+    return current;
   }
 
   /**
@@ -2236,6 +2331,24 @@ export class ExtensionController {
       if (url) {
         log('📄 Google Doc recibido del GM:', url.substring(0, 50));
         await this._showGoogleDocModal(url, name);
+      }
+    });
+
+    // Listener para recibir páginas de Notion compartidas por el GM
+    this.OBR.broadcast.onMessage('com.dmscreen/showNotionPage', async (event) => {
+      const { url, name, pageId } = event.data;
+      if (url) {
+        log('📝 Página Notion recibida del GM:', url.substring(0, 50));
+        await this._showNotionPageModal(url, name, pageId);
+      }
+    });
+
+    // Listener para recibir contenido genérico compartido por el GM
+    this.OBR.broadcast.onMessage('com.dmscreen/showContent', async (event) => {
+      const { url, name } = event.data;
+      if (url) {
+        log('🔗 Contenido recibido del GM:', url.substring(0, 50));
+        await this._showContentModal(url, name);
       }
     });
   }
@@ -2935,6 +3048,81 @@ export class ExtensionController {
     } catch (error) {
       logError('Error al abrir modal de Google Doc:', error);
       window.open(docUrl, '_blank', 'noopener,noreferrer');
+    }
+  }
+
+  /**
+   * Muestra un modal con página de Notion usando OBR.modal
+   * @param {string} url - URL de la página
+   * @param {string} name - Nombre de la página
+   * @param {string} pageId - ID de la página de Notion
+   * @private
+   */
+  async _showNotionPageModal(url, name, pageId) {
+    if (!this.OBR || !this.OBR.modal) {
+      logError('OBR.modal no disponible');
+      window.open(url, '_blank', 'noopener,noreferrer');
+      return;
+    }
+
+    try {
+      const currentPath = window.location.pathname;
+      const baseDir = currentPath.substring(0, currentPath.lastIndexOf('/') + 1);
+      const baseUrl = window.location.origin + baseDir;
+      
+      const viewerUrl = new URL('index.html', baseUrl);
+      viewerUrl.searchParams.set('modal', 'true');
+      viewerUrl.searchParams.set('url', encodeURIComponent(url));
+      if (name) {
+        viewerUrl.searchParams.set('name', encodeURIComponent(name));
+      }
+      
+      await this.OBR.modal.open({
+        id: 'gm-vault-notion-viewer',
+        url: viewerUrl.toString(),
+        height: 800,
+        width: 1200
+      });
+    } catch (error) {
+      logError('Error al abrir modal de Notion:', error);
+      window.open(url, '_blank', 'noopener,noreferrer');
+    }
+  }
+
+  /**
+   * Muestra un modal con contenido genérico usando OBR.modal
+   * @param {string} url - URL del contenido
+   * @param {string} name - Nombre del contenido
+   * @private
+   */
+  async _showContentModal(url, name) {
+    if (!this.OBR || !this.OBR.modal) {
+      logError('OBR.modal no disponible');
+      window.open(url, '_blank', 'noopener,noreferrer');
+      return;
+    }
+
+    try {
+      const currentPath = window.location.pathname;
+      const baseDir = currentPath.substring(0, currentPath.lastIndexOf('/') + 1);
+      const baseUrl = window.location.origin + baseDir;
+      
+      const viewerUrl = new URL('index.html', baseUrl);
+      viewerUrl.searchParams.set('modal', 'true');
+      viewerUrl.searchParams.set('url', encodeURIComponent(url));
+      if (name) {
+        viewerUrl.searchParams.set('name', encodeURIComponent(name));
+      }
+      
+      await this.OBR.modal.open({
+        id: 'gm-vault-content-viewer',
+        url: viewerUrl.toString(),
+        height: 800,
+        width: 1200
+      });
+    } catch (error) {
+      logError('Error al abrir modal de contenido:', error);
+      window.open(url, '_blank', 'noopener,noreferrer');
     }
   }
 

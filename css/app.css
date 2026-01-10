@@ -637,92 +637,81 @@
   .category-title {font-family: var(--font-family-base);font-size: var(--font-size-base);line-height: 24px;font-weight: var(--font-weight-bold);color: var(--color-text-primary);letter-spacing: 0.5px;margin: 0;flex: 1;}
   .category-content { display: block; margin-left: 32px; }
   .category-pages { display: block; margin-left: 32px; }
-  .category-context-menu-button,
+  /* Contenedor de botones de acción en page-button */
+  .page-button-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    margin-left: auto;
+    opacity: 0;
+    transition: opacity var(--transition-fast);
+  }
+  
+  .page-button:hover .page-button-actions {
+    opacity: 1;
+  }
+  
+  .page-button.context-menu-open .page-button-actions {
+    opacity: 1;
+  }
+  
+  /* Estilos base para botones de acción */
+  .page-share-button,
+  .page-visibility-button,
   .page-context-menu-button {
+    width: var(--icon-size-lg);
+    height: var(--icon-size-lg);
+    background: transparent;
+    border: none;
+    border-radius: var(--radius-full);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background var(--transition-fast);
+    flex-shrink: 0;
+  }
+  
+  .page-share-button:hover,
+  .page-visibility-button:hover,
+  .page-context-menu-button:hover {
+    background: var(--color-bg-hover);
+  }
+  
+  .page-share-button img,
+  .page-visibility-button img,
+  .page-context-menu-button img {
+    width: var(--icon-size-sm);
+    height: var(--icon-size-sm);
+  }
+  
+  /* Botones de categoría (mantienen position absolute) */
+  .category-context-menu-button,
+  .category-visibility-button {
     position: absolute;
     right: var(--spacing-sm);
     top: 50%;
     transform: translateY(-50%);
     opacity: 0;
     transition: opacity var(--transition-fast);
-    width: 32px;
-    height: 32px;
-    margin-left: auto;
+    width: var(--icon-size-lg);
+    height: var(--icon-size-lg);
     background: transparent;
     border: none;
+    border-radius: var(--radius-full);
     cursor: pointer;
-    padding: var(--spacing-xs);
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
   
-  .page-context-menu-button { z-index: 10; }
-  
-  .page-context-menu-button img {
-    width: var(--icon-size-md);
-    height: var(--icon-size-md);
+  .category-context-menu-button:hover,
+  .category-visibility-button:hover {
+    background: var(--color-bg-hover);
   }
   
-  /* Mostrar botones de acción en hover */
-  .page-button:hover .page-share-button,
-  .page-button:hover .page-visibility-button,
-  .page-button:hover .page-context-menu-button {
-    opacity: 1;
-  }
-  
-  /* Botones de compartir para páginas */
-  .page-share-button {
-    position: absolute;
-    right: calc(var(--spacing-sm) * 7); /* A la izquierda del botón de visibilidad */
-    top: 50%;
-    transform: translateY(-50%);
-    opacity: 0;
-    transition: opacity var(--transition-fast);
-    width: 32px;
-    height: 32px;
-    background: transparent;
-    border: none;
-    cursor: pointer;
-    padding: var(--spacing-xs);
-    z-index: 10;
-  }
-  
-  .page-share-button img {
-    width: var(--icon-size-md);
-    height: var(--icon-size-md);
-  }
-  
-  /* Botones de visibilidad para páginas y carpetas */
-  .category-visibility-button,
-  .page-visibility-button {
-    position: absolute;
-    right: calc(var(--spacing-sm) * 4); /* A la izquierda del botón de menú contextual */
-    top: 50%;
-    transform: translateY(-50%);
-    opacity: 0;
-    transition: opacity var(--transition-fast);
-    width: 32px;
-    height: 32px;
-    background: transparent;
-    border: none;
-    cursor: pointer;
-    padding: var(--spacing-xs);
-  }
-  
-  .page-visibility-button { 
-    z-index: 10;
-  }
-  
-  .page-visibility-button img {
-    width: var(--icon-size-md);
-    height: var(--icon-size-md);
-  }
-  
-  /* Mantener visible los botones cuando el menú contextual está activo */
   .category-context-menu-button.context-menu-active,
-  .page-context-menu-button.context-menu-active,
-  .category-title-container.context-menu-open .category-context-menu-button,
-  .page-button.context-menu-open .page-share-button,
-  .page-button.context-menu-open .page-visibility-button,
-  .page-button.context-menu-open .page-context-menu-button {
+  .category-title-container.context-menu-open .category-context-menu-button {
     opacity: 1;
   }
   
@@ -1302,7 +1291,7 @@
     font-size: var(--font-size-base);
     width: 100%;
     margin-bottom: var(--spacing-sm);
-    position: relative;
+    gap: var(--spacing-sm);
   }
   
   .page-button:hover {
