@@ -9,7 +9,9 @@ import {
   GLOBAL_TOKEN_KEY, 
   ROOM_METADATA_KEY,
   FULL_CONFIG_KEY,
-  VAULT_OWNER_KEY 
+  VAULT_OWNER_KEY,
+  ROOM_CONTENT_CACHE_KEY,
+  ROOM_HTML_CACHE_KEY
 } from '../utils/constants.js';
 import { log, logError, getUserRole } from '../utils/logger.js';
 import { compressJson, validateTotalMetadataSize, filterVisiblePages } from '../utils/helpers.js';
@@ -173,6 +175,8 @@ export class StorageService {
 
   /**
    * Obtiene la configuración desde room metadata
+   * Según la arquitectura: room metadata solo contiene estructura visible para players.
+   * El GM debe usar localStorage para la configuración completa.
    * @returns {Promise<Object|null>}
    */
   async getRoomConfig() {
@@ -181,15 +185,10 @@ export class StorageService {
     try {
       const metadata = await this.OBR.room.getMetadata();
       
-      // Primero intentar obtener config completa (para GMs)
-      const isGM = await getUserRole();
-      if (isGM && metadata[FULL_CONFIG_KEY]) {
-        log('📦 Config completa obtenida de room metadata');
-        return metadata[FULL_CONFIG_KEY];
-      }
-      
-      // Fallback: config visible para players
+      // Solo obtener config visible (estructura para players)
+      // El GM NO debe leer de room metadata, debe usar localStorage
       if (metadata[ROOM_METADATA_KEY]) {
+        log('📦 Config visible obtenida de room metadata');
         return metadata[ROOM_METADATA_KEY];
       }
     } catch (e) {
@@ -200,6 +199,8 @@ export class StorageService {
 
   /**
    * Guarda la configuración en room metadata
+   * Según la arquitectura: solo se guarda la estructura visible para players.
+   * El contenido completo se guarda en localStorage del GM y se comparte via broadcast.
    * @param {Object} config - Configuración completa
    * @returns {Promise<boolean>}
    */
@@ -215,7 +216,7 @@ export class StorageService {
 
       const metadata = await this.OBR.room.getMetadata() || {};
       
-      // Crear versión filtrada para players
+      // Crear versión filtrada para players (solo estructura, sin contenido)
       const visibleConfig = filterVisiblePages(config);
       
       // Validar tamaño de config visible
@@ -226,25 +227,56 @@ export class StorageService {
         return false;
       }
 
-      // Guardar config visible
+      // Guardar SOLO config visible (estructura de páginas para players)
+      // NO guardamos FULL_CONFIG_KEY ni ROOM_CONTENT_CACHE_KEY
+      // El contenido completo está en localStorage del GM y se comparte via broadcast
       await this.OBR.room.setMetadata({
         [ROOM_METADATA_KEY]: compressJson(visibleConfig)
       });
 
-      // Intentar guardar config completa (puede fallar por tamaño)
-      const fullValidation = validateTotalMetadataSize(FULL_CONFIG_KEY, config, metadata);
-      if (fullValidation.fits) {
+      // Limpiar FULL_CONFIG_KEY si existe (no debería estar según arquitectura)
+      if (metadata[FULL_CONFIG_KEY]) {
         await this.OBR.room.setMetadata({
-          [FULL_CONFIG_KEY]: compressJson(config)
+          [FULL_CONFIG_KEY]: null
         });
-        log('💾 Config completa guardada en room metadata');
-      } else {
-        log('ℹ️ Config completa no cabe en metadata, solo se guarda config visible');
+        log('🧹 Limpiado FULL_CONFIG_KEY del room metadata (debe estar solo en localStorage)');
       }
 
+      log('💾 Configuración visible guardada en room metadata para players');
       return true;
     } catch (e) {
       logError('Error al guardar en room metadata:', e);
+      return false;
+    }
+  }
+
+  /**
+   * Limpia todo el room metadata relacionado con el vault
+   * @returns {Promise<boolean>}
+   */
+  async clearRoomMetadata() {
+    if (!this.OBR) return false;
+
+    try {
+      const isGM = await getUserRole();
+      if (!isGM) {
+        log('⚠️ Solo el GM puede limpiar room metadata');
+        return false;
+      }
+
+      log('🧹 Limpiando room metadata...');
+      
+      await this.OBR.room.setMetadata({
+        [ROOM_METADATA_KEY]: null,
+        [FULL_CONFIG_KEY]: null,
+        [ROOM_CONTENT_CACHE_KEY]: null,
+        [ROOM_HTML_CACHE_KEY]: null
+      });
+
+      log('✅ Room metadata limpiado correctamente');
+      return true;
+    } catch (e) {
+      logError('Error al limpiar room metadata:', e);
       return false;
     }
   }

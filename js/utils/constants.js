@@ -37,6 +37,8 @@ export const BROADCAST_CHANNEL_RESPONSE = 'com.dmscreen/responseContent';
 export const BROADCAST_CHANNEL_VISIBLE_PAGES = 'com.dmscreen/visiblePages';
 export const BROADCAST_CHANNEL_REQUEST_VISIBLE_PAGES = 'com.dmscreen/requestVisiblePages';
 export const BROADCAST_CHANNEL_SHOW_IMAGE = 'com.dmscreen/showImage';
+export const BROADCAST_CHANNEL_REQUEST_FULL_VAULT = 'com.dmscreen/requestFullVault';
+export const BROADCAST_CHANNEL_RESPONSE_FULL_VAULT = 'com.dmscreen/responseFullVault';
 
 // ============================================
 // TIMEOUTS Y LÍMITES

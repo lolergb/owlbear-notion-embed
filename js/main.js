@@ -63,6 +63,12 @@ window.addEventListener('beforeunload', () => {
 window.gmVault = {
   getController: () => extensionController,
   getConfig: () => extensionController?.getConfig(),
+  clearRoomMetadata: async () => {
+    if (extensionController) {
+      return await extensionController.clearRoomMetadata();
+    }
+    return false;
+  },
   version: '2.0.0-modular'
 };
 

@@ -6,6 +6,7 @@
 
 import { log, logError, setOBRReference, setGetTokenFunction, initDebugMode, getUserRole, isDebugMode } from '../utils/logger.js';
 import { filterVisiblePages } from '../utils/helpers.js';
+import { BROADCAST_CHANNEL_REQUEST_FULL_VAULT, BROADCAST_CHANNEL_RESPONSE_FULL_VAULT, OWNER_TIMEOUT } from '../utils/constants.js';
 
 // Models
 import { Page } from '../models/Page.js';
@@ -114,10 +115,14 @@ export class ExtensionController {
     
     // Configurar broadcast (si es GM)
     if (this.isGM) {
+      // Establecer vault owner y iniciar heartbeat
+      await this._establishVaultOwnership();
       this._setupGMBroadcast();
       this._startHeartbeat();
     } else {
       this._setupPlayerBroadcast();
+      // Verificar si el GM está activo
+      this._checkGMAvailability();
     }
     
     // Iniciar detección de cambio de rol
@@ -396,6 +401,34 @@ export class ExtensionController {
    */
   getConfig() {
     return this.config;
+  }
+
+  /**
+   * Limpia todo el room metadata relacionado con el vault
+   * Útil para limpiar datos antiguos o cuando se migra a la nueva arquitectura
+   * @returns {Promise<boolean>}
+   */
+  async clearRoomMetadata() {
+    if (!this.isGM) {
+      log('⚠️ Solo el GM puede limpiar room metadata');
+      return false;
+    }
+    
+    if (confirm('¿Limpiar todo el room metadata del vault? Esto eliminará:\n' +
+                '- Configuración visible para players\n' +
+                '- Configuración completa (si existe)\n' +
+                '- Caché de contenido compartido\n\n' +
+                'Tu configuración local (localStorage) NO se afectará.')) {
+      const result = await this.storageService.clearRoomMetadata();
+      if (result) {
+        alert('✅ Room metadata limpiado correctamente');
+        log('✅ Room metadata limpiado. La configuración sigue en localStorage.');
+      } else {
+        alert('❌ Error al limpiar room metadata');
+      }
+      return result;
+    }
+    return false;
   }
 
   /**
@@ -2323,9 +2356,10 @@ export class ExtensionController {
     let config = null;
     let configSource = 'none';
 
-    // Para el GM: prioridad localStorage > room metadata > default
+    // Para el GM: SOLO localStorage (según arquitectura, todo está en localStorage)
+    // Para Players: room metadata (estructura visible) + broadcast para contenido
     if (this.isGM) {
-      // 1. Intentar cargar de localStorage (configuración del usuario)
+      // 1. Intentar cargar de localStorage (configuración completa del GM)
       const localConfig = this.storageService.getLocalConfig();
       if (localConfig && localConfig.categories && localConfig.categories.length > 0) {
         config = localConfig;
@@ -2333,17 +2367,8 @@ export class ExtensionController {
         log('📦 Config de localStorage:', JSON.stringify(localConfig).substring(0, 200));
       }
       
-      // 2. Si no hay en localStorage, intentar room metadata
-      if (!config) {
-        const roomConfig = await this.storageService.getRoomConfig();
-        if (roomConfig && roomConfig.categories && roomConfig.categories.length > 0) {
-          config = roomConfig;
-          configSource = 'roomMetadata';
-          log('📦 Config de room metadata encontrada');
-        }
-      }
-      
-      // 3. Si no hay ninguna, cargar default desde URL
+      // 2. Si no hay en localStorage, cargar default desde URL
+      // NO usar room metadata para GM (según arquitectura)
       if (!config) {
         try {
           const defaultConfig = await this._fetchDefaultConfig();
@@ -2359,11 +2384,24 @@ export class ExtensionController {
         }
       }
     } else {
-      // Para jugadores: solicitar al GM
-      const visibleConfig = await this.broadcastService.requestVisiblePages();
-      if (visibleConfig && visibleConfig.categories) {
-        config = visibleConfig;
-        configSource = 'broadcast';
+      // Para jugadores: verificar si el GM está activo antes de solicitar
+      const gmAvailable = await this._checkGMAvailability();
+      
+      if (gmAvailable.isActive) {
+        // GM activo: solicitar páginas visibles
+        const visibleConfig = await this.broadcastService.requestVisiblePages();
+        if (visibleConfig && visibleConfig.categories) {
+          config = visibleConfig;
+          configSource = 'broadcast';
+        }
+      } else {
+        // GM inactivo: usar room metadata si existe
+        const roomConfig = await this.storageService.getRoomConfig();
+        if (roomConfig && roomConfig.categories) {
+          config = roomConfig;
+          configSource = 'roomMetadata';
+          log('⚠️ GM inactivo, usando configuración de room metadata');
+        }
       }
     }
 
@@ -2436,6 +2474,23 @@ export class ExtensionController {
       if (!this.config) return null;
       return filterVisiblePages(this.config.toJSON ? this.config.toJSON() : this.config);
     });
+
+    // Responder a solicitudes de vault completo (cuando un player se promociona a GM)
+    this.OBR.broadcast.onMessage(BROADCAST_CHANNEL_REQUEST_FULL_VAULT, async (event) => {
+      const { requesterId, requesterName } = event.data;
+      if (!requesterId || !this.config) return;
+
+      log(`📤 Solicitud de vault completo de ${requesterName} (${requesterId})`);
+      
+      // Enviar configuración completa (solo lectura)
+      const configJson = this.config.toJSON ? this.config.toJSON() : this.config;
+      await this.broadcastService.sendMessage(BROADCAST_CHANNEL_RESPONSE_FULL_VAULT, {
+        requesterId,
+        config: configJson
+      });
+      
+      log('✅ Vault completo enviado');
+    });
   }
 
   /**
@@ -2503,6 +2558,114 @@ export class ExtensionController {
         await this._showContentModal(url, name);
       }
     });
+
+    // Listener para recibir vault completo cuando se promociona a GM
+    this.OBR.broadcast.onMessage(BROADCAST_CHANNEL_RESPONSE_FULL_VAULT, async (event) => {
+      const { requesterId, config } = event.data;
+      // Solo procesar si la solicitud es para este player
+      if (requesterId === this.playerId && config) {
+        log('✅ Vault completo recibido al promocionar a GM');
+        // Guardar en localStorage
+        this.storageService.saveLocalConfig(config);
+        // Recargar configuración
+        await this._loadConfig();
+        await this.render();
+      }
+    });
+  }
+
+  /**
+   * Establece el vault ownership cuando el GM se conecta
+   * @private
+   */
+  async _establishVaultOwnership() {
+    if (!this.isGM || !this.OBR) return;
+
+    try {
+      const owner = await this.storageService.getVaultOwner();
+      const myId = await this.OBR.player.getId();
+      
+      // Si no hay owner o el owner está inactivo, establecer como owner
+      const isOwnerStale = owner && (Date.now() - (owner.lastHeartbeat || 0)) > OWNER_TIMEOUT;
+      
+      if (!owner || isOwnerStale || owner.id === myId) {
+        // Establecer como vault owner
+        await this.storageService.setVaultOwner(this.playerId, this.playerName);
+        log('👑 Establecido como vault owner');
+      } else {
+        log('👁️ Otro GM es el vault owner:', owner.name);
+      }
+    } catch (e) {
+      logError('Error estableciendo vault ownership:', e);
+    }
+  }
+
+  /**
+   * Verifica si el GM está activo (para players)
+   * @returns {Promise<{isActive: boolean, owner: Object|null, minutesInactive: number}>}
+   * @private
+   */
+  async _checkGMAvailability() {
+    if (this.isGM) {
+      return { isActive: true, owner: null, minutesInactive: 0 };
+    }
+
+    try {
+      const owner = await this.storageService.getVaultOwner();
+      
+      if (!owner) {
+        log('⚠️ No hay GM activo en el vault');
+        return { isActive: false, owner: null, minutesInactive: 0 };
+      }
+      
+      const timeSinceLastActivity = Date.now() - (owner.lastHeartbeat || 0);
+      const isActive = timeSinceLastActivity < OWNER_TIMEOUT;
+      const minutesInactive = Math.round(timeSinceLastActivity / 60000);
+      
+      if (!isActive) {
+        log('⚠️ GM inactivo:', minutesInactive, 'minutos sin actividad');
+      }
+      
+      return { isActive, owner, minutesInactive };
+    } catch (e) {
+      logError('Error verificando disponibilidad del GM:', e);
+      return { isActive: false, owner: null, minutesInactive: 0 };
+    }
+  }
+
+  /**
+   * Muestra un mensaje cuando el GM no está activo
+   * @param {string} context - Contexto de la solicitud (ej: "cargar contenido")
+   * @private
+   */
+  async _showGMNotActiveMessage(context = '') {
+    const availability = await this._checkGMAvailability();
+    
+    if (availability.isActive) return true;
+    
+    const notionContent = document.getElementById('notion-content');
+    if (notionContent) {
+      const minutesText = availability.minutesInactive > 0 
+        ? `${availability.minutesInactive} minutos` 
+        : 'un momento';
+      
+      notionContent.innerHTML = `
+        <div class="empty-state">
+          <div class="empty-state-icon">👋</div>
+          <p class="empty-state-text">Your GM is not active right now</p>
+          <p class="empty-state-hint">Wait for them to join the session or send them a greeting!</p>
+          <p class="empty-state-subhint">The content you're trying to view requires your GM to be online.</p>
+          <p class="empty-state-subhint" style="opacity: 0.6; font-size: 0.9em;">
+            GM inactive for ${minutesText}
+          </p>
+          <button class="btn btn--sm btn--secondary" onclick="window.location.reload()">
+            🔄 Retry
+          </button>
+        </div>
+      `;
+    }
+    
+    return false;
   }
 
   /**
@@ -2517,6 +2680,7 @@ export class ExtensionController {
 
   /**
    * Inicia detección de cambio de rol
+   * Cuando un player se promociona a GM, solicita todo el vault del GM anterior
    * @private
    */
   _startRoleChangeDetection() {
@@ -2528,6 +2692,14 @@ export class ExtensionController {
         
         if (lastRole !== currentRole) {
           log(`🔄 Cambio de rol detectado: ${lastRole} → ${currentRole}`);
+          
+          // Si un player se promociona a GM, solicitar todo el vault
+          if (lastRole === 'PLAYER' && currentRole === 'GM') {
+            log('📥 Player promocionado a GM, solicitando vault completo...');
+            await this._requestFullVaultOnPromotion();
+          }
+          
+          // Recargar para aplicar cambios
           window.location.reload();
         }
         
@@ -2536,6 +2708,29 @@ export class ExtensionController {
         // Ignorar errores de conexión
       }
     }, 3000);
+  }
+
+  /**
+   * Solicita el vault completo cuando un player se promociona a GM
+   * El listener para recibir la respuesta ya está configurado en _setupPlayerBroadcast
+   * @private
+   */
+  async _requestFullVaultOnPromotion() {
+    try {
+      // Solicitar vault completo vía broadcast
+      await this.broadcastService.sendMessage(BROADCAST_CHANNEL_REQUEST_FULL_VAULT, {
+        requesterId: this.playerId,
+        requesterName: this.playerName
+      });
+      
+      log('📤 Solicitud de vault completo enviada');
+      
+      // El listener en _setupPlayerBroadcast procesará la respuesta
+      // Esperar un momento antes de recargar para dar tiempo a recibir la respuesta
+      await new Promise(resolve => setTimeout(resolve, 2000));
+    } catch (e) {
+      logError('Error solicitando vault completo:', e);
+    }
   }
 
   // ============================================
