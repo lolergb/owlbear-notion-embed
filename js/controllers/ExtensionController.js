@@ -40,6 +40,7 @@ export class ExtensionController {
     
     // Estado de la aplicación
     this.isGM = true;
+    this.isCoGM = false; // Co-GM (GM promovido, solo lectura)
     this.roomId = null;
     this.playerId = null;
     this.playerName = null;
@@ -116,10 +117,12 @@ export class ExtensionController {
     
     // Configurar broadcast (si es GM)
     if (this.isGM) {
-      // Establecer vault owner y iniciar heartbeat
-      await this._establishVaultOwnership();
+      // Establecer vault owner y iniciar heartbeat (solo si no es coGM)
+      if (!this.isCoGM) {
+        await this._establishVaultOwnership();
+        this._startHeartbeat();
+      }
       this._setupGMBroadcast();
-      this._startHeartbeat();
     } else {
       this._setupPlayerBroadcast();
       // Verificar si el GM está activo
@@ -290,7 +293,7 @@ export class ExtensionController {
       this.config,
       this.pagesContainer,
       this.roomId,
-      this.isGM
+      { isGM: this.isGM, isCoGM: this.isCoGM }
     );
   }
 
@@ -2394,18 +2397,59 @@ export class ExtensionController {
       
       this.isGM = await getUserRole();
       
+      // Detectar si es Co-GM (GM promovido, solo lectura)
+      if (this.isGM) {
+        await this._detectCoGM();
+      } else {
+        this.isCoGM = false;
+      }
+      
       this.storageService.setRoomId(this.roomId);
       
       log('👤 Info del jugador:', {
         roomId: this.roomId,
         playerId: this.playerId,
         playerName: this.playerName,
-        isGM: this.isGM
+        isGM: this.isGM,
+        isCoGM: this.isCoGM
       });
     } catch (e) {
       logError('Error obteniendo info del jugador:', e);
       this.roomId = 'default';
       this.isGM = true; // Asumir GM por defecto
+    }
+  }
+
+  /**
+   * Detecta si el GM actual es Co-GM (solo lectura)
+   * @private
+   */
+  async _detectCoGM() {
+    try {
+      const owner = await this.storageService.getVaultOwner();
+      
+      if (!owner) {
+        // No hay owner, no es coGM
+        this.isCoGM = false;
+        return;
+      }
+      
+      // Verificar si soy el owner
+      const isMe = owner.id === this.playerId;
+      
+      // Verificar si el owner está inactivo (más de 15 minutos sin heartbeat)
+      const timeSinceLastActivity = Date.now() - (owner.lastHeartbeat || 0);
+      const isStale = timeSinceLastActivity > OWNER_TIMEOUT;
+      
+      // Es Co-GM si hay owner, no soy yo, y no está inactivo
+      this.isCoGM = !isMe && !isStale;
+      
+      if (this.isCoGM) {
+        log('👁️ [Co-GM] Modo solo lectura - Master GM:', owner.name);
+      }
+    } catch (e) {
+      logError('Error detectando Co-GM:', e);
+      this.isCoGM = false;
     }
   }
 
