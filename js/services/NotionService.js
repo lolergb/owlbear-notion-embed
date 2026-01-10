@@ -128,7 +128,7 @@ export class NotionService {
         return { lastEditedTime: null, icon: null };
       }
 
-      const apiUrl = `/.netlify/functions/notion-api?pageId=${encodeURIComponent(pageId)}&token=${encodeURIComponent(userToken)}&info=true`;
+      const apiUrl = `/.netlify/functions/notion-api?pageId=${encodeURIComponent(pageId)}&token=${encodeURIComponent(userToken)}&type=page`;
       
       const response = await fetch(apiUrl, {
         method: 'GET',

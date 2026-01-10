@@ -3882,16 +3882,30 @@ export class ExtensionController {
     `;
 
     try {
-      // Resolver URL relativa a absoluta
-      let absoluteUrl = page.url;
-      if (!absoluteUrl.startsWith('http')) {
-        absoluteUrl = new URL(absoluteUrl, window.location.origin).toString();
+      // Extraer solo la ruta del archivo, ignorando cualquier dominio
+      // Esto evita problemas de CORS cuando la URL apunta a otro dominio (ej: producción vs preview)
+      let fetchUrl = page.url;
+      
+      // Si la URL contiene un dominio, extraer solo la ruta relativa
+      if (fetchUrl.startsWith('http')) {
+        try {
+          const urlObj = new URL(fetchUrl);
+          // Usar solo pathname para evitar CORS entre dominios
+          fetchUrl = urlObj.pathname;
+        } catch {
+          // Si falla el parsing, usar la URL original
+        }
       }
       
-      log('📄 Cargando demo HTML desde:', absoluteUrl);
+      // Asegurar que comienza con /
+      if (!fetchUrl.startsWith('/')) {
+        fetchUrl = '/' + fetchUrl;
+      }
       
-      // Fetch del archivo HTML
-      const response = await fetch(absoluteUrl);
+      log('📄 Cargando demo HTML desde:', fetchUrl);
+      
+      // Fetch del archivo HTML (usando ruta relativa al origen actual)
+      const response = await fetch(fetchUrl);
       if (!response.ok) {
         throw new Error(`Error loading demo HTML: ${response.status}`);
       }
