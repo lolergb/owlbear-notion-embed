@@ -32,8 +32,10 @@ export class UIRenderer {
     this.onAddPage = null;
     this.onAddCategory = null;
     this.onShowModal = null;
-    // Es GM?
+    // Es GM? (true = GM completo, 'coGM' = coGM solo compartir, false = player)
     this.isGM = true;
+    // Es coGM? (solo ve botón compartir)
+    this.isCoGM = false;
     // Config para calcular posiciones
     this.config = null;
   }
@@ -82,9 +84,21 @@ export class UIRenderer {
 
   /**
    * Renderiza todas las categorías desde config
+   * @param {Object} config - Configuración
+   * @param {HTMLElement} container - Contenedor
+   * @param {string} roomId - ID de la room
+   * @param {boolean|Object} isGMOrOptions - true/false para GM, o objeto {isGM, isCoGM}
    */
-  renderAllCategories(config, container, roomId, isGM = true) {
-    this.isGM = isGM;
+  renderAllCategories(config, container, roomId, isGMOrOptions = true) {
+    // Soportar tanto boolean como objeto de opciones
+    if (typeof isGMOrOptions === 'object') {
+      this.isGM = isGMOrOptions.isGM !== false;
+      this.isCoGM = isGMOrOptions.isCoGM === true;
+    } else {
+      this.isGM = isGMOrOptions;
+      this.isCoGM = false;
+    }
+    
     container.innerHTML = '';
 
     if (!config || !config.categories || config.categories.length === 0) {
@@ -99,7 +113,7 @@ export class UIRenderer {
     }
 
     config.categories.forEach(category => {
-      this.renderCategory(category, container, 0, roomId, [], isGM);
+      this.renderCategory(category, container, 0, roomId, [], this.isGM);
     });
   }
 
@@ -161,8 +175,8 @@ export class UIRenderer {
     categoryTitle.textContent = category.name;
     titleContainer.appendChild(categoryTitle);
 
-    // Botón de menú contextual para carpetas (solo GM)
-    if (isGM) {
+    // Botón de menú contextual para carpetas (solo GM completo, no coGM)
+    if (isGM && !this.isCoGM) {
       const contextMenuButton = document.createElement('button');
       contextMenuButton.className = 'category-context-menu-button icon-button';
       contextMenuButton.innerHTML = '<img src="img/icon-contextualmenu.svg" class="icon-button-icon" alt="Menu" />';
@@ -258,14 +272,37 @@ export class UIRenderer {
 
     // Determinar icono de tipo de link
     let linkIconHtml = '';
-    if (page.url.includes('notion.so') || page.url.includes('notion.site')) {
+    const url = page.url || '';
+    if (url.includes('notion.so') || url.includes('notion.site')) {
       linkIconHtml = '<img src="img/icon-notion.svg" alt="Notion" class="page-link-icon">';
-    } else if (page.url.includes('dndbeyond.com')) {
+    } else if (url.includes('dndbeyond.com')) {
       linkIconHtml = '<img src="img/icon-dnd.svg" alt="D&D Beyond" class="page-link-icon">';
-    } else if (page.url.includes('youtube.com') || page.url.includes('youtu.be')) {
+    } else if (url.includes('youtube.com') || url.includes('youtu.be')) {
       linkIconHtml = '<img src="img/icon-youtube.svg" alt="YouTube" class="page-link-icon">';
-    } else if (page.url.includes('drive.google.com') || page.url.includes('docs.google.com')) {
+    } else if (url.includes('vimeo.com')) {
+      linkIconHtml = '<img src="img/icon-vimeo.svg" alt="Vimeo" class="page-link-icon">';
+    } else if (url.includes('drive.google.com') || url.includes('docs.google.com') || url.includes('sheets.google.com') || url.includes('slides.google.com')) {
       linkIconHtml = '<img src="img/icon-google-docs.svg" alt="Google Docs" class="page-link-icon">';
+    } else if (url.match(/\.(jpg|jpeg|png|gif|webp|svg|bmp)(\?|$)/i)) {
+      linkIconHtml = '<img src="img/icon-image.svg" alt="Image" class="page-link-icon">';
+    } else if (url.match(/\.(mp4|webm|mov)(\?|$)/i)) {
+      linkIconHtml = '<img src="img/icon-link.svg" alt="Video" class="page-link-icon">'; // No hay icon-video
+    } else if (url.match(/\.(pdf)(\?|$)/i)) {
+      linkIconHtml = '<img src="img/icon-pdf.svg" alt="PDF" class="page-link-icon">';
+    } else if (url.includes('dropbox.com')) {
+      linkIconHtml = '<img src="img/icon-dropbox.svg" alt="Dropbox" class="page-link-icon">';
+    } else if (url.includes('figma.com')) {
+      linkIconHtml = '<img src="img/icon-figma.svg" alt="Figma" class="page-link-icon">';
+    } else if (url.includes('github.com') || url.includes('github.io')) {
+      linkIconHtml = '<img src="img/icon-github.svg" alt="GitHub" class="page-link-icon">';
+    } else if (url.includes('onedrive.live.com') || url.includes('1drv.ms')) {
+      linkIconHtml = '<img src="img/icon-onedrive.svg" alt="OneDrive" class="page-link-icon">';
+    } else if (url.includes('codepen.io')) {
+      linkIconHtml = '<img src="img/icon-codepen.svg" alt="CodePen" class="page-link-icon">';
+    } else if (url.includes('jsfiddle.net')) {
+      linkIconHtml = '<img src="img/icon-jsfiddle.svg" alt="JSFiddle" class="page-link-icon">';
+    } else if (url.startsWith('http')) {
+      linkIconHtml = '<img src="img/icon-link.svg" alt="Link" class="page-link-icon">';
     }
 
     // Indicador de visible para players
@@ -280,61 +317,63 @@ export class UIRenderer {
       </div>
     `;
 
-    // Botones de acción (solo GM)
-    if (isGM) {
-      // Contenedor de botones de acción
-      const actionsContainer = document.createElement('div');
-      actionsContainer.className = 'page-button-actions';
+    // Contenedor de botones de acción (siempre visible para todos los roles)
+    const actionsContainer = document.createElement('div');
+    actionsContainer.className = 'page-button-actions';
 
-      // Botón de compartir con players
-      const shareButton = document.createElement('button');
-      shareButton.className = 'page-share-button';
-      shareButton.innerHTML = '<img src="img/icon-players.svg" alt="Share">';
-      shareButton.title = 'Share with players';
-      
-      shareButton.addEventListener('click', (e) => {
-        e.stopPropagation();
-        if (this.onPageShare) {
-          this.onPageShare(page, categoryPath, pageIndex);
-        }
-      });
+    // Botón de compartir con players (todos: GM, coGM y Player)
+    const shareButton = document.createElement('button');
+    shareButton.className = 'page-share-button';
+    shareButton.innerHTML = '<img src="img/icon-players.svg" alt="Share">';
+    shareButton.title = 'Share with players';
+    
+    shareButton.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (this.onPageShare) {
+        this.onPageShare(page, categoryPath, pageIndex);
+      }
+    });
 
-      // Botón de visibilidad
-      const visibilityButton = document.createElement('button');
-      visibilityButton.className = 'page-visibility-button';
-      visibilityButton.innerHTML = `<img src="img/${page.visibleToPlayers ? 'icon-eye-open' : 'icon-eye-close'}.svg" alt="Visibility">`;
-      visibilityButton.title = page.visibleToPlayers ? 'Visible to players' : 'Hidden from players';
-      
-      visibilityButton.addEventListener('click', (e) => {
-        e.stopPropagation();
-        if (this.onVisibilityChange) {
-          this.onVisibilityChange(page, categoryPath, pageIndex, !page.visibleToPlayers);
-        }
-      });
+    actionsContainer.appendChild(shareButton);
 
-      // Botón de menú contextual (editar/eliminar)
-      const contextMenuButton = document.createElement('button');
-      contextMenuButton.className = 'page-context-menu-button';
-      contextMenuButton.innerHTML = '<img src="img/icon-contextualmenu.svg" alt="Menu">';
-      contextMenuButton.title = 'Options';
-      contextMenuButton.setAttribute('data-page-name', page.name);
-      contextMenuButton.setAttribute('data-page-index', pageIndex);
-      
-      contextMenuButton.addEventListener('click', (e) => {
-        e.stopPropagation();
-        e.preventDefault();
-        try {
-          this._showPageContextMenu(contextMenuButton, page, categoryPath, pageIndex);
-        } catch (error) {
-          console.error('Error al mostrar menú contextual:', error, { page, categoryPath, pageIndex });
-        }
-      });
+    // Botones adicionales solo para GM completo (no coGM ni Player)
+    if (isGM && !this.isCoGM) {
+        // Botón de visibilidad
+        const visibilityButton = document.createElement('button');
+        visibilityButton.className = 'page-visibility-button';
+        visibilityButton.innerHTML = `<img src="img/${page.visibleToPlayers ? 'icon-eye-open' : 'icon-eye-close'}.svg" alt="Visibility">`;
+        visibilityButton.title = page.visibleToPlayers ? 'Visible to players' : 'Hidden from players';
+        
+        visibilityButton.addEventListener('click', (e) => {
+          e.stopPropagation();
+          if (this.onVisibilityChange) {
+            this.onVisibilityChange(page, categoryPath, pageIndex, !page.visibleToPlayers);
+          }
+        });
 
-      actionsContainer.appendChild(shareButton);
-      actionsContainer.appendChild(visibilityButton);
-      actionsContainer.appendChild(contextMenuButton);
-      button.appendChild(actionsContainer);
+        // Botón de menú contextual (editar/eliminar)
+        const contextMenuButton = document.createElement('button');
+        contextMenuButton.className = 'page-context-menu-button';
+        contextMenuButton.innerHTML = '<img src="img/icon-contextualmenu.svg" alt="Menu">';
+        contextMenuButton.title = 'Options';
+        contextMenuButton.setAttribute('data-page-name', page.name);
+        contextMenuButton.setAttribute('data-page-index', pageIndex);
+        
+        contextMenuButton.addEventListener('click', (e) => {
+          e.stopPropagation();
+          e.preventDefault();
+          try {
+            this._showPageContextMenu(contextMenuButton, page, categoryPath, pageIndex);
+          } catch (error) {
+            console.error('Error al mostrar menú contextual:', error, { page, categoryPath, pageIndex });
+          }
+        });
+
+        actionsContainer.appendChild(visibilityButton);
+        actionsContainer.appendChild(contextMenuButton);
     }
+    
+    button.appendChild(actionsContainer);
 
     // Click para abrir página
     button.addEventListener('click', (e) => {

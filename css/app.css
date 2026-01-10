@@ -645,6 +645,8 @@
     margin-left: auto;
     opacity: 0;
     transition: opacity var(--transition-fast);
+    position: relative;
+    z-index: 10; /* Por encima del page-link-icon */
   }
   
   .page-button:hover .page-button-actions {
@@ -659,8 +661,8 @@
   .page-share-button,
   .page-visibility-button,
   .page-context-menu-button {
-    width: var(--icon-size-lg);
-    height: var(--icon-size-lg);
+    width: 40px; /* 24px icono + 8px padding * 2 */
+    height: 40px;
     background: transparent;
     border: none;
     border-radius: var(--radius-full);
@@ -669,6 +671,7 @@
     align-items: center;
     justify-content: center;
     transition: background var(--transition-fast);
+    padding: var(--spacing-sm); /* 8px padding */
     flex-shrink: 0;
   }
   
@@ -681,8 +684,8 @@
   .page-share-button img,
   .page-visibility-button img,
   .page-context-menu-button img {
-    width: var(--icon-size-sm);
-    height: var(--icon-size-sm);
+    width: var(--icon-size-lg); /* 24px */
+    height: var(--icon-size-lg); /* 24px */
   }
   
   /* Botones de categoría (mantienen position absolute) */
@@ -1340,6 +1343,8 @@
     height: var(--icon-size-lg);
     opacity: 1;
     transition: opacity var(--transition-fast);
+    z-index: 1; /* Por debajo de page-button-actions (z-index: 10) */
+    pointer-events: none; /* No interfiere con clicks */
   }
   
   .page-button.context-menu-open .page-link-icon {
