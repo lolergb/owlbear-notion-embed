@@ -9,7 +9,9 @@ import {
   BROADCAST_CHANNEL_RESPONSE,
   BROADCAST_CHANNEL_VISIBLE_PAGES,
   BROADCAST_CHANNEL_REQUEST_VISIBLE_PAGES,
-  BROADCAST_CHANNEL_SHOW_IMAGE
+  BROADCAST_CHANNEL_SHOW_IMAGE,
+  BROADCAST_CHANNEL_REQUEST_FULL_VAULT,
+  BROADCAST_CHANNEL_RESPONSE_FULL_VAULT
 } from '../utils/constants.js';
 import { log, logWarn, getUserRole } from '../utils/logger.js';
 
@@ -61,31 +63,31 @@ export class BroadcastService {
 
   /**
    * Envía un mensaje por broadcast
-   * @param {string} type - Tipo de mensaje
+   * @param {string} channel - Canal de broadcast (puede ser el nombre del canal directamente o un alias)
    * @param {Object} data - Datos a enviar
    */
-  async sendMessage(type, data) {
+  async sendMessage(channel, data) {
     if (!this.OBR) {
       logWarn('OBR no disponible para enviar mensaje');
       return;
     }
 
-    const channels = {
+    // Mapeo de aliases a canales (opcional, para compatibilidad)
+    const channelAliases = {
       'SHOW_IMAGE': BROADCAST_CHANNEL_SHOW_IMAGE,
+      'REQUEST_FULL_VAULT': BROADCAST_CHANNEL_REQUEST_FULL_VAULT,
+      'RESPONSE_FULL_VAULT': BROADCAST_CHANNEL_RESPONSE_FULL_VAULT,
     };
 
-    const channel = channels[type];
-    if (!channel) {
-      logWarn('Tipo de mensaje desconocido:', type);
-      return;
-    }
+    // Usar el alias si existe, sino usar el canal directamente
+    const targetChannel = channelAliases[channel] || channel;
 
     try {
-      await this.OBR.broadcast.sendMessage(channel, {
+      await this.OBR.broadcast.sendMessage(targetChannel, {
         ...data,
         timestamp: Date.now()
       });
-      log(`📤 Mensaje enviado [${type}]:`, data);
+      log(`📤 Mensaje enviado [${targetChannel}]:`, Object.keys(data));
     } catch (e) {
       logWarn('Error enviando mensaje:', e);
     }

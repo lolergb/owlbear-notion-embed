@@ -2558,20 +2558,9 @@ export class ExtensionController {
         await this._showContentModal(url, name);
       }
     });
-
-    // Listener para recibir vault completo cuando se promociona a GM
-    this.OBR.broadcast.onMessage(BROADCAST_CHANNEL_RESPONSE_FULL_VAULT, async (event) => {
-      const { requesterId, config } = event.data;
-      // Solo procesar si la solicitud es para este player
-      if (requesterId === this.playerId && config) {
-        log('✅ Vault completo recibido al promocionar a GM');
-        // Guardar en localStorage
-        this.storageService.saveLocalConfig(config);
-        // Recargar configuración
-        await this._loadConfig();
-        await this.render();
-      }
-    });
+    
+    // Nota: El listener para vault completo está en _requestFullVaultOnPromotion()
+    // ya que necesita esperar la respuesta antes de recargar
   }
 
   /**
@@ -2693,10 +2682,11 @@ export class ExtensionController {
         if (lastRole !== currentRole) {
           log(`🔄 Cambio de rol detectado: ${lastRole} → ${currentRole}`);
           
-          // Si un player se promociona a GM, solicitar todo el vault
+          // Si un player se promociona a GM, solicitar todo el vault antes de recargar
           if (lastRole === 'PLAYER' && currentRole === 'GM') {
             log('📥 Player promocionado a GM, solicitando vault completo...');
-            await this._requestFullVaultOnPromotion();
+            const received = await this._requestFullVaultOnPromotion();
+            log(received ? '✅ Vault recibido, recargando...' : '⚠️ No se recibió vault, recargando...');
           }
           
           // Recargar para aplicar cambios
@@ -2712,24 +2702,48 @@ export class ExtensionController {
 
   /**
    * Solicita el vault completo cuando un player se promociona a GM
-   * El listener para recibir la respuesta ya está configurado en _setupPlayerBroadcast
+   * @returns {Promise<boolean>} - true si se recibió el vault
    * @private
    */
   async _requestFullVaultOnPromotion() {
     try {
-      // Solicitar vault completo vía broadcast
-      await this.broadcastService.sendMessage(BROADCAST_CHANNEL_REQUEST_FULL_VAULT, {
-        requesterId: this.playerId,
-        requesterName: this.playerName
+      log('📤 Solicitando vault completo al GM...');
+      
+      return new Promise((resolve) => {
+        // Timeout de 5 segundos
+        const timeout = setTimeout(() => {
+          log('⏰ Timeout esperando vault completo');
+          unsubscribe();
+          resolve(false);
+        }, 5000);
+        
+        // Escuchar respuesta del GM
+        const unsubscribe = this.OBR.broadcast.onMessage(BROADCAST_CHANNEL_RESPONSE_FULL_VAULT, (event) => {
+          const { requesterId, config } = event.data;
+          
+          // Solo procesar si la respuesta es para este player
+          if (requesterId === this.playerId && config) {
+            clearTimeout(timeout);
+            unsubscribe();
+            
+            log('✅ Vault completo recibido, guardando en localStorage...');
+            
+            // Guardar en localStorage antes de recargar
+            this.storageService.saveLocalConfig(config);
+            
+            resolve(true);
+          }
+        });
+        
+        // Enviar solicitud
+        this.broadcastService.sendMessage(BROADCAST_CHANNEL_REQUEST_FULL_VAULT, {
+          requesterId: this.playerId,
+          requesterName: this.playerName
+        });
       });
-      
-      log('📤 Solicitud de vault completo enviada');
-      
-      // El listener en _setupPlayerBroadcast procesará la respuesta
-      // Esperar un momento antes de recargar para dar tiempo a recibir la respuesta
-      await new Promise(resolve => setTimeout(resolve, 2000));
     } catch (e) {
       logError('Error solicitando vault completo:', e);
+      return false;
     }
   }
 
