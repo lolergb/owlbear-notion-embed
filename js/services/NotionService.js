@@ -405,6 +405,15 @@ export class NotionService {
           categories: []
         };
 
+        // Añadir la página principal como primera página de la categoría
+        category.pages.push({
+          type: 'page',
+          name: title,
+          url: this._buildNotionUrl(title, id),
+          visibleToPlayers: false
+        });
+        stats.pagesImported++;
+
         // Procesar cada página hija
         for (const child of childPages) {
           const result = await processPage(child.id, child.title, depth + 1);
@@ -419,11 +428,8 @@ export class NotionService {
           }
         }
 
-        // Si la categoría tiene contenido, devolverla
-        if (category.pages.length > 0 || category.categories.length > 0) {
-          stats.pagesImported++;
-          return category;
-        }
+        // Devolver la categoría (siempre tiene al menos la página principal)
+        return category;
 
         return null;
       } catch (e) {
