@@ -183,7 +183,12 @@ export class UIRenderer {
 
       contextMenuButton.addEventListener('click', (e) => {
         e.stopPropagation();
-        this._showCategoryContextMenu(contextMenuButton, category, [...categoryPath, category.name], titleContainer, roomId);
+        e.preventDefault();
+        try {
+          this._showCategoryContextMenu(contextMenuButton, category, [...categoryPath, category.name], titleContainer, roomId);
+        } catch (error) {
+          console.error('Error al mostrar menú contextual de categoría:', error, { category, categoryPath });
+        }
       });
 
       titleContainer.appendChild(contextMenuButton);
@@ -312,10 +317,17 @@ export class UIRenderer {
       contextMenuButton.className = 'page-context-menu-button';
       contextMenuButton.innerHTML = '<img src="img/icon-contextualmenu.svg" alt="Menu">';
       contextMenuButton.title = 'Options';
+      contextMenuButton.setAttribute('data-page-name', page.name);
+      contextMenuButton.setAttribute('data-page-index', pageIndex);
       
       contextMenuButton.addEventListener('click', (e) => {
         e.stopPropagation();
-        this._showPageContextMenu(contextMenuButton, page, categoryPath, pageIndex);
+        e.preventDefault();
+        try {
+          this._showPageContextMenu(contextMenuButton, page, categoryPath, pageIndex);
+        } catch (error) {
+          console.error('Error al mostrar menú contextual:', error, { page, categoryPath, pageIndex });
+        }
       });
 
       actionsContainer.appendChild(shareButton);
@@ -427,6 +439,21 @@ export class UIRenderer {
   }
 
   /**
+   * Obtiene el objeto padre dado un path de categorías
+   * @private
+   */
+  _getParentFromPath(categoryPath) {
+    if (!this.config) return null;
+    let current = this.config;
+    for (const catName of categoryPath) {
+      const cat = (current.categories || []).find(c => c.name === catName);
+      if (cat) current = cat;
+      else return null;
+    }
+    return current;
+  }
+
+  /**
    * Obtiene el total de páginas en una categoría (para validar move)
    * @private
    */
@@ -484,6 +511,11 @@ export class UIRenderer {
    * @private
    */
   _showPageContextMenu(button, page, categoryPath, pageIndex) {
+    if (!button || !page) {
+      console.error('_showPageContextMenu: button o page no válidos', { button, page });
+      return;
+    }
+
     const existingMenu = document.getElementById('context-menu');
     if (existingMenu) existingMenu.remove();
 
@@ -493,10 +525,21 @@ export class UIRenderer {
 
     const rect = button.getBoundingClientRect();
     
-    // Calcular si se puede mover
-    const totalPages = this._getTotalPagesInCategory(categoryPath);
-    const canMoveUp = pageIndex > 0;
-    const canMoveDown = pageIndex < totalPages - 1;
+    // Calcular si se puede mover usando el orden combinado
+    let canMoveUp = false;
+    let canMoveDown = false;
+    
+    try {
+      const parent = this._getParentFromPath(categoryPath);
+      if (parent) {
+        const combinedOrder = this._getCombinedOrder(parent, parent?.pages || []);
+        const posInOrder = combinedOrder.findIndex(o => o.type === 'page' && o.index === pageIndex);
+        canMoveUp = posInOrder > 0;
+        canMoveDown = posInOrder >= 0 && posInOrder < combinedOrder.length - 1;
+      }
+    } catch (e) {
+      console.error('Error calculando orden para menú contextual:', e);
+    }
     
     const menuItems = [
       { 
@@ -551,10 +594,27 @@ export class UIRenderer {
       action: () => this._confirmDeletePage(page, categoryPath, pageIndex)
     });
 
-    const menu = this._createContextMenu(menuItems, { x: rect.left, y: rect.bottom + 4 }, () => {
+    // Validar que rect sea válido
+    if (!rect || rect.width === 0 || rect.height === 0) {
+      console.error('_showPageContextMenu: rect no válido', { rect, button });
+      return;
+    }
+
+    try {
+      const menu = this._createContextMenu(menuItems, { x: rect.left, y: rect.bottom + 4 }, () => {
+        button.classList.remove('context-menu-active');
+        if (pageButton) pageButton.classList.remove('context-menu-open');
+      });
+      
+      if (!menu) {
+        console.error('_showPageContextMenu: _createContextMenu retornó null');
+      }
+    } catch (e) {
+      console.error('Error creando menú contextual:', e);
+      // Limpiar clases en caso de error
       button.classList.remove('context-menu-active');
       if (pageButton) pageButton.classList.remove('context-menu-open');
-    });
+    }
   }
 
   /**
@@ -562,6 +622,11 @@ export class UIRenderer {
    * @private
    */
   _showCategoryContextMenu(button, category, categoryPath, titleContainer, roomId) {
+    if (!button || !category) {
+      console.error('_showCategoryContextMenu: button o category no válidos', { button, category });
+      return;
+    }
+
     const existingMenu = document.getElementById('context-menu');
     if (existingMenu) existingMenu.remove();
 
@@ -570,11 +635,24 @@ export class UIRenderer {
 
     const rect = button.getBoundingClientRect();
     
-    // Calcular si se puede mover
-    const catIndex = this._getCategoryIndex(categoryPath);
-    const totalCats = this._getTotalCategoriesInParent(categoryPath);
-    const canMoveUp = catIndex > 0;
-    const canMoveDown = catIndex >= 0 && catIndex < totalCats - 1;
+    // Calcular si se puede mover usando el orden combinado
+    let canMoveUp = false;
+    let canMoveDown = false;
+    
+    try {
+      // Para categorías, el padre es el path sin el último elemento
+      const parentPath = categoryPath.slice(0, -1);
+      const parent = this._getParentFromPath(parentPath);
+      if (parent) {
+        const catIndex = this._getCategoryIndex(categoryPath);
+        const combinedOrder = this._getCombinedOrder(parent, parent?.pages || []);
+        const posInOrder = combinedOrder.findIndex(o => o.type === 'category' && o.index === catIndex);
+        canMoveUp = posInOrder > 0;
+        canMoveDown = posInOrder >= 0 && posInOrder < combinedOrder.length - 1;
+      }
+    } catch (e) {
+      console.error('Error calculando orden para menú contextual de categoría:', e);
+    }
     
     const menuItems = [
       { 
@@ -658,11 +736,28 @@ export class UIRenderer {
       }
     });
 
-    const menu = this._createContextMenu(menuItems, { x: rect.left, y: rect.bottom + 4 }, () => {
+    // Validar que rect sea válido
+    if (!rect || rect.width === 0 || rect.height === 0) {
+      console.error('_showCategoryContextMenu: rect no válido', { rect, button });
+      return;
+    }
+
+    try {
+      const menu = this._createContextMenu(menuItems, { x: rect.left, y: rect.bottom + 4 }, () => {
+        button.classList.remove('context-menu-active');
+        titleContainer.classList.remove('context-menu-open');
+        button.style.opacity = '0';
+      });
+      
+      if (!menu) {
+        console.error('_showCategoryContextMenu: _createContextMenu retornó null');
+      }
+    } catch (e) {
+      console.error('Error creando menú contextual de categoría:', e);
+      // Limpiar clases en caso de error
       button.classList.remove('context-menu-active');
       titleContainer.classList.remove('context-menu-open');
-      button.style.opacity = '0';
-    });
+    }
   }
 
   /**
