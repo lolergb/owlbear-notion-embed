@@ -488,11 +488,13 @@ export class NotionService {
 
   /**
    * Genera la estructura de vault recursivamente desde una página
+   * Usa el nuevo formato items[] para simplicidad y orden implícito
+   * 
    * @param {string} pageId - ID de la página raíz
    * @param {string} pageTitle - Título de la página raíz
    * @param {number} maxDepth - Profundidad máxima (default: 10)
    * @param {Function} onProgress - Callback de progreso
-   * @returns {Promise<Object>} - Estructura de vault
+   * @returns {Promise<Object>} - Estructura de vault en formato items[]
    */
   async generateVaultFromPage(pageId, pageTitle, maxDepth = 10, onProgress = null) {
     const stats = {
@@ -502,6 +504,9 @@ export class NotionService {
       unsupportedTypes: new Set()
     };
 
+    /**
+     * Procesa una página y devuelve un item (page o category con items[])
+     */
     const processPage = async (id, title, depth = 0) => {
       if (depth >= maxDepth) {
         stats.pagesSkipped++;
@@ -521,9 +526,8 @@ export class NotionService {
         // Obtener páginas hijas (ya vienen en orden de Notion)
         const childPages = await this.fetchChildPages(id);
         
-        // Si no hay hijas, verificar si tiene contenido real
+        // Si no hay hijas, es una página simple
         if (childPages.length === 0) {
-          // Verificar contenido real (evitar páginas vacías o solo con título)
           const hasContent = await this.hasRealContent(id);
           
           if (!hasContent) {
@@ -537,53 +541,39 @@ export class NotionService {
           return {
             type: 'page',
             name: title,
-            url: this._buildNotionUrl(title, id),
-            visibleToPlayers: false
+            url: this._buildNotionUrl(title, id)
           };
         }
 
-        // Si hay hijas, crear una categoría
-        const category = {
-          name: title,
-          pages: [],
-          categories: [],
-          order: [] // Array de orden explícito que se persiste en JSON
-        };
+        // Si hay hijas, crear una categoría con items[]
+        const items = [];
 
-        // Verificar si la página principal tiene contenido real antes de añadirla
+        // Verificar si la página principal tiene contenido real
         const mainPageHasContent = await this.hasRealContent(id);
         if (mainPageHasContent) {
-          const pageIndex = category.pages.length;
-          category.pages.push({
+          items.push({
+            type: 'page',
             name: title,
-            url: this._buildNotionUrl(title, id),
-            visibleToPlayers: false
+            url: this._buildNotionUrl(title, id)
           });
-          category.order.push({ type: 'page', index: pageIndex });
           stats.pagesImported++;
         }
 
         // Procesar cada página hija (en orden de Notion)
         for (const child of childPages) {
           const result = await processPage(child.id, child.title, depth + 1);
-          
           if (result) {
-            if (result.type === 'page') {
-              const pageIndex = category.pages.length;
-              category.pages.push(result);
-              category.order.push({ type: 'page', index: pageIndex });
-            } else {
-              // Es una subcategoría
-              const catIndex = category.categories.length;
-              category.categories.push(result);
-              category.order.push({ type: 'category', index: catIndex });
-            }
+            items.push(result);
           }
         }
 
-        // Solo devolver la categoría si tiene contenido
-        if (category.pages.length > 0 || category.categories.length > 0) {
-          return category;
+        // Solo devolver la categoría si tiene items
+        if (items.length > 0) {
+          return {
+            type: 'category',
+            name: title,
+            items
+          };
         }
         
         return null;
@@ -599,20 +589,20 @@ export class NotionService {
 
     // Construir configuración final
     let config;
-    if (rootResult && rootResult.type !== 'page') {
-      // La raíz es una categoría (tiene hijos)
+    if (rootResult && rootResult.type === 'category') {
+      // La raíz es una categoría, usarla directamente
       config = {
-        categories: rootResult.categories.length > 0 || rootResult.pages.length > 0
-          ? [rootResult]
-          : []
+        categories: [{
+          name: rootResult.name,
+          items: rootResult.items
+        }]
       };
     } else if (rootResult) {
       // La raíz es una página simple, crear categoría contenedora
       config = {
         categories: [{
           name: pageTitle,
-          pages: [rootResult],
-          categories: []
+          items: [rootResult]
         }]
       };
     } else {
