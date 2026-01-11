@@ -2604,6 +2604,15 @@ export class ExtensionController {
       const progressEl = document.getElementById('import-progress');
       const statusEl = document.getElementById('import-status');
       const fillEl = document.getElementById('import-fill');
+      const form = modal.querySelector('.form');
+      const formFields = form.querySelectorAll('.form__field');
+      const hint = form.querySelector('.notion-pages-hint');
+      const formActions = form.querySelector('.form__actions');
+
+      // Ocultar elementos del formulario, dejar solo título y progress
+      formFields.forEach(field => field.style.display = 'none');
+      if (hint) hint.style.display = 'none';
+      if (formActions) formActions.style.display = 'none';
 
       importBtn.disabled = true;
       cancelBtn.disabled = true;
@@ -2661,6 +2670,10 @@ export class ExtensionController {
             'No pages found',
             'The selected page has no child pages to import.'
           );
+          // Restaurar visibilidad de elementos del formulario
+          formFields.forEach(field => field.style.display = '');
+          if (hint) hint.style.display = '';
+          if (formActions) formActions.style.display = '';
           importBtn.disabled = false;
           cancelBtn.disabled = false;
           progressEl.style.display = 'none';
@@ -2671,6 +2684,10 @@ export class ExtensionController {
           'Import failed',
           e.message || 'An error occurred while importing.'
         );
+        // Restaurar visibilidad de elementos del formulario
+        formFields.forEach(field => field.style.display = '');
+        if (hint) hint.style.display = '';
+        if (formActions) formActions.style.display = '';
         importBtn.disabled = false;
         cancelBtn.disabled = false;
         progressEl.style.display = 'none';

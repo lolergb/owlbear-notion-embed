@@ -2128,22 +2128,23 @@
   max-width: 400px;
 }
 
-.notion-pages-list {
-  overflow-y: auto;
-  max-height: 250px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-bg-input);
+#notion-pages-list {
+  background-color: var(--color-bg-surface);
+  border-radius: var(--radius-lg);
 }
 
 .notion-page-item {
   display: flex;
   align-items: center;
-  gap: var(--spacing-sm);
-  padding: var(--spacing-sm) var(--spacing-md);
+  padding: var(--spacing-md) var(--spacing-lg);
+  color: var(--color-text-secondary);
   cursor: pointer;
-  border-bottom: 1px solid var(--color-border);
-  transition: background 0.15s ease;
+  transition: all var(--transition-normal);
+  text-align: left;
+  font-size: var(--font-size-base);
+  width: 100%;
+  gap: var(--spacing-sm);
+  position: relative;
 }
 
 .notion-page-item:last-child {
@@ -2151,12 +2152,11 @@
 }
 
 .notion-page-item:hover {
-  background: rgba(150, 122, 204, 0.1);
+  background: var(--color-bg-primary);
 }
 
 .notion-page-item--selected {
-  background: rgba(150, 122, 204, 0.2);
-  border-left: 3px solid var(--color-primary);
+  background-color: var(--color-bg-hover);
 }
 
 .notion-page-item__icon {
@@ -2186,7 +2186,8 @@
 }
 
 .notion-page-item__meta {
-  font-size: 0.75em;
+  font-size: var(--font-size-sm);
+  padding-top: var(--spacing-xs);
   color: var(--color-text-muted);
 }
 
@@ -2220,39 +2221,39 @@
 }
 
 .notion-pages-hint {
-  margin-top: var(--spacing-sm);
-  padding: var(--spacing-sm);
-  background: rgba(150, 122, 204, 0.1);
-  border-radius: var(--radius-sm);
-  font-size: 0.8em;
+  padding: var(--spacing-md);
+  background: var(--color-bg-overlay);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
   color: var(--color-text-muted);
 }
 
 /* Import progress */
 .import-progress {
-  margin-top: var(--spacing-md);
   padding: var(--spacing-md);
-  background: var(--color-bg-input);
+  background: var(--color-bg-overlay);
   border-radius: var(--radius-md);
-  border: 1px solid var(--color-border);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
 }
 
 .import-progress__status {
-  font-size: 0.85em;
+  font-size: var(--font-size-base);
   color: var(--color-text-primary);
   margin-bottom: var(--spacing-xs);
+  line-height: var(--font-line-base);
 }
 
 .import-progress__bar {
   height: 4px;
-  background: var(--color-border);
+  background: var(--color-bg-hover);
   border-radius: 2px;
   overflow: hidden;
 }
 
 .import-progress__fill {
   height: 100%;
-  background: var(--color-primary);
+  background: var(--color-accent-link);
   width: 0%;
   transition: width 0.3s ease;
 }
