@@ -443,7 +443,7 @@ export class UIRenderer {
     const pages = filteredPages || category.pages || [];
     const categories = category.categories || [];
     
-    // Si existe un orden guardado, usarlo
+    // Si existe un orden guardado explícito, usarlo
     if (category.order && Array.isArray(category.order)) {
       // Validar y filtrar orden existente
       const validOrder = category.order.filter(item => {
@@ -471,7 +471,37 @@ export class UIRenderer {
       return validOrder;
     }
     
-    // Si no hay orden guardado, crear uno por defecto (categorías primero, luego páginas)
+    // Verificar si hay campos _order (importado desde Notion)
+    const hasNotionOrder = pages.some(p => p._order !== undefined) || 
+                           categories.some(c => c._order !== undefined);
+    
+    if (hasNotionOrder) {
+      // Combinar todo y ordenar por _order
+      const allItems = [];
+      
+      categories.forEach((cat, index) => {
+        allItems.push({ 
+          type: 'category', 
+          index, 
+          _order: cat._order !== undefined ? cat._order : 9999 
+        });
+      });
+      
+      pages.forEach((page, index) => {
+        allItems.push({ 
+          type: 'page', 
+          index, 
+          _order: page._order !== undefined ? page._order : 9999 
+        });
+      });
+      
+      // Ordenar por _order
+      allItems.sort((a, b) => a._order - b._order);
+      
+      return allItems.map(item => ({ type: item.type, index: item.index }));
+    }
+    
+    // Si no hay orden guardado ni _order, usar defecto (categorías primero, luego páginas)
     const order = [];
     categories.forEach((cat, index) => {
       order.push({ type: 'category', index });

@@ -542,12 +542,16 @@ export class NotionService {
           };
         }
 
-        // Si hay hijas, crear una categoría con las páginas
+        // Si hay hijas, crear una categoría
+        // Usamos arrays separados pero con índice de orden para mantener el orden de Notion
         const category = {
           name: title,
           pages: [],
           categories: []
         };
+
+        // Índice de orden para mantener el orden de Notion
+        let orderIndex = 0;
 
         // Verificar si la página principal tiene contenido real antes de añadirla
         const mainPageHasContent = await this.hasRealContent(id);
@@ -556,7 +560,8 @@ export class NotionService {
             type: 'page',
             name: title,
             url: this._buildNotionUrl(title, id),
-            visibleToPlayers: false
+            visibleToPlayers: false,
+            _order: orderIndex++
           });
           stats.pagesImported++;
         }
@@ -566,6 +571,7 @@ export class NotionService {
           const result = await processPage(child.id, child.title, depth + 1);
           
           if (result) {
+            result._order = orderIndex++;
             if (result.type === 'page') {
               category.pages.push(result);
             } else {
