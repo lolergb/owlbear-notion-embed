@@ -2337,7 +2337,12 @@ export class ExtensionController {
       downloadJsonBtn.addEventListener('click', () => {
         try {
           const config = this.config || { categories: [] };
-          const jsonStr = JSON.stringify(config, null, 2);
+          
+          // Convertir a formato items[] (nuevo formato)
+          const configJson = config.toJSON ? config.toJSON() : config;
+          const itemsFormatConfig = this.configParser.toItemsFormat(configJson);
+          
+          const jsonStr = JSON.stringify(itemsFormatConfig, null, 2);
           const blob = new Blob([jsonStr], { type: 'application/json' });
           const url = URL.createObjectURL(blob);
           
@@ -2353,11 +2358,23 @@ export class ExtensionController {
           let itemCount = 0;
           const countExportItems = (cats) => {
             for (const cat of cats || []) {
-              itemCount += (cat.pages || []).length;
-              if (cat.categories) countExportItems(cat.categories);
+              if (cat.items) {
+                // Formato items[]
+                itemCount += cat.items.filter(item => item.type === 'page').length;
+                cat.items.filter(item => item.type === 'category').forEach(subcat => {
+                  if (subcat.items) {
+                    const subcatConfig = { categories: [{ ...subcat }] };
+                    countExportItems(subcatConfig.categories);
+                  }
+                });
+              } else {
+                // Formato legacy (fallback)
+                itemCount += (cat.pages || []).length;
+                if (cat.categories) countExportItems(cat.categories);
+              }
             }
           };
-          countExportItems(config.categories);
+          countExportItems(itemsFormatConfig.categories);
           this.analyticsService.trackJSONExported(itemCount);
         } catch (err) {
           alert('❌ Error downloading: ' + err.message);
