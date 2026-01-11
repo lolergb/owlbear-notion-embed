@@ -2532,7 +2532,7 @@ export class ExtensionController {
         const result = await this.notionService.generateVaultFromPage(
           selectedPage.id,
           selectedPage.title,
-          3, // maxDepth
+          10, // maxDepth - soporta estructuras profundas de Notion
           (progress) => {
             statusEl.textContent = progress.message;
             // Simular progreso visual

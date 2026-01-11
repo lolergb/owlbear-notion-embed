@@ -490,11 +490,11 @@ export class NotionService {
    * Genera la estructura de vault recursivamente desde una página
    * @param {string} pageId - ID de la página raíz
    * @param {string} pageTitle - Título de la página raíz
-   * @param {number} maxDepth - Profundidad máxima (default: 3)
+   * @param {number} maxDepth - Profundidad máxima (default: 10)
    * @param {Function} onProgress - Callback de progreso
    * @returns {Promise<Object>} - Estructura de vault
    */
-  async generateVaultFromPage(pageId, pageTitle, maxDepth = 3, onProgress = null) {
+  async generateVaultFromPage(pageId, pageTitle, maxDepth = 10, onProgress = null) {
     const stats = {
       pagesImported: 0,
       pagesSkipped: 0,
