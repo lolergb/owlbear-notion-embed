@@ -2129,6 +2129,8 @@
 }
 
 #notion-pages-list {
+  overflow-y: auto;
+  max-height: 250px;
   background-color: var(--color-bg-surface);
   border-radius: var(--radius-lg);
 }
