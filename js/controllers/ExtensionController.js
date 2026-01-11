@@ -2853,9 +2853,9 @@ export class ExtensionController {
         this.config.pages.push(newPage);
       } else {
         // Agregar a la carpeta seleccionada
-        const parent = this._findCategoryByPath(data.parentFolder.split('/'));
-        if (parent) {
-          if (!parent.pages) parent.pages = [];
+      const parent = this._findCategoryByPath(data.parentFolder.split('/'));
+      if (parent) {
+        if (!parent.pages) parent.pages = [];
           parent.pages.push(newPage);
         } else {
           logError('Carpeta no encontrada:', data.parentFolder);
@@ -2863,8 +2863,8 @@ export class ExtensionController {
         }
       }
       
-      await this.saveConfig(this.config);
-      this.analyticsService.trackPageAdded(data.name, this._detectPageType(data.url));
+        await this.saveConfig(this.config);
+        this.analyticsService.trackPageAdded(data.name, this._detectPageType(data.url));
     });
   }
 

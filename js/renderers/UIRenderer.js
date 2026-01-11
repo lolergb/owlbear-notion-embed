@@ -134,7 +134,7 @@ export class UIRenderer {
     const rootCombinedOrder = this._getCombinedOrder(config, rootPages);
     
     // Renderizar según el orden combinado del root
-    rootCombinedOrder.forEach(item => {
+    rootCombinedOrder.forEach((item, index) => {
       if (item.type === 'page') {
         const page = rootPages[item.index];
         if (page) {
@@ -142,6 +142,10 @@ export class UIRenderer {
           const originalIndex = (config.pages || []).findIndex(p => p.name === page.name && p.url === page.url);
           const pageButton = this._createPageButton(page, roomId, [], originalIndex !== -1 ? originalIndex : item.index, this.isGM);
           container.appendChild(pageButton);
+          // Aplicar animación con delay stagger
+          requestAnimationFrame(() => {
+            pageButton.classList.add('list-item-entering');
+          });
         }
       } else if (item.type === 'category') {
         const category = (config.categories || [])[item.index];
@@ -149,6 +153,13 @@ export class UIRenderer {
           // Si es jugador, verificar que la categoría tiene contenido visible
           if (this.isGM || this.hasVisibleContentForPlayers(category)) {
             this.renderCategory(category, container, 0, roomId, [], this.isGM);
+            // Aplicar animación al título de la categoría
+            const categoryTitle = container.querySelector('.category:last-child .category-title-container');
+            if (categoryTitle) {
+              requestAnimationFrame(() => {
+                categoryTitle.classList.add('list-item-entering');
+              });
+            }
           }
         }
       }
@@ -257,7 +268,7 @@ export class UIRenderer {
     const combinedOrder = this._getCombinedOrder(category, categoryPages);
     
     // Renderizar según el orden combinado
-    combinedOrder.forEach(item => {
+    combinedOrder.forEach((item, index) => {
       if (item.type === 'page') {
         const page = categoryPages[item.index];
         if (page) {
@@ -265,6 +276,10 @@ export class UIRenderer {
           const originalIndex = (category.pages || []).findIndex(p => p.name === page.name && p.url === page.url);
           const pageButton = this._createPageButton(page, roomId, [...categoryPath, category.name], originalIndex !== -1 ? originalIndex : item.index, isGM);
           contentContainer.appendChild(pageButton);
+          // Aplicar animación con delay stagger
+          requestAnimationFrame(() => {
+            pageButton.classList.add('list-item-entering');
+          });
         }
       } else if (item.type === 'category') {
         const subcat = (category.categories || [])[item.index];
@@ -272,6 +287,13 @@ export class UIRenderer {
           // Si es jugador, verificar que la subcategoría tiene contenido visible
           if (isGM || this.hasVisibleContentForPlayers(subcat)) {
             this.renderCategory(subcat, contentContainer, level + 1, roomId, [...categoryPath, category.name], isGM);
+            // Aplicar animación al título de la categoría
+            const subcatTitle = contentContainer.querySelector(`.category:last-child .category-title-container`);
+            if (subcatTitle) {
+              requestAnimationFrame(() => {
+                subcatTitle.classList.add('list-item-entering');
+              });
+            }
           }
         }
       }
@@ -291,6 +313,11 @@ export class UIRenderer {
     });
 
     parentElement.appendChild(categoryDiv);
+    
+    // Aplicar animación al título de la categoría
+    requestAnimationFrame(() => {
+      titleContainer.classList.add('list-item-entering');
+    });
   }
 
   /**
