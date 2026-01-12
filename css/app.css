@@ -478,7 +478,7 @@
     position: relative;
     width: 36px;
     height: 20px;
-    background-color: var(--color-bg-overlay);
+    background-color: var(--color-bg-primary);
     border-radius: 10px;
     cursor: pointer;
     transition: background-color var(--transition-normal);
@@ -492,7 +492,7 @@
     left: 2px;
     width: 16px;
     height: 16px;
-    background-color: var(--color-bg-primary);
+    background-color: var(--color-text-primary);
     border-radius: var(--radius-full);
     transition: transform var(--transition-normal), background-color var(--transition-normal);
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
