@@ -409,7 +409,10 @@ export class ExtensionController {
     try {
       const pageId = page.getNotionPageId();
       
-      if (page.isNotionPage() && pageId) {
+      // Prioridad: htmlContent embebido (local-first) antes de cualquier URL
+      if (page.hasEmbeddedHtml()) {
+        await this._renderEmbeddedHtmlPage(page);
+      } else if (page.isNotionPage() && pageId) {
         await this._renderNotionPage(page, pageId);
       } else if (page.isDemoHtmlFile()) {
         // Content-demo: cargar HTML estático con estilo Notion
@@ -4287,6 +4290,38 @@ export class ExtensionController {
    * Renderiza una página HTML de demo (content-demo) con estilo Notion
    * @private
    */
+  /**
+   * Renderiza una página con HTML embebido (local-first, desde Obsidian)
+   * @private
+   */
+  async _renderEmbeddedHtmlPage(page) {
+    this._setNotionDisplayMode('content');
+    
+    const notionContent = document.getElementById('notion-content');
+    if (!notionContent) return;
+
+    try {
+      // El htmlContent ya viene pre-renderizado con estilos de Notion
+      notionContent.innerHTML = page.htmlContent;
+      
+      // Guardar en caché para players
+      if (this.isGM && !this.isCoGM) {
+        // Generar un ID único para la página (basado en nombre)
+        const pageId = `embedded-${page.name.toLowerCase().replace(/\s+/g, '-')}`;
+        this.cacheService.saveHtmlToLocalCache(pageId, page.htmlContent);
+      }
+      
+      log('✅ Renderizado HTML embebido para:', page.name);
+    } catch (e) {
+      logError('Error renderizando HTML embebido:', e);
+      notionContent.innerHTML = `
+        <div class="error-container">
+          <p class="error-message">Error loading embedded content: ${e.message}</p>
+        </div>
+      `;
+    }
+  }
+
   async _renderDemoHtmlPage(page) {
     this._setNotionDisplayMode('content');
     

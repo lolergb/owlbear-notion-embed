@@ -13,12 +13,13 @@ import { extractNotionPageId, isNotionUrl, isDemoHtmlFile } from '../utils/helpe
 export class Page {
   /**
    * @param {string} name - Nombre de la página
-   * @param {string} url - URL de la página
+   * @param {string} url - URL de la página (puede ser null si hay htmlContent)
    * @param {Object} options - Opciones adicionales
    * @param {boolean} [options.visibleToPlayers=false] - Si está visible para jugadores
    * @param {string[]} [options.blockTypes] - Tipos de bloques a filtrar (Notion)
    * @param {Object} [options.icon] - Icono de la página
    * @param {string} [options.linkedTokenId] - ID del token vinculado
+   * @param {string} [options.htmlContent] - HTML pre-renderizado (local-first, sin URL)
    */
   constructor(name, url, options = {}) {
     this.name = name;
@@ -27,6 +28,7 @@ export class Page {
     this.blockTypes = options.blockTypes || null;
     this.icon = options.icon || null;
     this.linkedTokenId = options.linkedTokenId || null;
+    this.htmlContent = options.htmlContent || null;
   }
 
   /**
@@ -102,10 +104,19 @@ export class Page {
   }
 
   /**
+   * Verifica si esta página tiene HTML embebido (local-first)
+   * @returns {boolean}
+   */
+  hasEmbeddedHtml() {
+    return !!this.htmlContent;
+  }
+
+  /**
    * Obtiene el tipo de contenido de la página
-   * @returns {'notion'|'google-doc'|'image'|'video'|'external'}
+   * @returns {'embedded-html'|'notion'|'google-doc'|'image'|'video'|'external'}
    */
   getContentType() {
+    if (this.hasEmbeddedHtml()) return 'embedded-html';
     if (this.isNotionPage()) return 'notion';
     if (this.isGoogleDoc()) return 'google-doc';
     if (this.isImage()) return 'image';
@@ -122,7 +133,8 @@ export class Page {
       visibleToPlayers: this.visibleToPlayers,
       blockTypes: this.blockTypes ? [...this.blockTypes] : null,
       icon: this.icon ? { ...this.icon } : null,
-      linkedTokenId: this.linkedTokenId
+      linkedTokenId: this.linkedTokenId,
+      htmlContent: this.htmlContent
     });
   }
 
@@ -132,9 +144,13 @@ export class Page {
    */
   toJSON() {
     const json = {
-      name: this.name,
-      url: this.url
+      name: this.name
     };
+
+    // URL puede ser null si hay htmlContent
+    if (this.url) {
+      json.url = this.url;
+    }
 
     if (this.visibleToPlayers) {
       json.visibleToPlayers = true;
@@ -152,6 +168,11 @@ export class Page {
       json.linkedTokenId = this.linkedTokenId;
     }
 
+    // HTML embebido (local-first)
+    if (this.htmlContent) {
+      json.htmlContent = this.htmlContent;
+    }
+
     return json;
   }
 
@@ -161,11 +182,12 @@ export class Page {
    * @returns {Page}
    */
   static fromJSON(json) {
-    return new Page(json.name, json.url, {
+    return new Page(json.name, json.url || null, {
       visibleToPlayers: json.visibleToPlayers,
       blockTypes: json.blockTypes,
       icon: json.icon,
-      linkedTokenId: json.linkedTokenId
+      linkedTokenId: json.linkedTokenId,
+      htmlContent: json.htmlContent
     });
   }
 }

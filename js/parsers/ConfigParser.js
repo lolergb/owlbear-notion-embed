@@ -110,7 +110,8 @@ export class ConfigParser {
       if (!item || !item.type) continue;
 
       if (item.type === 'page') {
-        if (item.name && item.url) {
+        // Aceptar páginas con url O htmlContent (local-first)
+        if (item.name && (item.url || item.htmlContent)) {
           pages.push(this._parsePage(item));
           order.push({ type: 'page', index: pageIndex++ });
         }
@@ -140,8 +141,9 @@ export class ConfigParser {
       return [];
     }
 
+    // Aceptar páginas con url O htmlContent (local-first)
     return pagesJson
-      .filter(page => page && page.name && page.url)
+      .filter(page => page && page.name && (page.url || page.htmlContent))
       .map(page => this._parsePage(page));
   }
 
@@ -150,11 +152,12 @@ export class ConfigParser {
    * @private
    */
   _parsePage(pageJson) {
-    return new Page(pageJson.name, pageJson.url, {
+    return new Page(pageJson.name, pageJson.url || null, {
       visibleToPlayers: pageJson.visibleToPlayers || false,
       blockTypes: pageJson.blockTypes || null,
       icon: pageJson.icon || null,
-      linkedTokenId: pageJson.linkedTokenId || null
+      linkedTokenId: pageJson.linkedTokenId || null,
+      htmlContent: pageJson.htmlContent || null
     });
   }
 
@@ -264,8 +267,11 @@ export class ConfigParser {
     }
 
     if (item.type === 'page') {
-      if (!item.url || typeof item.url !== 'string') {
-        errors.push(`${path}: falta URL o no es string`);
+      // Aceptar url O htmlContent (local-first)
+      const hasUrl = item.url && typeof item.url === 'string';
+      const hasHtmlContent = item.htmlContent && typeof item.htmlContent === 'string';
+      if (!hasUrl && !hasHtmlContent) {
+        errors.push(`${path}: falta URL o htmlContent`);
       }
     }
 
@@ -299,8 +305,11 @@ export class ConfigParser {
       errors.push(`${path}: falta nombre o no es string`);
     }
 
-    if (!page.url || typeof page.url !== 'string') {
-      errors.push(`${path}: falta URL o no es string`);
+    // Aceptar url O htmlContent (local-first)
+    const hasUrl = page.url && typeof page.url === 'string';
+    const hasHtmlContent = page.htmlContent && typeof page.htmlContent === 'string';
+    if (!hasUrl && !hasHtmlContent) {
+      errors.push(`${path}: falta URL o htmlContent`);
     }
 
     if (page.blockTypes && !Array.isArray(page.blockTypes)) {
@@ -364,16 +373,21 @@ export class ConfigParser {
    * @private
    */
   _migratePage(page) {
-    if (!page || !page.url) return null;
+    // Aceptar páginas con url O htmlContent (local-first)
+    if (!page || (!page.url && !page.htmlContent)) return null;
 
-    return {
+    const migrated = {
       name: page.name || 'Unnamed Page',
-      url: page.url,
-      visibleToPlayers: page.visibleToPlayers || page.visible || false,
-      ...(page.blockTypes && { blockTypes: page.blockTypes }),
-      ...(page.icon && { icon: page.icon }),
-      ...(page.linkedTokenId && { linkedTokenId: page.linkedTokenId })
+      visibleToPlayers: page.visibleToPlayers || page.visible || false
     };
+
+    if (page.url) migrated.url = page.url;
+    if (page.htmlContent) migrated.htmlContent = page.htmlContent;
+    if (page.blockTypes) migrated.blockTypes = page.blockTypes;
+    if (page.icon) migrated.icon = page.icon;
+    if (page.linkedTokenId) migrated.linkedTokenId = page.linkedTokenId;
+
+    return migrated;
   }
 
   // ============================================
@@ -445,10 +459,11 @@ export class ConfigParser {
   _pageToItemFormat(page) {
     const item = {
       type: 'page',
-      name: page.name,
-      url: page.url
+      name: page.name
     };
 
+    if (page.url) item.url = page.url;
+    if (page.htmlContent) item.htmlContent = page.htmlContent;
     if (page.visibleToPlayers) item.visibleToPlayers = true;
     if (page.blockTypes) item.blockTypes = page.blockTypes;
     if (page.icon) item.icon = page.icon;
@@ -530,10 +545,11 @@ export class ConfigParser {
    */
   _itemToPageFormat(item) {
     const page = {
-      name: item.name,
-      url: item.url
+      name: item.name
     };
 
+    if (item.url) page.url = item.url;
+    if (item.htmlContent) page.htmlContent = item.htmlContent;
     if (item.visibleToPlayers) page.visibleToPlayers = true;
     if (item.blockTypes) page.blockTypes = item.blockTypes;
     if (item.icon) page.icon = item.icon;
