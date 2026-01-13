@@ -3838,6 +3838,7 @@ export class ExtensionController {
       // Mostrar content, ocultar y limpiar iframe
       if (notionIframe) {
         notionIframe.src = 'about:blank';
+        notionIframe.style.display = 'none';
       }
       notionContainer.classList.remove('hidden');
       notionContainer.classList.add('show-content');
