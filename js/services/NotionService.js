@@ -18,6 +18,9 @@ export class NotionService {
     this.cacheService = null;
     // Referencia al StorageService
     this.storageService = null;
+    // Token de default cacheado
+    this._defaultToken = null;
+    this._defaultTokenFetched = false;
   }
 
   /**
@@ -28,6 +31,35 @@ export class NotionService {
     if (OBR) this.OBR = OBR;
     if (cacheService) this.cacheService = cacheService;
     if (storageService) this.storageService = storageService;
+  }
+
+  /**
+   * Obtiene el token de default desde Netlify (solo una vez)
+   * @private
+   * @returns {Promise<string|null>}
+   */
+  async _getDefaultToken() {
+    if (this._defaultTokenFetched) {
+      return this._defaultToken;
+    }
+
+    try {
+      const response = await fetch('/.netlify/functions/get-default-token');
+      if (response.ok) {
+        const data = await response.json();
+        this._defaultToken = data.token || null;
+        this._defaultTokenFetched = true;
+        if (this._defaultToken) {
+          log('🔑 Token de default-config obtenido');
+        }
+        return this._defaultToken;
+      }
+    } catch (e) {
+      logWarn('No se pudo obtener token de default:', e);
+    }
+
+    this._defaultTokenFetched = true;
+    return null;
   }
 
   /**
@@ -51,9 +83,14 @@ export class NotionService {
 
     try {
       // Obtener token del usuario
-      const userToken = this.storageService?.getUserToken();
+      let tokenToUse = this.storageService?.getUserToken();
       
-      if (!userToken) {
+      // Si no hay token de usuario, intentar usar el token de default
+      if (!tokenToUse) {
+        tokenToUse = await this._getDefaultToken();
+      }
+      
+      if (!tokenToUse) {
         // Sin token, intentar obtener del caché compartido
         const sharedBlocks = await this._getFromSharedCache(pageId);
         if (sharedBlocks) {
@@ -66,7 +103,7 @@ export class NotionService {
 
       log('🌐 Obteniendo bloques desde la API para:', pageId);
       
-      const apiUrl = `/.netlify/functions/notion-api?pageId=${encodeURIComponent(pageId)}&token=${encodeURIComponent(userToken)}`;
+      const apiUrl = `/.netlify/functions/notion-api?pageId=${encodeURIComponent(pageId)}&token=${encodeURIComponent(tokenToUse)}`;
       
       const response = await fetch(apiUrl, {
         method: 'GET',
@@ -130,13 +167,17 @@ export class NotionService {
     }
 
     try {
-      const userToken = this.storageService?.getUserToken();
+      // Obtener token del usuario o usar el de default
+      let tokenToUse = this.storageService?.getUserToken();
+      if (!tokenToUse) {
+        tokenToUse = await this._getDefaultToken();
+      }
       
-      if (!userToken) {
+      if (!tokenToUse) {
         return { lastEditedTime: null, icon: null };
       }
 
-      const apiUrl = `/.netlify/functions/notion-api?pageId=${encodeURIComponent(pageId)}&token=${encodeURIComponent(userToken)}&type=page`;
+      const apiUrl = `/.netlify/functions/notion-api?pageId=${encodeURIComponent(pageId)}&token=${encodeURIComponent(tokenToUse)}&type=page`;
       
       const response = await fetch(apiUrl, {
         method: 'GET',
@@ -192,15 +233,19 @@ export class NotionService {
     }
 
     try {
-      const userToken = this.storageService?.getUserToken();
+      // Obtener token del usuario o usar el de default
+      let tokenToUse = this.storageService?.getUserToken();
+      if (!tokenToUse) {
+        tokenToUse = await this._getDefaultToken();
+      }
       
-      if (!userToken) {
+      if (!tokenToUse) {
         return [];
       }
 
       // Usar el mismo endpoint que para páginas - la API de Notion usa el mismo endpoint
       // para obtener hijos de bloques, pasando el blockId como pageId
-      const apiUrl = `/.netlify/functions/notion-api?pageId=${encodeURIComponent(blockId)}&token=${encodeURIComponent(userToken)}`;
+      const apiUrl = `/.netlify/functions/notion-api?pageId=${encodeURIComponent(blockId)}&token=${encodeURIComponent(tokenToUse)}`;
       
       const response = await fetch(apiUrl, {
         method: 'GET',

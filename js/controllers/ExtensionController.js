@@ -351,6 +351,9 @@ export class ExtensionController {
       this.roomId,
       viewOptions
     );
+
+    // Actualizar clase del container
+    this._updateContainerClass();
   }
 
   /**
@@ -396,6 +399,9 @@ export class ExtensionController {
     }
     if (buttonContainer) buttonContainer.classList.add('hidden');
     if (playerViewToggle) playerViewToggle.classList.add('hidden');
+
+    // Actualizar clase del container
+    this._updateContainerClass();
 
     // Crear botones del header para la página de detalle
     this._createPageDetailButtons(page);
@@ -1290,6 +1296,31 @@ export class ExtensionController {
   }
 
   /**
+   * Actualiza la clase del container según el contenedor visible
+   * @private
+   */
+  _updateContainerClass() {
+    const container = document.querySelector('.container');
+    if (!container) return;
+
+    // Remover clases previas
+    container.classList.remove('page-list', 'notion-container', 'settings-container');
+
+    // Determinar qué contenedor está visible
+    const pageList = document.getElementById('page-list');
+    const notionContainer = document.getElementById('notion-container');
+    const settingsContainer = document.getElementById('settings-container');
+
+    if (settingsContainer && !settingsContainer.classList.contains('hidden')) {
+      container.classList.add('settings-container');
+    } else if (notionContainer && !notionContainer.classList.contains('hidden')) {
+      container.classList.add('notion-container');
+    } else if (pageList && !pageList.classList.contains('hidden')) {
+      container.classList.add('page-list');
+    }
+  }
+
+  /**
    * Limpia recursos al cerrar
    */
   cleanup() {
@@ -1466,6 +1497,9 @@ export class ExtensionController {
     // Mostrar toggle de player view (solo si es GM)
     const playerViewToggle = document.querySelector('.player-view-toggle');
     if (playerViewToggle && this.isGM) playerViewToggle.classList.remove('hidden');
+
+    // Actualizar clase del container
+    this._updateContainerClass();
 
     // Ocultar botones de página de detalle
     this._hidePageDetailButtons();
@@ -2218,6 +2252,9 @@ export class ExtensionController {
     if (pageTitle) pageTitle.textContent = 'Settings';
     if (buttonContainer) buttonContainer.classList.add('hidden');
     if (playerViewToggle) playerViewToggle.classList.add('hidden');
+
+    // Actualizar clase del container
+    this._updateContainerClass();
 
     // Ocultar/mostrar secciones según rol
     const allForms = settingsContainer ? settingsContainer.querySelectorAll('.form') : [];

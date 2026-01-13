@@ -117,6 +117,27 @@ export class UIRenderer {
       return;
     }
 
+    // Si es Player view (no es GM), verificar si hay contenido visible
+    if (!this.isGM) {
+      // Verificar si hay páginas visibles en root
+      const hasVisibleRootPages = config?.pages && config.pages.some(p => p.visibleToPlayers === true);
+      // Verificar si hay categorías con contenido visible
+      const hasVisibleCategories = config?.categories && config.categories.some(cat => 
+        this.hasVisibleContentForPlayers(cat)
+      );
+      
+      if (!hasVisibleRootPages && !hasVisibleCategories) {
+        container.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-state-icon">👁️</div>
+            <p class="empty-state-text">No content visible to players</p>
+            <p class="empty-state-hint">Toggle visibility on pages using the eye icon to share them with players</p>
+          </div>
+        `;
+        return;
+      }
+    }
+
     // Obtener orden combinado del root (páginas + categorías mezcladas)
     const rootPages = (config.pages || []).filter(page => {
       // Filtrar páginas válidas - aceptar URL válida O htmlContent (local-first)

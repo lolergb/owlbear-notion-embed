@@ -1617,6 +1617,13 @@
       margin-right: 32px;
     }
     .category-title { margin-right: 72px}
+    #page-title,
+    .page-icon-placeholder {
+      display: none;
+    }
+    .form__actions {
+      flex-direction: row;
+    }
   }
 
 /* ============================================
