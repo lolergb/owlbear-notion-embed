@@ -3863,10 +3863,14 @@ export class ExtensionController {
     // Restaurar clases originales
     notionContent.className = 'notion-container__content notion-content';
 
-    const hasToken = this.storageService.hasUserToken();
+    const hasUserToken = this.storageService.hasUserToken();
     
-    // Caso 1: Master GM sin token - debe configurar su token
-    if (this.isGM && !this.isCoGM && !hasToken) {
+    // Verificar si hay token de default disponible (para páginas del default-config)
+    const hasDefaultToken = await this.notionService._getDefaultToken();
+    const hasAnyToken = hasUserToken || hasDefaultToken;
+    
+    // Caso 1: Master GM sin ningún token - debe configurar su token
+    if (this.isGM && !this.isCoGM && !hasAnyToken) {
       log('⚠️ Master GM sin token de Notion');
       notionContent.innerHTML = `
         <div class="empty-state">
@@ -3882,7 +3886,7 @@ export class ExtensionController {
     }
     
     // Caso 2: Player o Co-GM sin token - solicitar contenido al GM
-    const needsContentFromGM = (!this.isGM || this.isCoGM) && !hasToken;
+    const needsContentFromGM = (!this.isGM || this.isCoGM) && !hasAnyToken;
     
     if (needsContentFromGM) {
       log(`👤 ${this.isCoGM ? 'Co-GM' : 'Player'} sin token, solicitando contenido al Master GM...`);
@@ -3890,7 +3894,7 @@ export class ExtensionController {
       return;
     }
 
-    // Caso 3: Usuario con token propio - renderizar normalmente
+    // Caso 3: Usuario con token (propio o default) - renderizar normalmente
     await this._renderNotionPageWithToken(page, pageId, notionContent, forceRefresh);
   }
 
