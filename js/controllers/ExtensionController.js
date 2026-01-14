@@ -2814,10 +2814,14 @@ export class ExtensionController {
         const allCategories = [];
 
         // Procesar cada página seleccionada
+        let totalPagesProcessed = 0;
         for (let i = 0; i < pagesToImport.length; i++) {
           const page = pagesToImport[i];
+          const baseProgress = (i / pagesToImport.length) * 80;
+          const pageProgressRange = 80 / pagesToImport.length;
+          
           statusEl.textContent = `Processing ${i + 1}/${pagesToImport.length}: ${page.title}...`;
-          fillEl.style.width = `${((i) / pagesToImport.length) * 80}%`;
+          fillEl.style.width = `${baseProgress}%`;
 
           const result = await this.notionService.generateVaultFromPage(
             page.id,
@@ -2825,8 +2829,13 @@ export class ExtensionController {
             10, // maxDepth
             (progress) => {
               statusEl.textContent = `(${i + 1}/${pagesToImport.length}) ${progress.message}`;
+              // Actualizar barra de progreso basado en páginas procesadas
+              const subProgress = Math.min(progress.pagesImported * 5, pageProgressRange);
+              fillEl.style.width = `${baseProgress + subProgress}%`;
             }
           );
+          
+          totalPagesProcessed += result.stats.pagesImported;
 
           // Acumular estadísticas
           totalStats.pagesImported += result.stats.pagesImported;
