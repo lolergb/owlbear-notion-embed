@@ -1062,6 +1062,10 @@ export class NotionService {
                 }
               }
               
+              // Agrupar mentions con parent DB para crear carpetas si estamos en root
+              const mentionsByDb = new Map(); // parentDbTitle -> pages[]
+              const mentionsWithoutDb = []; // Páginas sin parent DB
+              
               // Procesar mentions que no estén ya importados
               for (const mention of mentions) {
                 const mentionId = mention.pageId;
@@ -1114,17 +1118,43 @@ export class NotionService {
                       }
                     }
                   }
-                }
-                
-                // Si no se pudo asignar a una categoría, añadir a items directamente
-                if (!assignedToCategory) {
-                  items.push(newPage);
-                  stats.pagesImported++;
-                  log(`  ✅ Mention "${pageInfo.title}" añadido a items`);
+                  
+                  // Si no se asignó a categoría, agrupar por DB para crear carpeta
+                  if (!assignedToCategory) {
+                    if (!mentionsByDb.has(pageInfo.parentDbTitle)) {
+                      mentionsByDb.set(pageInfo.parentDbTitle, []);
+                    }
+                    mentionsByDb.get(pageInfo.parentDbTitle).push(newPage);
+                  }
+                } else {
+                  // Sin parent DB: añadir directamente a items
+                  mentionsWithoutDb.push(newPage);
                 }
                 
                 // Marcar como importado
                 importedIds.add(normalizedId);
+              }
+              
+              // Crear carpetas para mentions agrupados por DB
+              if (mentionsByDb.size > 0) {
+                for (const [dbTitle, dbPages] of mentionsByDb) {
+                  if (dbPages.length > 0) {
+                    items.push({
+                      type: 'category',
+                      name: dbTitle,
+                      items: dbPages
+                    });
+                    stats.pagesImported += dbPages.length;
+                    log(`📁 Carpeta creada para mentions de DB "${dbTitle}": ${dbPages.length} páginas`);
+                  }
+                }
+              }
+              
+              // Añadir mentions sin parent DB directamente a items
+              for (const page of mentionsWithoutDb) {
+                items.push(page);
+                stats.pagesImported++;
+                log(`  ✅ Mention "${page.name}" añadido a items`);
               }
             }
           }
