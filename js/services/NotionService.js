@@ -382,6 +382,12 @@ export class NotionService {
       
       log('📂 Bloques de página encontrados:', pageBlocks.length);
       
+      // DEBUG: Mostrar todos los tipos de bloques encontrados
+      console.log('🔍 DEBUG fetchChildPages - Bloques recibidos:', pageBlocks.length);
+      console.log('🔍 DEBUG fetchChildPages - Tipos:', pageBlocks.map(b => b.type));
+      const dbBlocks = pageBlocks.filter(b => b.type === 'child_database');
+      console.log('🔍 DEBUG fetchChildPages - child_database encontrados:', dbBlocks.length, dbBlocks.map(b => ({ id: b.id, title: b.child_database?.title })));
+      
       // Procesar bloques en orden (child_page, link_to_page y child_database mezclados)
       const results = [];
       
@@ -441,10 +447,12 @@ export class NotionService {
           const databaseId = block.id;
           const databaseTitle = block.child_database?.title || 'Database';
           
+          console.log('🔍 DEBUG child_database detectado:', { databaseId, databaseTitle });
           log('📊 Procesando base de datos:', databaseTitle, databaseId);
           
           try {
             const dbPages = await this.fetchDatabasePages(databaseId);
+            console.log('🔍 DEBUG child_database páginas:', dbPages.length, dbPages.map(p => p.title));
             log('📊 Páginas encontradas en DB:', dbPages.length);
             
             for (const dbPage of dbPages) {
@@ -814,6 +822,7 @@ export class NotionService {
    * @returns {Promise<Array>} - Lista de páginas con sus IDs y títulos
    */
   async fetchDatabasePages(databaseId) {
+    console.log('🔍 DEBUG fetchDatabasePages llamado con:', databaseId);
     try {
       // Obtener token del usuario o usar el de default
       let tokenToUse = this.storageService?.getUserToken();
@@ -822,10 +831,12 @@ export class NotionService {
       }
       
       if (!tokenToUse) {
+        console.log('🔍 DEBUG fetchDatabasePages - No hay token!');
         logWarn('No hay token para consultar base de datos');
         return [];
       }
 
+      console.log('🔍 DEBUG fetchDatabasePages - Token disponible, consultando...');
       log('📊 Consultando páginas de base de datos:', databaseId);
       
       const params = new URLSearchParams({
