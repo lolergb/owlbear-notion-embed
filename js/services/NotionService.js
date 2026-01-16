@@ -640,7 +640,11 @@ export class NotionService {
       const apiUrl = `/.netlify/functions/notion-api?pageId=${encodeURIComponent(pageId)}&token=${encodeURIComponent(tokenToUse)}&type=page`;
       
       const response = await fetch(apiUrl);
-      if (!response.ok) return null;
+      if (!response.ok) {
+        // 404 significa que la página no está compartida con la integración o no existe
+        // No logear como error ya que es un caso esperado para mentions a páginas externas
+        return null;
+      }
 
       const pageData = await response.json();
       
@@ -878,7 +882,7 @@ export class NotionService {
                 const pageInfo = await this._getMentionedPageInfo(mentionId);
                 
                 if (!pageInfo) {
-                  log(`  ⚠️ No se pudo obtener info de "${mention.text}"`);
+                  log(`  ⚠️ Mention "${mention.text}" omitido (la página no está compartida con tu integración de Notion)`);
                   continue;
                 }
                 
