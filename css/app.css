@@ -121,15 +121,18 @@
     font-size: var(--font-size-base);
     color: var(--color-text-secondary);
     padding: var(--spacing-lg);
-    height: 100%;
+    min-height: 100vh;
+    height: 100vh;
     width: 100%;
     max-width: 100%;
     margin: 0;
     display: flex;
     flex-direction: column;
     overflow-x: hidden;
+    overflow-y: auto;
     background-color: var(--color-bg-overlay);
     transition: width 0.3s ease;
+    box-sizing: border-box;
   }
   
   /* ==========================================================================
@@ -379,7 +382,8 @@
     ========================================================================== */
   .container {
     width: 100%;
-    height: 100%;
+    flex: 1;
+    min-height: 0;
     max-width: 600px;
     margin: 0 auto;
     display: flex;
@@ -1329,6 +1333,7 @@
   .page-button.context-menu-open .page-context-menu-button,
   .icon-button:hover { background: var(--color-bg-hover); }
   .icon-button:active { background: var(--color-bg-active); }
+  .icon-button.shared { background: var(--color-success, #22c55e); }
   .icon-button-icon { width: var(--icon-size-md); height: var(--icon-size-md); display: block; }
   
   /* Alias: add-first-category-button → btn--primary (para compatibilidad) */
@@ -2611,7 +2616,7 @@
 .mention-modal__header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: var(--spacing-sm);
   padding: var(--spacing-md) var(--spacing-lg);
   border-bottom: 1px solid var(--color-border);
   flex-shrink: 0;
@@ -2625,7 +2630,15 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  padding-right: var(--spacing-md);
+  flex: 1;
+}
+
+.mention-modal__share {
+  flex-shrink: 0;
+}
+
+.mention-modal__share.shared {
+  background-color: var(--color-success, #22c55e);
 }
 
 .mention-modal__close {
@@ -2675,7 +2688,12 @@
 
 /* Notion content inside modal */
 .mention-modal__notion-content {
-  /* Inherit notion-content styles */
+  padding: 0 var(--spacing-md);
+}
+
+/* Properties inside modal */
+.mention-modal__notion-content .notion-page-properties {
+  margin-bottom: var(--spacing-md);
 }
 
 /* Ensure mentions inside modal are not interactive */
@@ -2690,7 +2708,8 @@
    NOTION DATABASE PROPERTIES
    ============================================= */
 
-.notion-page-properties {
+.notion-page-properties,
+#notion-content .notion-page-properties {
   display: flex;
   flex-wrap: wrap;
   gap: var(--spacing-sm);
@@ -2741,29 +2760,18 @@
   color: var(--color-text-primary);
 }
 
-/* Notion tag colors */
-.notion-tag--default { background-color: rgba(150, 150, 150, 0.2); }
-.notion-tag--gray { background-color: rgba(150, 150, 150, 0.3); color: #9b9a97; }
-.notion-tag--brown { background-color: rgba(140, 100, 75, 0.3); color: #64473a; }
-.notion-tag--orange { background-color: rgba(255, 163, 68, 0.3); color: #d9730d; }
-.notion-tag--yellow { background-color: rgba(255, 220, 73, 0.3); color: #dfab01; }
-.notion-tag--green { background-color: rgba(77, 171, 154, 0.3); color: #0f7b6c; }
-.notion-tag--blue { background-color: rgba(82, 156, 202, 0.3); color: #0b6e99; }
-.notion-tag--purple { background-color: rgba(154, 109, 215, 0.3); color: #6940a5; }
-.notion-tag--pink { background-color: rgba(226, 85, 161, 0.3); color: #ad1a72; }
-.notion-tag--red { background-color: rgba(255, 115, 105, 0.3); color: #e03e3e; }
-
-/* Dark theme adjustments for tags */
-@media (prefers-color-scheme: dark) {
-  .notion-tag--gray { color: #979a9b; }
-  .notion-tag--brown { color: #937264; }
-  .notion-tag--orange { color: #ffa344; }
-  .notion-tag--yellow { color: #ffdc49; }
-  .notion-tag--green { color: #4dab9a; }
-  .notion-tag--blue { color: #529cca; }
-  .notion-tag--purple { color: #9a6dd7; }
-  .notion-tag--pink { color: #e255a1; }
-  .notion-tag--red { color: #ff7369; }
+/* Notion tag colors - todos usan default por ahora */
+.notion-tag--default,
+.notion-tag--gray,
+.notion-tag--brown,
+.notion-tag--orange,
+.notion-tag--yellow,
+.notion-tag--green,
+.notion-tag--blue,
+.notion-tag--purple,
+.notion-tag--pink,
+.notion-tag--red {
+  background-color: rgba(150, 150, 150, 0.2);
 }
 
 /* Checkbox */

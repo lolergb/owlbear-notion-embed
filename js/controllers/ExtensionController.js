@@ -5194,6 +5194,16 @@ export class ExtensionController {
     title.className = 'mention-modal__title';
     title.textContent = displayName;
     
+    // Botón de compartir (solo para GM y coGM)
+    let shareBtn = null;
+    if (this.isGM) {
+      shareBtn = document.createElement('button');
+      shareBtn.className = 'mention-modal__share icon-button';
+      shareBtn.innerHTML = '<img src="img/icon-players.svg" class="icon-button-icon" alt="Share" />';
+      shareBtn.setAttribute('aria-label', 'Share with players');
+      shareBtn.title = 'Share with players';
+    }
+    
     const closeBtn = document.createElement('button');
     closeBtn.className = 'mention-modal__close';
     closeBtn.innerHTML = '&times;';
@@ -5201,6 +5211,7 @@ export class ExtensionController {
     closeBtn.title = 'Close (Escape)';
     
     header.appendChild(title);
+    if (shareBtn) header.appendChild(shareBtn);
     header.appendChild(closeBtn);
     
     // Contenido del modal - inicialmente con loading state
@@ -5305,6 +5316,47 @@ export class ExtensionController {
           this._showImageModal(url, caption);
         });
       });
+      
+      // Handler para compartir (si existe el botón)
+      if (shareBtn) {
+        shareBtn.addEventListener('click', async () => {
+          try {
+            // Clonar el contenido y remover botones de compartir
+            const clone = content.cloneNode(true);
+            clone.querySelectorAll('.share-button, .notion-image-share-button, .video-share-button').forEach(el => el.remove());
+            const htmlContent = clone.innerHTML;
+            
+            if (!htmlContent.trim()) {
+              this._showFeedback('⚠️ No content to share');
+              return;
+            }
+            
+            // Enviar el HTML renderizado
+            const result = await this.broadcastService.sendMessage('com.dmscreen/showNotionContent', {
+              name: displayName,
+              html: htmlContent,
+              pageId: notionPageId,
+              senderId: this.playerId
+            });
+            
+            if (result?.success) {
+              this._showFeedback('📄 Page shared!');
+              // Feedback visual temporal en el botón
+              shareBtn.classList.add('shared');
+              shareBtn.title = 'Shared!';
+              setTimeout(() => {
+                shareBtn.classList.remove('shared');
+                shareBtn.title = 'Share with players';
+              }, 2000);
+            } else if (result?.error !== 'size_limit') {
+              this._showFeedback('❌ Error sharing page');
+            }
+          } catch (e) {
+            logError('Error compartiendo página desde modal:', e);
+            this._showFeedback('❌ Error sharing page');
+          }
+        });
+      }
       
     } catch (error) {
       logError('Error cargando página en modal:', error);
