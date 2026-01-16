@@ -623,8 +623,9 @@ export class NotionService {
   }
 
   /**
-   * Verifica si una página tiene contenido real (no solo títulos, links o vacía)
-   * child_page y link_to_page NO cuentan como contenido propio (se procesan como hijas)
+   * Verifica si una página tiene contenido real
+   * Patrón: (título/heading || párrafo con texto) & NO solo bases de datos
+   * Una página con solo child_database NO cuenta como contenido propio
    * @param {string} pageId - ID de la página
    * @returns {Promise<boolean>} - true si tiene contenido real
    */
@@ -636,62 +637,78 @@ export class NotionService {
         return false;
       }
 
-      // Tipos de bloques que consideramos "contenido real"
-      // NO incluimos child_page ni link_to_page (esos son hijos, no contenido propio)
-      const contentTypes = [
-        'paragraph', 'bulleted_list_item', 'numbered_list_item',
-        'image', 'video', 'embed', 'bookmark', 'code', 'quote',
-        'callout', 'table', 'toggle', 'to_do', 'equation',
-        'column_list', 'synced_block', 'template', 'link_preview',
-        'file', 'pdf', 'audio', 'divider'
-      ];
+      let hasTextContent = false;  // Tiene título, párrafo o heading con texto
+      let hasRichContent = false;  // Tiene imágenes, videos, tablas, etc.
+      let onlyHasDatabase = true;  // Solo tiene child_database (sin contenido real)
 
-      let contentScore = 0;
-      const MIN_CONTENT_SCORE = 1; // Mínimo para considerar que tiene contenido
-
-      // Verificar si hay contenido real
       for (const block of blocks) {
         // Ignorar child_page y link_to_page (son hijas, no contenido propio)
         if (block.type === 'child_page' || block.type === 'link_to_page') {
           continue;
         }
 
-        // Si es un tipo de contenido
-        if (contentTypes.includes(block.type)) {
-          // Para párrafos, verificar que no estén vacíos
-          if (block.type === 'paragraph') {
-            const text = block.paragraph?.rich_text;
-            if (text && text.length > 0 && text.some(t => t.plain_text?.trim())) {
-              contentScore += 1;
-            }
-          } else if (block.type === 'divider') {
-            // Los dividers solos no cuentan mucho
-            contentScore += 0.1;
-          } else {
-            // Imágenes, videos, tablas, etc. cuentan más
-            contentScore += 2;
-          }
-        }
-        
-        // Headings con contenido toggle cuentan
-        if (block.type === 'heading_1' || block.type === 'heading_2' || block.type === 'heading_3') {
-          const headingData = block[block.type];
-          // Si el heading tiene hijos (toggle), cuenta como contenido
-          if (block.has_children) {
-            contentScore += 2;
-          } else {
-            // Headings solos no cuentan mucho (son solo títulos)
-            contentScore += 0.2;
-          }
+        // child_database no cuenta como contenido real por sí solo
+        if (block.type === 'child_database') {
+          continue;
         }
 
-        // Si ya tenemos suficiente contenido, no seguir contando
-        if (contentScore >= MIN_CONTENT_SCORE) {
-          return true;
+        // Párrafos con texto real
+        if (block.type === 'paragraph') {
+          const text = block.paragraph?.rich_text;
+          if (text && text.length > 0 && text.some(t => t.plain_text?.trim())) {
+            hasTextContent = true;
+            onlyHasDatabase = false;
+          }
+          continue;
+        }
+
+        // Headings con texto
+        if (block.type === 'heading_1' || block.type === 'heading_2' || block.type === 'heading_3') {
+          const headingData = block[block.type];
+          const text = headingData?.rich_text;
+          if (text && text.length > 0 && text.some(t => t.plain_text?.trim())) {
+            hasTextContent = true;
+            onlyHasDatabase = false;
+          }
+          // Headings con hijos (toggles) también cuentan
+          if (block.has_children) {
+            hasRichContent = true;
+            onlyHasDatabase = false;
+          }
+          continue;
+        }
+
+        // Listas con texto
+        if (block.type === 'bulleted_list_item' || block.type === 'numbered_list_item' || block.type === 'to_do') {
+          const listData = block[block.type];
+          const text = listData?.rich_text;
+          if (text && text.length > 0 && text.some(t => t.plain_text?.trim())) {
+            hasTextContent = true;
+            onlyHasDatabase = false;
+          }
+          continue;
+        }
+
+        // Contenido rico (imágenes, videos, tablas, etc.)
+        const richContentTypes = [
+          'image', 'video', 'embed', 'bookmark', 'code', 'quote',
+          'callout', 'table', 'toggle', 'equation', 'column_list',
+          'synced_block', 'template', 'link_preview', 'file', 'pdf', 'audio'
+        ];
+        
+        if (richContentTypes.includes(block.type)) {
+          hasRichContent = true;
+          onlyHasDatabase = false;
+        }
+
+        // Dividers solos no cuentan
+        if (block.type === 'divider') {
+          continue;
         }
       }
 
-      return contentScore >= MIN_CONTENT_SCORE;
+      // Tiene contenido si tiene texto O contenido rico, Y no es solo una DB
+      return (hasTextContent || hasRichContent) && !onlyHasDatabase;
     } catch (e) {
       logWarn('Error verificando contenido de página:', pageId, e);
       return true; // En caso de error, asumimos que tiene contenido
@@ -922,9 +939,6 @@ export class NotionService {
         
         // Mapa de categorías por nombre para agrupar por labels
         const categoryMap = new Map(); // categoryName -> { type: 'category', name, items: [] }
-        
-        // Páginas de DB sin categoría asignada (irán a carpeta de la DB)
-        const databasePages = new Map(); // databaseId -> { title, pages: [] }
 
         // Verificar si la página principal tiene contenido real
         const mainPageHasContent = await this.hasRealContent(id);
@@ -959,6 +973,14 @@ export class NotionService {
         // PASO 2: Procesar páginas de DB con agrupación por labels
         const existingCategoryNames = Array.from(categoryMap.keys());
         
+        if (existingCategoryNames.length > 0) {
+          log(`📁 Categorías existentes para matching: ${existingCategoryNames.join(', ')}`);
+        }
+        
+        if (dbPagesForLater.length > 0) {
+          log(`📊 Procesando ${dbPagesForLater.length} páginas de DB para asignar por labels`);
+        }
+        
         for (const child of dbPagesForLater) {
           const pageData = {
             type: 'page',
@@ -970,6 +992,8 @@ export class NotionService {
           
           // Buscar si algún label coincide con una categoría existente
           if (child.labels && child.labels.length > 0) {
+            log(`  🏷️ "${child.title}" tiene labels: [${child.labels.join(', ')}]`);
+            
             for (const label of child.labels) {
               const matchingCategoryName = this._findMatchingCategory(label, existingCategoryNames);
               
@@ -979,38 +1003,28 @@ export class NotionService {
                 if (category && category.items) {
                   category.items.push(pageData);
                   assignedToCategory = true;
-                  log(`🏷️ "${child.title}" asignado a "${matchingCategoryName}" por label "${label}"`);
+                  log(`    ✅ Asignado a "${matchingCategoryName}" por label "${label}"`);
                   break;
                 }
               }
             }
+          } else {
+            log(`  ⚠️ "${child.title}" no tiene labels`);
           }
           
-          // Si no se asignó a ninguna categoría, añadir a la carpeta de la DB
+          // Si no se asignó a ninguna categoría, NO crear carpeta de DB
+          // Solo importamos páginas de DB que coincidan con categorías existentes
           if (!assignedToCategory) {
-            if (!databasePages.has(child.databaseId)) {
-              databasePages.set(child.databaseId, {
-                title: child.databaseTitle || 'Database',
-                pages: []
-              });
-            }
-            databasePages.get(child.databaseId).pages.push(pageData);
+            log(`⏭️ Página de DB "${child.title}" omitida (sin categoría coincidente)`);
+            stats.pagesSkipped++;
+            continue;
           }
           
           stats.pagesImported++;
         }
         
-        // PASO 3: Añadir carpetas de bases de datos (solo las que no se asignaron por label)
-        for (const [dbId, dbData] of databasePages) {
-          if (dbData.pages.length > 0) {
-            items.push({
-              type: 'category',
-              name: dbData.title,
-              items: dbData.pages
-            });
-            log(`📊 Carpeta de DB creada: ${dbData.title} con ${dbData.pages.length} páginas`);
-          }
-        }
+        // NOTA: Ya no creamos carpetas de bases de datos automáticamente
+        // Solo importamos páginas de DB que coinciden con categorías existentes por label
 
         // ============================================
         // ESCANEAR MENTIONS EN EL CONTENIDO
@@ -1041,15 +1055,17 @@ export class NotionService {
                 importedIds.add(child.id);
               }
               
-              // IDs de páginas en carpetas de DB
-              for (const [dbId, dbData] of databasePages) {
-                for (const page of dbData.pages) {
-                  // Extraer ID de la URL
-                  const urlMatch = page.url?.match(/-([a-f0-9]{32})(?:[^a-f0-9]|$)/i);
-                  if (urlMatch) {
-                    const extractedId = urlMatch[1];
-                    const formattedId = `${extractedId.substring(0, 8)}-${extractedId.substring(8, 12)}-${extractedId.substring(12, 16)}-${extractedId.substring(16, 20)}-${extractedId.substring(20, 32)}`;
-                    importedIds.add(formattedId);
+              // IDs de páginas ya en categorías
+              for (const [catName, category] of categoryMap) {
+                if (category.items) {
+                  for (const page of category.items) {
+                    // Extraer ID de la URL
+                    const urlMatch = page.url?.match(/-([a-f0-9]{32})(?:[^a-f0-9]|$)/i);
+                    if (urlMatch) {
+                      const extractedId = urlMatch[1];
+                      const formattedId = this._normalizeId(extractedId);
+                      importedIds.add(formattedId);
+                    }
                   }
                 }
               }
@@ -1086,69 +1102,37 @@ export class NotionService {
                   url: pageInfo.url
                 };
                 
-                // Si tiene parent DB, añadir a carpeta de esa DB
-                if (pageInfo.parentDbId && pageInfo.parentDbTitle) {
-                  // Buscar si ya existe la carpeta de esa DB
-                  if (!databasePages.has(pageInfo.parentDbId)) {
-                    databasePages.set(pageInfo.parentDbId, {
-                      title: pageInfo.parentDbTitle,
-                      pages: []
-                    });
-                  }
-                  
-                  // Verificar que no esté ya en la carpeta
-                  const existsInFolder = databasePages.get(pageInfo.parentDbId).pages.some(
-                    p => p.url === pageInfo.url || p.name === pageInfo.title
-                  );
-                  
-                  if (!existsInFolder) {
-                    databasePages.get(pageInfo.parentDbId).pages.push(newPage);
-                    stats.pagesImported++;
-                    log(`  ✅ Añadido "${pageInfo.title}" a carpeta "${pageInfo.parentDbTitle}"`);
-                  }
-                } else {
-                  // Sin parent DB, añadir a items directamente
-                  items.push(newPage);
-                  stats.pagesImported++;
-                  log(`  ✅ Añadido "${pageInfo.title}" a items`);
-                }
+                // Intentar asignar a una categoría existente por título de la DB padre
+                let assignedToCategory = false;
                 
-                // Marcar como importado
-                importedIds.add(normalizedId);
-              }
-              
-              // Re-añadir carpetas de DB que se hayan creado/actualizado por mentions
-              // (solo las nuevas, las anteriores ya están en items)
-              for (const [dbId, dbData] of databasePages) {
-                // Verificar si esta carpeta ya está en items
-                const folderExists = items.some(
-                  item => item.type === 'category' && item.name === dbData.title
-                );
-                
-                if (!folderExists && dbData.pages.length > 0) {
-                  items.push({
-                    type: 'category',
-                    name: dbData.title,
-                    items: dbData.pages
-                  });
-                  log(`📊 Nueva carpeta de DB por mentions: ${dbData.title} con ${dbData.pages.length} páginas`);
-                } else if (folderExists) {
-                  // Actualizar la carpeta existente con las nuevas páginas
-                  const existingFolder = items.find(
-                    item => item.type === 'category' && item.name === dbData.title
-                  );
-                  if (existingFolder) {
-                    // Añadir páginas que no estén ya
-                    for (const page of dbData.pages) {
-                      const pageExists = existingFolder.items.some(
-                        p => p.url === page.url || p.name === page.name
-                      );
-                      if (!pageExists) {
-                        existingFolder.items.push(page);
+                if (pageInfo.parentDbTitle) {
+                  // Buscar si hay una categoría que coincida con el título de la DB
+                  const matchingCategoryName = this._findMatchingCategory(pageInfo.parentDbTitle, existingCategoryNames);
+                  
+                  if (matchingCategoryName) {
+                    const category = categoryMap.get(matchingCategoryName);
+                    if (category && category.items) {
+                      // Verificar que no esté ya
+                      const exists = category.items.some(p => p.url === newPage.url || p.name === newPage.name);
+                      if (!exists) {
+                        category.items.push(newPage);
+                        stats.pagesImported++;
+                        assignedToCategory = true;
+                        log(`  ✅ Mention "${pageInfo.title}" asignado a "${matchingCategoryName}"`);
                       }
                     }
                   }
                 }
+                
+                // Si no se pudo asignar a una categoría, añadir a items directamente
+                if (!assignedToCategory) {
+                  items.push(newPage);
+                  stats.pagesImported++;
+                  log(`  ✅ Mention "${pageInfo.title}" añadido a items`);
+                }
+                
+                // Marcar como importado
+                importedIds.add(normalizedId);
               }
             }
           }
