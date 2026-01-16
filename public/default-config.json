@@ -2,10 +2,6 @@
   "order": [
     {
       "type": "category",
-      "index": 4
-    },
-    {
-      "type": "category",
       "index": 0
     },
     {
@@ -19,59 +15,27 @@
     {
       "type": "category",
       "index": 3
-    },
-    {
-      "type": "category",
-      "index": 5
     }
   ],
   "categories": [
     {
       "name": "⭐ Start Here",
-      "order": [
-        {
-          "type": "page",
-          "index": 0
-        },
-        {
-          "type": "page",
-          "index": 2
-        },
-        {
-          "type": "page",
-          "index": 3
-        },
-        {
-          "type": "page",
-          "index": 1
-        }
-      ],
       "pages": [
         {
-          "url": "https://owlbear-gm-vault.netlify.app/content-demo/quick-start.html",
-          "name": "Quick Start"
+          "name": "Quick Start",
+          "url": "https://www.notion.so/Quick-Start-2d8d4856c90e80f1b4e4ecff59e61dd5"
         },
         {
-          "url": "https://media.wizards.com/2023/downloads/dnd/SRD_CC_v5.1.pdf",
-          "name": "SRD CC 5.1"
+          "name": "Race - Elf",
+          "url": "https://www.5esrd.com/wp-content/uploads/2016/12/DeanSpencer-elfrogue-reduced.png"
         },
         {
-          "url": "https://www.5esrd.com/wp-content/uploads/2016/12/DeanSpencer-elfrogue-reduced.png",
-          "name": "Race - Elf"
+          "name": "Enemy — Goblin (Link to token)",
+          "url": "https://www.5esrd.com/gamemastering/monsters-foes/monsters-by-type/humanoids/goblin/"
         },
         {
-          "url": "https://www.5esrd.com/gamemastering/monsters-foes/monsters-by-type/humanoids/goblin/",
-          "name": "Enemy — Goblin (Link to token)"
-        }
-      ],
-      "categories": []
-    },
-    {
-      "name": "Session Notes",
-      "pages": [
-        {
-          "name": "Template",
-          "url": "https://owlbear-gm-vault.netlify.app/content-demo/session-notes.html"
+          "name": "SRD CC 5.1",
+          "url": "https://media.wizards.com/2023/downloads/dnd/SRD_CC_v5.1.pdf"
         }
       ],
       "categories": [],
@@ -81,7 +45,31 @@
           "index": 0
         },
         {
-          "type": "category",
+          "type": "page",
+          "index": 1
+        },
+        {
+          "type": "page",
+          "index": 2
+        },
+        {
+          "type": "page",
+          "index": 3
+        }
+      ]
+    },
+    {
+      "name": "Session Notes",
+      "pages": [
+        {
+          "name": "Template",
+          "url": "https://www.notion.so/Session-Notes-Template-2d8d4856c90e806eb8fffd6f055eaf3b"
+        }
+      ],
+      "categories": [],
+      "order": [
+        {
+          "type": "page",
           "index": 0
         }
       ]
@@ -95,15 +83,11 @@
           "pages": [
             {
               "name": "Scene — The Watched Crossroads",
-              "url": "https://owlbear-gm-vault.netlify.app/content-demo/scene-the-watched-crossroads.html"
+              "url": "https://www.notion.so/Scene-The-Watched-Crossroads-2d8d4856c90e804185b4cf910d4817c1"
             }
           ],
           "categories": [],
           "order": [
-            {
-              "type": "page",
-              "index": 1
-            },
             {
               "type": "page",
               "index": 0
@@ -115,10 +99,26 @@
           "pages": [
             {
               "name": "Maera",
-              "url": "https://owlbear-gm-vault.netlify.app/content-demo/maera-manos-secas.html"
+              "url": "https://www.notion.so/Maera-Manos-Secas-2d8d4856c90e8030b014dbbb7bf5306d"
             }
           ],
-          "categories": []
+          "categories": [],
+          "order": [
+            {
+              "type": "page",
+              "index": 0
+            }
+          ]
+        }
+      ],
+      "order": [
+        {
+          "type": "category",
+          "index": 0
+        },
+        {
+          "type": "category",
+          "index": 1
         }
       ]
     },
@@ -127,15 +127,15 @@
       "pages": [
         {
           "name": "Presentation",
-          "url": "https://docs.google.com/presentation/d/1oIMHW9qRPMSauD16w6uxTbRBtSZGaTBWC57OnM7MKnU/edit?usp=sharing"
+          "url": "https://docs.google.com/presentation/d/1oIMHW9qRPMSauD16w6uxTbRBtSZGaTBWC57OnM7MKnU"
         },
         {
           "name": "Spreadsheet",
-          "url": "https://docs.google.com/spreadsheets/d/1YG2RgqGYro4nedTnCiaaUxDHGHoyxSQlLtqUAGua010/edit?usp=sharing"
+          "url": "https://docs.google.com/spreadsheets/d/1YG2RgqGYro4nedTnCiaaUxDHGHoyxSQlLtqUAGua010"
         },
         {
           "name": "Document",
-          "url": "https://docs.google.com/document/d/1tza3tqn9fAFn5ppfm4eR2oz5JSAvXMa0LZ-EpJaQ7n0/edit?usp=sharing"
+          "url": "https://docs.google.com/document/d/1tza3tqn9gAFn5ppfm4eR2oz5JSAvXMa0LZ-EpJaQ7n0"
         },
         {
           "name": "Video (Vimeo)",
