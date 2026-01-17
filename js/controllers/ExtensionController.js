@@ -206,6 +206,31 @@ export class ExtensionController {
         return;
       }
       
+      // Verificar si el botón está dentro de un modal de mention
+      let overlay = null;
+      let content = null;
+      
+      if (button) {
+        // Buscar el overlay del modal desde el botón
+        overlay = button.closest('.mention-modal-overlay');
+        if (overlay) {
+          content = overlay.querySelector('.mention-modal__content');
+        }
+      } else {
+        // Si no hay botón, buscar el modal activo
+        overlay = document.querySelector('.mention-modal-overlay--visible');
+        if (overlay) {
+          content = overlay.querySelector('.mention-modal__content');
+        }
+      }
+      
+      // Si estamos en un modal, recargar el contenido del modal
+      if (overlay && content) {
+        log('🔄 Recargando contenido del modal...');
+        await controller._reloadMentionModalContent(overlay, content);
+        return;
+      }
+      
       // Intentar obtener la página actual del controller (solo Master GM)
       if (controller.currentPage && controller.currentPage.isNotionPage()) {
         const pageId = controller.currentPage.getNotionPageId();
@@ -5534,6 +5559,112 @@ export class ExtensionController {
   }
 
   /**
+   * Recarga el contenido de un modal de mention existente
+   * @param {HTMLElement} overlay - El overlay del modal
+   * @param {HTMLElement} content - El contenedor de contenido
+   * @private
+   */
+  async _reloadMentionModalContent(overlay, content) {
+    const notionPageId = overlay.dataset.notionPageId;
+    const displayName = overlay.dataset.displayName;
+    const page = overlay._mentionModalPage;
+    
+    if (!notionPageId || !page) {
+      log('⚠️ No se puede recargar modal: datos faltantes');
+      return;
+    }
+    
+    // Mostrar loading
+    content.innerHTML = `
+      <div class="empty-state mention-modal__loading">
+        <div class="empty-state-icon">⏳</div>
+        <p class="empty-state-text">Reloading page...</p>
+        <p class="empty-state-hint">Please wait while we reload the content</p>
+      </div>
+    `;
+    
+    try {
+      // Limpiar caché de esta página
+      this.cacheService.clearPageCache(notionPageId);
+      
+      // Configurar renderer para modo modal
+      this.notionRenderer.setRenderingOptions({ isInModal: true });
+      
+      let htmlContent = null;
+      
+      // Master GM: usar API de Notion directamente
+      if (this.isGM && !this.isCoGM) {
+        const result = await this._generateNotionHtmlWithHeader(notionPageId, {
+          includeShareButtons: true,
+          fallbackTitle: displayName,
+          useCache: false // Forzar recarga sin caché
+        });
+        htmlContent = result?.html;
+      } else {
+        // CoGM y Players: solicitar contenido al GM
+        const gmAvailable = await this._checkGMAvailability();
+        
+        if (!gmAvailable.isActive) {
+          content.innerHTML = `
+            <div class="empty-state">
+              <div class="empty-state-icon">👋</div>
+              <p class="empty-state-text">The GM is not active</p>
+              <p class="empty-state-hint">Wait for the GM to join the session to view this page</p>
+            </div>
+          `;
+          return;
+        }
+        
+        // Solicitar contenido al GM vía broadcast (sin caché)
+        htmlContent = await this.broadcastService.requestContentFromGM(notionPageId);
+        
+        if (htmlContent) {
+          // Guardar en caché local
+          this.cacheService.saveHtmlToLocalCache(notionPageId, htmlContent);
+        }
+      }
+      
+      if (!htmlContent) {
+        content.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-state-icon">⏳</div>
+            <p class="empty-state-text">Content not available</p>
+            <p class="empty-state-hint">The GM needs to open this page first to cache it.</p>
+          </div>
+        `;
+        return;
+      }
+      
+      // Mostrar contenido
+      content.innerHTML = `<div class="notion-content mention-modal__notion-content">${htmlContent}</div>`;
+      
+      // Adjuntar handlers de imágenes
+      const images = content.querySelectorAll('.notion-image-clickable');
+      images.forEach(img => {
+        if (img.dataset.listenerAdded) return;
+        img.dataset.listenerAdded = 'true';
+        img.addEventListener('click', () => {
+          const url = img.dataset.imageUrl;
+          const caption = img.dataset.imageCaption;
+          this._showImageModal(url, caption);
+        });
+      });
+      
+    } catch (error) {
+      logError('Error recargando contenido del modal:', error);
+      content.innerHTML = `
+        <div class="empty-state">
+          <div class="empty-state-icon">⚠️</div>
+          <p class="empty-state-text">Error reloading page</p>
+          <p class="empty-state-hint">${error.message || 'Unknown error'}</p>
+        </div>
+      `;
+    } finally {
+      this.notionRenderer.setRenderingOptions({ isInModal: false });
+    }
+  }
+
+  /**
    * Muestra un modal con el contenido de una página mencionada
    * @private
    */
@@ -5544,6 +5675,15 @@ export class ExtensionController {
     overlay.setAttribute('aria-modal', 'true');
     overlay.setAttribute('role', 'dialog');
     overlay.setAttribute('aria-label', `Page: ${displayName}`);
+    
+    // Guardar referencia a page y displayName para poder recargar el modal
+    const notionPageId = page.getNotionPageId();
+    if (notionPageId) {
+      overlay.dataset.notionPageId = notionPageId;
+      overlay.dataset.displayName = displayName;
+      // Guardar referencia al page object (serializado)
+      overlay._mentionModalPage = page;
+    }
     
     // Crear modal
     const modal = document.createElement('div');
@@ -5667,8 +5807,8 @@ export class ExtensionController {
           content.innerHTML = `
             <div class="empty-state">
               <div class="empty-state-icon">👋</div>
-              <p class="empty-state-text">Your GM is not active right now</p>
-              <p class="empty-state-hint">Wait for them to join the session</p>
+              <p class="empty-state-text">The GM is not active</p>
+              <p class="empty-state-hint">Wait for the GM to join the session to view this page</p>
               <button class="btn btn--sm btn--secondary mention-modal__retry-btn">
                 🔄 Retry
               </button>

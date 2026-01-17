@@ -2677,7 +2677,7 @@
 .mention-modal__content {
   flex: 1;
   overflow-y: auto;
-  padding: var(--spacing-lg) 0;
+  padding: 0;
   min-height: 200px;
   background-color: var(--color-bg-primary);
   margin: 0 var(--spacing-lg) var(--spacing-lg);
