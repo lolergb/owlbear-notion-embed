@@ -4096,7 +4096,28 @@ export class ExtensionController {
   _setupGMBroadcast() {
     // Responder a solicitudes de contenido
     this.broadcastService.setupGMContentResponder(async (pageId) => {
-      return this.cacheService.getHtmlFromLocalCache(pageId);
+      // Primero intentar obtener del caché local
+      let html = this.cacheService.getHtmlFromLocalCache(pageId);
+      
+      // Si no está en caché, intentar generarlo bajo demanda
+      if (!html) {
+        log('📡 Contenido no en caché, generando bajo demanda para:', pageId);
+        try {
+          const pageInfo = await this.notionService.fetchPageInfo(pageId, true);
+          const blocks = await this.notionService.fetchBlocks(pageId, true);
+          html = await this.notionRenderer.renderBlocks(blocks);
+          
+          // Cachear para futuras solicitudes
+          if (html) {
+            this.cacheService.saveHtmlToLocalCache(pageId, html);
+            log('✅ Contenido generado y cacheado para:', pageId);
+          }
+        } catch (e) {
+          log('⚠️ Error generando contenido bajo demanda:', e.message);
+        }
+      }
+      
+      return html;
     });
 
     // Responder a solicitudes de páginas visibles
@@ -4495,6 +4516,14 @@ export class ExtensionController {
     // Restaurar clases originales
     notionContent.className = 'notion-container__content notion-content';
 
+    // DEBUG: Log para verificar rol
+    console.log('🔍 _renderNotionPage DEBUG:', {
+      isGM: this.isGM,
+      isCoGM: this.isCoGM,
+      pageId,
+      pageName: page?.name
+    });
+
     const hasUserToken = this.storageService.hasUserToken();
     
     // Verificar si hay token de default disponible (para páginas del default-config)
@@ -4504,10 +4533,12 @@ export class ExtensionController {
     // Caso 1: Co-GM o Player - SIEMPRE solicitar contenido del GM master
     // No importa si hay token default, porque ese token es para demos, no para el vault del usuario
     if (!this.isGM || this.isCoGM) {
-      log(`👤 ${this.isCoGM ? 'Co-GM' : 'Player'} - solicitando contenido al Master GM...`);
+      console.log(`👤 ${this.isCoGM ? 'Co-GM' : 'Player'} - usando broadcast, NO API de Notion`);
       await this._requestNotionContentFromGM(page, pageId, notionContent);
       return;
     }
+    
+    console.log('👑 Master GM - usando API de Notion directamente');
     
     // Caso 2: Master GM sin ningún token - debe configurar su token
     if (!hasAnyToken) {
