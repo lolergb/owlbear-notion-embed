@@ -1925,17 +1925,21 @@ export class ExtensionController {
           let notionContent = document.getElementById('notion-content');
           let htmlContent = '';
           
-          // Si el contenido no está cargado (compartiendo desde lista), usar función centralizada
+          // Si el contenido no está cargado (compartiendo desde lista), renderizarlo primero
           if (!notionContent || !notionContent.innerHTML.trim()) {
-            log('📄 Contenido no cargado, generando HTML completo para compartir...');
+            log('📄 Contenido no cargado, renderizando para compartir...');
             this._showFeedback('⏳ Loading content...');
             
-            // Usar función centralizada para generar HTML completo con header (cover, título, icono)
-            const result = await this._generateFullNotionHtml(pageId, {
-              forceRefresh: false,
-              includeShareButtons: false  // No incluir botones de share para players
+            // Usar función centralizada que incluye header completo (cover, título, icono)
+            const result = await this._generateNotionHtmlWithHeader(pageId, {
+              includeShareButtons: false, // No incluir botones de share en contenido compartido
+              fallbackTitle: page.name,
+              useCache: true
             });
-            htmlContent = result.html;
+            
+            if (result?.html) {
+              htmlContent = result.html;
+            }
           } else {
             // Clonar el contenido visible y remover botones de compartir
             const clone = notionContent.cloneNode(true);
@@ -3918,69 +3922,41 @@ export class ExtensionController {
   }
 
   /**
-   * Detecta si el GM actual es Co-GM (solo lectura) y establece ownership si corresponde
-   * Esta función combina la detección de coGM con la toma de ownership para evitar race conditions
+   * Detecta si el GM actual es Co-GM (solo lectura)
    * @private
    */
   async _detectCoGM() {
     try {
       const owner = await this.storageService.getVaultOwner();
       
-      // DEBUG: Log detallado del owner
-      console.log('🔍 [DEBUG] Vault owner actual:', {
-        owner: owner,
-        ownerId: owner?.id,
-        ownerName: owner?.name,
-        lastHeartbeat: owner?.lastHeartbeat,
-        lastHeartbeatDate: owner?.lastHeartbeat ? new Date(owner.lastHeartbeat).toLocaleTimeString() : 'N/A',
-        myPlayerId: this.playerId,
-        myPlayerName: this.playerName
-      });
+      log('🔍 Verificando vault owner:', owner);
       
-      // Verificar si el owner está inactivo (más de 15 minutos sin heartbeat)
-      const timeSinceLastActivity = owner ? (Date.now() - (owner.lastHeartbeat || 0)) : Infinity;
-      const isStale = timeSinceLastActivity > OWNER_TIMEOUT;
-      const minutesInactive = Math.round(timeSinceLastActivity / 60000);
-      
-      console.log('🔍 [DEBUG] Estado del owner:', {
-        timeSinceLastActivity: timeSinceLastActivity,
-        OWNER_TIMEOUT: OWNER_TIMEOUT,
-        isStale: isStale,
-        minutesInactive: minutesInactive
-      });
-      
-      // Si no hay owner, owner inválido, o el owner está inactivo → SOY MASTER GM
-      if (!owner || !owner.id || isStale) {
-        console.log('👑 [Master GM] Tomando ownership porque:', !owner ? 'no hay owner' : !owner.id ? 'owner sin ID' : 'owner inactivo');
+      // Si no hay owner o el owner no tiene datos válidos, no es coGM
+      if (!owner || !owner.id) {
+        log('👑 [Master GM] No hay vault owner válido');
         this.isCoGM = false;
-        // Establecer ownership inmediatamente
-        const setResult = await this.storageService.setVaultOwner(this.playerId, this.playerName);
-        console.log('👑 [DEBUG] setVaultOwner resultado:', setResult);
         return;
       }
       
-      // Verificar si soy el owner actual
+      // Verificar si soy el owner
       const isMe = owner.id === this.playerId;
-      console.log('🔍 [DEBUG] Comparación de IDs:', {
-        ownerIdType: typeof owner.id,
-        myIdType: typeof this.playerId,
-        ownerIdValue: owner.id,
-        myIdValue: this.playerId,
-        isMe: isMe,
-        strictEqual: owner.id === this.playerId,
-        looseEqual: owner.id == this.playerId
-      });
+      log('🔍 ¿Soy el owner?', isMe, '| Mi ID:', this.playerId, '| Owner ID:', owner.id);
       
-      if (isMe) {
-        // Soy el owner actual → Master GM
-        log('👑 [Master GM] Soy el vault owner');
-        this.isCoGM = false;
-        // Actualizar heartbeat
-        await this.storageService.setVaultOwner(this.playerId, this.playerName);
-      } else {
-        // Hay otro owner activo → Co-GM
+      // Verificar si el owner está inactivo (más de 15 minutos sin heartbeat)
+      const timeSinceLastActivity = Date.now() - (owner.lastHeartbeat || 0);
+      const isStale = timeSinceLastActivity > OWNER_TIMEOUT;
+      const minutesInactive = Math.round(timeSinceLastActivity / 60000);
+      log('🔍 Owner inactivo?', isStale, '| Minutos inactivo:', minutesInactive);
+      
+      // Es Co-GM si hay owner válido, no soy yo, y no está inactivo
+      this.isCoGM = !isMe && !isStale;
+      
+      if (this.isCoGM) {
         log('👁️ [Co-GM] Modo solo lectura - Master GM:', owner.name || 'Desconocido');
-        this.isCoGM = true;
+      } else if (isMe) {
+        log('👑 [Master GM] Soy el vault owner');
+      } else if (isStale) {
+        log('👑 [Master GM] El vault owner anterior está inactivo (', minutesInactive, 'min)');
       }
     } catch (e) {
       logError('Error detectando Co-GM:', e);
@@ -4000,11 +3976,10 @@ export class ExtensionController {
     let config = null;
     let configSource = 'none';
 
-    // Para el GM: SOLO localStorage (según arquitectura, todo está en localStorage)
-    // Para Players y Co-GM: solicitar via broadcast
-    // Para Master GM: localStorage
+    // Para el Master GM: SOLO localStorage (según arquitectura, todo está en localStorage)
+    // Para Co-GM y Players: room metadata (estructura visible) + broadcast para contenido
     if (this.isGM && !this.isCoGM) {
-      // MASTER GM: cargar desde localStorage (configuración completa)
+      // Master GM: cargar de localStorage
       // 1. Intentar cargar de localStorage (configuración completa del GM)
       const localConfig = this.storageService.getLocalConfig();
       if (localConfig && localConfig.categories && localConfig.categories.length > 0) {
@@ -4029,36 +4004,9 @@ export class ExtensionController {
           log('⚠️ No se pudo cargar config default:', e.message);
         }
       }
-    } else if (this.isCoGM) {
-      // CO-GM: solicitar vault completo del Master GM (ve todo pero solo lectura)
-      const gmAvailable = await this._checkGMAvailability();
-      
-      if (gmAvailable.isActive) {
-        log('👁️ Co-GM: solicitando vault completo del Master GM...');
-        const fullVaultReceived = await this._requestFullVaultOnPromotion();
-        
-        if (fullVaultReceived) {
-          // El vault se guardó en localStorage, cargarlo
-          const localConfig = this.storageService.getLocalConfig();
-          if (localConfig && localConfig.categories) {
-            config = localConfig;
-            configSource = 'broadcastFullVault';
-            log('✅ Co-GM: vault completo recibido y cargado');
-          }
-        }
-      }
-      
-      // Fallback: usar localStorage si ya tiene algo (de una sesión anterior)
-      if (!config) {
-        const localConfig = this.storageService.getLocalConfig();
-        if (localConfig && localConfig.categories && localConfig.categories.length > 0) {
-          config = localConfig;
-          configSource = 'localStorage-fallback';
-          log('⚠️ Co-GM: usando configuración local existente (Master GM no disponible)');
-        }
-      }
     } else {
-      // PLAYER: solicitar solo páginas visibles
+      // Co-GM y Players: solicitar configuración via broadcast
+      // El Co-GM debe ver la misma lista que el Master GM comparte
       const gmAvailable = await this._checkGMAvailability();
       
       if (gmAvailable.isActive) {
@@ -4148,21 +4096,21 @@ export class ExtensionController {
       // Primero intentar obtener del caché local
       let html = this.cacheService.getHtmlFromLocalCache(pageId);
       
-      // Si no está en caché, generar HTML completo bajo demanda (con header: cover, título, icono)
+      // Si no está en caché, intentar generarlo bajo demanda CON header (cover, título, icono)
       if (!html) {
         log('📡 Contenido no en caché, generando bajo demanda para:', pageId);
         try {
-          // Usar función centralizada para generar HTML completo con header
-          const result = await this._generateFullNotionHtml(pageId, {
-            forceRefresh: true,
-            includeShareButtons: false  // No incluir botones de share para players
+          // Usar función centralizada que incluye header completo
+          const result = await this._generateNotionHtmlWithHeader(pageId, {
+            includeShareButtons: false, // Players/coGM no deben ver botones de share
+            useCache: true
           });
-          html = result.html;
           
-          // Cachear para futuras solicitudes
-          if (html) {
+          if (result?.html) {
+            html = result.html;
+            // Cachear para futuras solicitudes (header + bloques)
             this.cacheService.saveHtmlToLocalCache(pageId, html);
-            log('✅ Contenido completo generado y cacheado para:', pageId);
+            log('✅ Contenido con header generado y cacheado para:', pageId);
           }
         } catch (e) {
           log('⚠️ Error generando contenido bajo demanda:', e.message);
@@ -4613,29 +4561,15 @@ export class ExtensionController {
   }
 
   /**
-   * Genera el HTML completo de una página de Notion (header + propiedades + bloques)
-   * Esta función centraliza la generación de HTML para evitar inconsistencias
-   * @param {string} pageId - ID de la página de Notion
-   * @param {Object} options - Opciones de generación
-   * @param {boolean} options.forceRefresh - Forzar recarga sin caché
-   * @param {Array} options.blockTypes - Filtro de tipos de bloque
-   * @param {boolean} options.includeShareButtons - Incluir botones de compartir (default: true)
-   * @param {boolean} options.visibleToPlayers - Si la página es visible para players
-   * @returns {Promise<{html: string, headerHtml: string, blocksHtml: string}>}
+   * Renderiza una página de Notion usando el token del usuario
    * @private
    */
-  async _generateFullNotionHtml(pageId, options = {}) {
-    const {
-      forceRefresh = false,
-      blockTypes = null,
-      includeShareButtons = true,
-      visibleToPlayers = false
-    } = options;
-
+  async _renderNotionPageWithToken(page, pageId, notionContent, forceRefresh = false) {
     // Obtener info de la página (cover, título, icono) y bloques
+    // Si forceRefresh, no usar caché para ninguno
     const pageInfo = await this.notionService.fetchPageInfo(pageId, !forceRefresh);
     const blocks = await this.notionService.fetchBlocks(pageId, !forceRefresh);
-    const blocksHtml = await this.notionRenderer.renderBlocks(blocks, blockTypes);
+    const blocksHtml = await this.notionRenderer.renderBlocks(blocks, page.blockTypes);
     
     // Construir HTML con header (cover + título)
     let headerHtml = '';
@@ -4644,14 +4578,6 @@ export class ExtensionController {
     if (pageInfo?.cover) {
       const coverUrl = pageInfo.cover.external?.url || pageInfo.cover.file?.url;
       if (coverUrl) {
-        const shareButtonHtml = includeShareButtons ? `
-              <button class="notion-image-share-button share-button" 
-                      data-image-url="${coverUrl}" 
-                      data-image-caption=""
-                      title="Share with room">
-                <img src="img/icon-players.svg" alt="Share" />
-              </button>` : '';
-        
         headerHtml += `
           <div class="notion-page-cover">
             <div class="notion-image-container">
@@ -4665,7 +4591,13 @@ export class ExtensionController {
                    data-image-caption=""
                    data-block-id="cover-${pageId}"
                    onload="const loading = this.parentElement.querySelector('.image-loading'); if(loading) loading.remove();"
-                   onerror="if(!this.dataset.refreshAttempted) { this.dataset.refreshAttempted='true'; setTimeout(() => { if(window.refreshImage) window.refreshImage(); }, 500); } else { this.style.display='none'; const loading = this.parentElement.querySelector('.image-loading'); if(loading) loading.remove(); const errorDiv = document.createElement('div'); errorDiv.className='empty-state notion-image-error'; errorDiv.innerHTML='<div class=\\'empty-state-icon\\'>⚠️</div><p class=\\'empty-state-text\\'>Cover image expired</p><button class=\\'btn btn--sm btn--ghost\\' onclick=\\'window.refreshImage && window.refreshImage(this)\\'>🔄 Reload page</button>'; this.parentElement.appendChild(errorDiv); }" />${shareButtonHtml}
+                   onerror="if(!this.dataset.refreshAttempted) { this.dataset.refreshAttempted='true'; setTimeout(() => { if(window.refreshImage) window.refreshImage(); }, 500); } else { this.style.display='none'; const loading = this.parentElement.querySelector('.image-loading'); if(loading) loading.remove(); const errorDiv = document.createElement('div'); errorDiv.className='empty-state notion-image-error'; errorDiv.innerHTML='<div class=\\'empty-state-icon\\'>⚠️</div><p class=\\'empty-state-text\\'>Cover image expired</p><button class=\\'btn btn--sm btn--ghost\\' onclick=\\'window.refreshImage && window.refreshImage(this)\\'>🔄 Reload page</button>'; this.parentElement.appendChild(errorDiv); }" />
+              <button class="notion-image-share-button share-button" 
+                      data-image-url="${coverUrl}" 
+                      data-image-caption=""
+                      title="Share with room">
+                <img src="img/icon-players.svg" alt="Share" />
+              </button>
             </div>
           </div>
         `;
@@ -4687,8 +4619,8 @@ export class ExtensionController {
       }
     }
     
-    // Indicador de visibilidad para players
-    const visibilityIndicator = visibleToPlayers ? this._getVisibilityIndicator() : '';
+    // Indicador de visibilidad para players - fácil de personalizar
+    const visibilityIndicator = page.visibleToPlayers ? this._getVisibilityIndicator() : '';
     
     // Usar título de Notion para el contenido interno, o "Untitled" si no existe
     const notionPageTitle = notionTitle || 'Untitled';
@@ -4697,29 +4629,9 @@ export class ExtensionController {
     // Renderizar propiedades de base de datos (si las hay)
     const propertiesHtml = this.notionRenderer.renderPageProperties(pageInfo?.properties);
     
-    // HTML completo
-    const fullHtml = headerHtml + propertiesHtml + blocksHtml;
-    
-    return {
-      html: fullHtml,
-      headerHtml,
-      propertiesHtml,
-      blocksHtml
-    };
-  }
+    notionContent.innerHTML = headerHtml + propertiesHtml + blocksHtml;
 
-  async _renderNotionPageWithToken(page, pageId, notionContent, forceRefresh = false) {
-    // Usar función centralizada para generar HTML completo
-    const { html, headerHtml, blocksHtml } = await this._generateFullNotionHtml(pageId, {
-      forceRefresh,
-      blockTypes: page.blockTypes,
-      includeShareButtons: true,
-      visibleToPlayers: page.visibleToPlayers
-    });
-    
-    notionContent.innerHTML = html;
-
-    // Guardar HTML en caché (sin botones de share para cuando se envíe a players)
+    // Guardar HTML en caché
     this.cacheService.saveHtmlToLocalCache(pageId, headerHtml + blocksHtml);
 
     // Attach event handlers para imágenes (incluyendo cover)
@@ -4747,6 +4659,105 @@ export class ExtensionController {
     }
     
     return null;
+  }
+
+  /**
+   * Genera el HTML completo de una página de Notion con header (cover, título, icono) + bloques
+   * Esta función centraliza la lógica de generación para mantener consistencia
+   * @param {string} pageId - ID de la página de Notion
+   * @param {Object} options - Opciones de generación
+   * @param {boolean} options.includeShareButtons - Si incluir botones de compartir (solo para GM)
+   * @param {string} options.fallbackTitle - Título a usar si no se obtiene de Notion
+   * @param {Array} options.blockTypes - Tipos de bloques a incluir (filtro opcional)
+   * @param {boolean} options.useCache - Si usar caché (default: true)
+   * @returns {Promise<{html: string, headerHtml: string, blocksHtml: string}|null>}
+   * @private
+   */
+  async _generateNotionHtmlWithHeader(pageId, options = {}) {
+    const {
+      includeShareButtons = false,
+      fallbackTitle = 'Untitled',
+      blockTypes = null,
+      useCache = true
+    } = options;
+
+    try {
+      // Obtener info de la página (cover, título, icono) y bloques
+      const pageInfo = await this.notionService.fetchPageInfo(pageId, useCache);
+      const blocks = await this.notionService.fetchBlocks(pageId, useCache);
+      const blocksHtml = await this.notionRenderer.renderBlocks(blocks, blockTypes);
+      
+      // Construir HTML del header (cover + título)
+      let headerHtml = '';
+      
+      // Cover image
+      if (pageInfo?.cover) {
+        const coverUrl = pageInfo.cover.external?.url || pageInfo.cover.file?.url;
+        if (coverUrl) {
+          const shareButtonHtml = includeShareButtons ? `
+              <button class="notion-image-share-button share-button" 
+                      data-image-url="${coverUrl}" 
+                      data-image-caption=""
+                      title="Share with room">
+                <img src="img/icon-players.svg" alt="Share" />
+              </button>` : '';
+          
+          headerHtml += `
+          <div class="notion-page-cover">
+            <div class="notion-image-container">
+              <div class="image-loading">
+                <div class="loading-spinner"></div>
+              </div>
+              <img src="${coverUrl}" alt="Page cover" 
+                   class="notion-cover-image notion-image-clickable loaded" 
+                   style="opacity: 1 !important; display: block !important;"
+                   data-image-url="${coverUrl}"
+                   data-image-caption=""
+                   data-block-id="cover-${pageId}"
+                   onload="const loading = this.parentElement.querySelector('.image-loading'); if(loading) loading.remove();"
+                   onerror="if(!this.dataset.refreshAttempted) { this.dataset.refreshAttempted='true'; setTimeout(() => { if(window.refreshImage) window.refreshImage(); }, 500); } else { this.style.display='none'; const loading = this.parentElement.querySelector('.image-loading'); if(loading) loading.remove(); const errorDiv = document.createElement('div'); errorDiv.className='empty-state notion-image-error'; errorDiv.innerHTML='<div class=\\'empty-state-icon\\'>⚠️</div><p class=\\'empty-state-text\\'>Cover image expired</p><button class=\\'btn btn--sm btn--ghost\\' onclick=\\'window.refreshImage && window.refreshImage(this)\\'>🔄 Reload page</button>'; this.parentElement.appendChild(errorDiv); }" />${shareButtonHtml}
+            </div>
+          </div>
+        `;
+        }
+      }
+      
+      // Extraer título de Notion
+      const notionTitle = this._extractNotionPageTitle(pageInfo);
+      
+      // Icono de Notion
+      let iconHtml = '';
+      if (pageInfo?.icon) {
+        if (pageInfo.icon.type === 'emoji') {
+          iconHtml = `<span class="notion-page-icon">${pageInfo.icon.emoji}</span>`;
+        } else if (pageInfo.icon.external?.url) {
+          iconHtml = `<img src="${pageInfo.icon.external.url}" alt="" class="notion-page-icon-img" />`;
+        } else if (pageInfo.icon.file?.url) {
+          iconHtml = `<img src="${pageInfo.icon.file.url}" alt="" class="notion-page-icon-img" />`;
+        }
+      }
+      
+      // Título (usar de Notion o fallback)
+      const pageTitle = notionTitle || fallbackTitle;
+      headerHtml += `<h1 class="notion-page-title">${iconHtml}${pageTitle}</h1>`;
+      
+      // Renderizar propiedades de base de datos (si las hay)
+      const propertiesHtml = this.notionRenderer.renderPageProperties(pageInfo?.properties);
+      
+      // HTML completo
+      const html = headerHtml + propertiesHtml + blocksHtml;
+      
+      return {
+        html,
+        headerHtml,
+        blocksHtml,
+        propertiesHtml,
+        pageInfo
+      };
+    } catch (e) {
+      logError('Error generando HTML de Notion con header:', e);
+      return null;
+    }
   }
 
   /**
