@@ -4718,6 +4718,10 @@ function renderCategory(category, parentElement, level = 0, roomId = null, categ
     // Obtener información para determinar si se puede mover arriba/abajo (usando orden combinado)
     // Usar getPagesJSONFromLocalStorage para asegurar datos frescos
     const config = getPagesJSONFromLocalStorage(roomId) || getPagesJSON(roomId) || await getDefaultJSON();
+    
+    // Inicializar orden si no existe
+    initializeOrderRecursive(config);
+    
     const parentPath = categoryPath.slice(0, -2);
     const parent = parentPath.length === 0 ? config : navigateConfigPath(config, parentPath);
     const index = categoryPath[categoryPath.length - 1];
@@ -4956,6 +4960,10 @@ function renderCategory(category, parentElement, level = 0, roomId = null, categ
         const rect = pageContextMenuButton.getBoundingClientRect();
         // Usar getPagesJSONFromLocalStorage para asegurar datos frescos
         const config = getPagesJSONFromLocalStorage(roomId) || getPagesJSON(roomId) || await getDefaultJSON();
+        
+        // Inicializar orden si no existe
+        initializeOrderRecursive(config);
+        
         // Obtener el path de la carpeta padre para agregar páginas en la misma carpeta
         const pageCategoryPath = categoryPath; // categoryPath viene del scope de renderCategory
         
@@ -5282,6 +5290,36 @@ function renderCategory(category, parentElement, level = 0, roomId = null, categ
   parentElement.appendChild(categoryDiv);
 }
 
+// Función para inicializar el orden en toda la configuración si no existe
+// Esto asegura que siempre haya un order válido para mover elementos
+function initializeOrderRecursive(node) {
+  if (!node) return;
+  
+  // Si no hay order, inicializarlo con el orden por defecto
+  if (!node.order || !Array.isArray(node.order)) {
+    const order = [];
+    const categories = node.categories || [];
+    const pages = node.pages || [];
+    
+    categories.forEach((cat, index) => {
+      order.push({ type: 'category', index });
+    });
+    
+    pages.forEach((page, index) => {
+      order.push({ type: 'page', index });
+    });
+    
+    if (order.length > 0) {
+      node.order = order;
+    }
+  }
+  
+  // Recursivamente inicializar subcarpetas
+  if (node.categories && Array.isArray(node.categories)) {
+    node.categories.forEach(cat => initializeOrderRecursive(cat));
+  }
+}
+
 // Función auxiliar para obtener el orden combinado de elementos en un nivel
 // El orden se guarda en parent.order como array de {type: 'category'|'page', index: number}
 function getCombinedOrder(parent) {
@@ -5502,13 +5540,23 @@ async function addCategoryToPageList(categoryPath, roomId) {
       if (categoryPath.length === 0) {
         // Agregar al nivel raíz
         if (!config.categories) config.categories = [];
-        config.categories.push(newCategory); // Agregar al final
+        const newIndex = config.categories.length;
+        config.categories.push(newCategory);
+        
+        // Actualizar el orden combinado para incluir la nueva carpeta al final
+        if (!config.order) config.order = [];
+        config.order.push({ type: 'category', index: newIndex });
       } else {
         // Agregar dentro de una categoría
         const parent = navigateConfigPath(config, categoryPath);
         if (parent) {
           if (!parent.categories) parent.categories = [];
-          parent.categories.push(newCategory); // Agregar al final
+          const newIndex = parent.categories.length;
+          parent.categories.push(newCategory);
+          
+          // Actualizar el orden combinado del parent
+          if (!parent.order) parent.order = [];
+          parent.order.push({ type: 'category', index: newIndex });
         }
       }
       
@@ -5617,12 +5665,29 @@ async function editCategoryFromPageList(category, categoryPath, roomId) {
               const newParent = navigateConfigPath(config, newParentPath);
               
               if (newParent && JSON.stringify(newParentPath) !== JSON.stringify(parentPath)) {
+                // Remover del order del parent original
+                if (parent.order) {
+                  parent.order = parent.order.filter(o => !(o.type === 'category' && o.index === index));
+                  // Reajustar índices en el order del parent original
+                  parent.order = parent.order.map(o => {
+                    if (o.type === 'category' && o.index > index) {
+                      return { ...o, index: o.index - 1 };
+                    }
+                    return o;
+                  });
+                }
+                
                 // Remover de la ubicación actual
                 parent[key].splice(index, 1);
                 
                 // Agregar a la nueva ubicación
                 if (!newParent.categories) newParent.categories = [];
+                const newIndex = newParent.categories.length;
                 newParent.categories.push(currentCategory);
+                
+                // Actualizar order del nuevo parent
+                if (!newParent.order) newParent.order = [];
+                newParent.order.push({ type: 'category', index: newIndex });
               }
             }
           } catch (e) {
@@ -5631,10 +5696,26 @@ async function editCategoryFromPageList(category, categoryPath, roomId) {
             alert('Error changing parent folder. The folder was updated but remains in its current location.');
           }
         } else if (data.parentCategory === '' && parentPath.length > 0) {
+          // Remover del order del parent original
+          if (parent.order) {
+            parent.order = parent.order.filter(o => !(o.type === 'category' && o.index === index));
+            parent.order = parent.order.map(o => {
+              if (o.type === 'category' && o.index > index) {
+                return { ...o, index: o.index - 1 };
+              }
+              return o;
+            });
+          }
+          
           // Mover a raíz
           parent[key].splice(index, 1);
           if (!config.categories) config.categories = [];
+          const newIndex = config.categories.length;
           config.categories.push(currentCategory);
+          
+          // Actualizar order del config (raíz)
+          if (!config.order) config.order = [];
+          config.order.push({ type: 'category', index: newIndex });
         }
       }
       
@@ -5755,12 +5836,28 @@ async function editPageFromPageList(page, pageCategoryPath, roomId) {
             const newParent = navigateConfigPath(config, newCategoryPath);
             
             if (newParent && JSON.stringify(newCategoryPath) !== JSON.stringify(pageCategoryPath)) {
+              // Remover del order del parent original
+              if (parent.order) {
+                parent.order = parent.order.filter(o => !(o.type === 'page' && o.index === pageIndex));
+                parent.order = parent.order.map(o => {
+                  if (o.type === 'page' && o.index > pageIndex) {
+                    return { ...o, index: o.index - 1 };
+                  }
+                  return o;
+                });
+              }
+              
               // Remover de la ubicación actual
               parent.pages.splice(pageIndex, 1);
               
               // Agregar a la nueva ubicación
               if (!newParent.pages) newParent.pages = [];
+              const newPageIndex = newParent.pages.length;
               newParent.pages.push(currentPage);
+              
+              // Actualizar order del nuevo parent
+              if (!newParent.order) newParent.order = [];
+              newParent.order.push({ type: 'page', index: newPageIndex });
             }
           }
         } catch (e) {
@@ -5874,12 +5971,28 @@ async function editPageFromHeader(page, pageCategoryPath, roomId, currentUrl, cu
             const newParent = navigateConfigPath(config, newCategoryPath);
             
             if (newParent && JSON.stringify(newCategoryPath) !== JSON.stringify(pageCategoryPath)) {
+              // Remover del order del parent original
+              if (parent.order) {
+                parent.order = parent.order.filter(o => !(o.type === 'page' && o.index === pageIndex));
+                parent.order = parent.order.map(o => {
+                  if (o.type === 'page' && o.index > pageIndex) {
+                    return { ...o, index: o.index - 1 };
+                  }
+                  return o;
+                });
+              }
+              
               // Remover de la ubicación actual
               parent.pages.splice(pageIndex, 1);
               
               // Agregar a la nueva ubicación
               if (!newParent.pages) newParent.pages = [];
+              const newPageIndex = newParent.pages.length;
               newParent.pages.push(currentPage);
+              
+              // Actualizar order del nuevo parent
+              if (!newParent.order) newParent.order = [];
+              newParent.order.push({ type: 'page', index: newPageIndex });
             }
           }
         } catch (e) {
@@ -5961,11 +6074,27 @@ async function deleteCategoryFromPageList(category, categoryPath, roomId) {
     
     const config = JSON.parse(JSON.stringify(getPagesJSON(roomId) || await getDefaultJSON()));
     
+    // Función helper para actualizar el orden después de eliminar
+    const updateOrderAfterDelete = (parent, deletedType, deletedIndex) => {
+      if (parent && parent.order) {
+        // Eliminar el item del order
+        parent.order = parent.order.filter(o => !(o.type === deletedType && o.index === deletedIndex));
+        // Reajustar índices de elementos del mismo tipo que venían después
+        parent.order = parent.order.map(o => {
+          if (o.type === deletedType && o.index > deletedIndex) {
+            return { ...o, index: o.index - 1 };
+          }
+          return o;
+        });
+      }
+    };
+    
     if (path.length === 0) {
       // Si el path está vacío (no debería pasar, pero por si acaso)
       const index = config.categories.findIndex(cat => cat.name === category.name);
       if (index !== -1) {
         config.categories.splice(index, 1);
+        updateOrderAfterDelete(config, 'category', index);
       } else {
         console.error('No se encontró la carpeta en el nivel raíz');
         alert('Error: Could not find folder to delete');
@@ -5977,6 +6106,7 @@ async function deleteCategoryFromPageList(category, categoryPath, roomId) {
       const index = parseInt(path[1]);
       if (config[key] && config[key][index] !== undefined) {
         config[key].splice(index, 1);
+        updateOrderAfterDelete(config, 'category', index);
       } else {
         console.error('No se encontró la carpeta en el nivel raíz:', key, index);
         alert('Error: Could not find folder to delete');
@@ -5990,6 +6120,7 @@ async function deleteCategoryFromPageList(category, categoryPath, roomId) {
       const parent = navigateConfigPath(config, parentPath);
       if (parent && parent[key] && parent[key][index] !== undefined) {
         parent[key].splice(index, 1);
+        updateOrderAfterDelete(parent, 'category', index);
       } else {
         console.error('No se encontró la carpeta en el path:', path);
         alert('Error: Could not find folder to delete');
@@ -6035,6 +6166,17 @@ async function deletePageFromPageList(page, pageCategoryPath, roomId) {
     }
     
     parent.pages.splice(pageIndex, 1);
+    
+    // Actualizar el orden después de eliminar
+    if (parent.order) {
+      parent.order = parent.order.filter(o => !(o.type === 'page' && o.index === pageIndex));
+      parent.order = parent.order.map(o => {
+        if (o.type === 'page' && o.index > pageIndex) {
+          return { ...o, index: o.index - 1 };
+        }
+        return o;
+      });
+    }
     
     await savePagesJSON(config, roomId);
     trackPageDeleted(page.name);
@@ -6089,7 +6231,8 @@ async function duplicateCategoryFromPageList(category, categoryPath, roomId) {
     const config = JSON.parse(JSON.stringify(getPagesJSON(roomId) || await getDefaultJSON()));
     
     // Encontrar la carpeta en la configuración
-    const parent = navigateConfigPath(config, categoryPath.slice(0, -2));
+    const parentPath = categoryPath.slice(0, -2);
+    const parent = parentPath.length === 0 ? config : navigateConfigPath(config, parentPath);
     const categoryIndex = categoryPath[categoryPath.length - 1];
     
     if (!parent || !parent.categories || !parent.categories[categoryIndex]) {
@@ -6112,8 +6255,26 @@ async function duplicateCategoryFromPageList(category, categoryPath, roomId) {
     }
     duplicatedCategory.name = newName;
     
-    // Insertar la carpeta duplicada justo después de la original
-    parent.categories.splice(categoryIndex + 1, 0, duplicatedCategory);
+    // El nuevo índice será el siguiente al final del array
+    const newCategoryIndex = parent.categories.length;
+    
+    // Insertar la carpeta duplicada al final del array
+    parent.categories.push(duplicatedCategory);
+    
+    // Actualizar el orden combinado para insertar justo después de la original
+    const order = getCombinedOrder(parent);
+    const originalPosInOrder = order.findIndex(o => o.type === 'category' && o.index === categoryIndex);
+    
+    // Insertar el nuevo item en el orden justo después del original
+    if (originalPosInOrder !== -1) {
+      order.splice(originalPosInOrder + 1, 0, { type: 'category', index: newCategoryIndex });
+    } else {
+      // Si no se encontró en el orden, agregarlo al final
+      order.push({ type: 'category', index: newCategoryIndex });
+    }
+    
+    // Guardar el orden actualizado
+    parent.order = order;
     
     await savePagesJSON(config, roomId);
     
@@ -6176,8 +6337,26 @@ async function duplicatePageFromPageList(page, pageCategoryPath, roomId) {
     }
     duplicatedPage.name = newName;
     
-    // Insertar la página duplicada justo después de la original
-    parent.pages.splice(pageIndex + 1, 0, duplicatedPage);
+    // El nuevo índice será el siguiente al final del array
+    const newPageIndex = parent.pages.length;
+    
+    // Insertar la página duplicada al final del array
+    parent.pages.push(duplicatedPage);
+    
+    // Actualizar el orden combinado para insertar justo después de la original
+    const order = getCombinedOrder(parent);
+    const originalPosInOrder = order.findIndex(o => o.type === 'page' && o.index === pageIndex);
+    
+    // Insertar el nuevo item en el orden justo después del original
+    if (originalPosInOrder !== -1) {
+      order.splice(originalPosInOrder + 1, 0, { type: 'page', index: newPageIndex });
+    } else {
+      // Si no se encontró en el orden, agregarlo al final
+      order.push({ type: 'page', index: newPageIndex });
+    }
+    
+    // Guardar el orden actualizado
+    parent.order = order;
     
     await savePagesJSON(config, roomId);
     
@@ -6417,15 +6596,28 @@ async function addPageToPageListWithCategorySelector(defaultCategoryPath, roomId
         // Si no hay carpetas, crear una
         if (!config.categories || config.categories.length === 0) {
           config.categories = [{ name: 'General', pages: [], categories: [] }];
+          // Actualizar order del config para incluir la nueva categoría
+          if (!config.order) config.order = [];
+          config.order.push({ type: 'category', index: 0 });
         }
         if (!config.categories[0].pages) config.categories[0].pages = [];
-        config.categories[0].pages.unshift(newPage); // Agregar al final
+        const newPageIndex = config.categories[0].pages.length;
+        config.categories[0].pages.push(newPage);
+        
+        // Actualizar el orden de la primera categoría
+        if (!config.categories[0].order) config.categories[0].order = [];
+        config.categories[0].order.push({ type: 'page', index: newPageIndex });
       } else {
         // Agregar dentro de la carpeta seleccionada
         const parent = navigateConfigPath(config, targetCategoryPath);
         if (parent) {
           if (!parent.pages) parent.pages = [];
-          parent.pages.push(newPage); // Agregar al final
+          const newPageIndex = parent.pages.length;
+          parent.pages.push(newPage);
+          
+          // Actualizar el orden del parent
+          if (!parent.order) parent.order = [];
+          parent.order.push({ type: 'page', index: newPageIndex });
         }
       }
       
@@ -6486,15 +6678,28 @@ async function addPageToPageListSimple(categoryPath, roomId) {
         // Si no hay carpetas, crear una
         if (!config.categories || config.categories.length === 0) {
           config.categories = [{ name: 'General', pages: [], categories: [] }];
+          // Actualizar order del config
+          if (!config.order) config.order = [];
+          config.order.push({ type: 'category', index: 0 });
         }
         if (!config.categories[0].pages) config.categories[0].pages = [];
-        config.categories[0].pages.unshift(newPage); // Agregar al final
+        const newPageIndex = config.categories[0].pages.length;
+        config.categories[0].pages.push(newPage);
+        
+        // Actualizar order de la categoría
+        if (!config.categories[0].order) config.categories[0].order = [];
+        config.categories[0].order.push({ type: 'page', index: newPageIndex });
       } else {
         // Agregar dentro de una categoría
         const parent = navigateConfigPath(config, categoryPath);
         if (parent) {
           if (!parent.pages) parent.pages = [];
-          parent.pages.push(newPage); // Agregar al final
+          const newPageIndex = parent.pages.length;
+          parent.pages.push(newPage);
+          
+          // Actualizar order del parent
+          if (!parent.order) parent.order = [];
+          parent.order.push({ type: 'page', index: newPageIndex });
         }
       }
       
@@ -6523,6 +6728,9 @@ async function addPageToPageListSimple(categoryPath, roomId) {
 
 // Función para renderizar páginas agrupadas por carpetas
 async function renderPagesByCategories(pagesConfig, pageList, roomId = null) {
+  // Inicializar orden si no existe (para datos importados o existentes sin order)
+  initializeOrderRecursive(pagesConfig);
+  
   // Mostrar loading
   pageList.innerHTML = `
     <div class="notion-waiting">
