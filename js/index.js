@@ -4710,14 +4710,18 @@ function renderCategory(category, parentElement, level = 0, roomId = null, categ
   }
   
   // Menú contextual para carpetas (solo para Master GM, no para Co-GM)
+  console.log('🟢 Verificando permisos para menú contextual:', { isGM, isCoGMGlobal, categoryName: category.name });
   if (isGM && !isCoGMGlobal) {
+  console.log('🟢 Registrando listener para menú contextual de:', category.name);
   contextMenuButton.addEventListener('click', async (e) => {
+    console.log('🔵 CLICK en menú contextual de carpeta:', category.name);
     e.stopPropagation();
     const rect = contextMenuButton.getBoundingClientRect();
     
     // Obtener información para determinar si se puede mover arriba/abajo (usando orden combinado)
     // Usar getPagesJSONFromLocalStorage para asegurar datos frescos
     const config = getPagesJSONFromLocalStorage(roomId) || getPagesJSON(roomId) || await getDefaultJSON();
+    console.log('🔵 Config cargado:', { hasCategories: !!config?.categories, count: config?.categories?.length });
     
     // Inicializar orden si no existe
     initializeOrderRecursive(config);
@@ -4727,7 +4731,7 @@ function renderCategory(category, parentElement, level = 0, roomId = null, categ
     const index = categoryPath[categoryPath.length - 1];
     
     // Debug para niveles anidados
-    log('📂 Menú carpeta:', { 
+    console.log('📂 Menú carpeta:', { 
       categoryName: category.name, 
       categoryPath, 
       parentPath, 
