@@ -4744,9 +4744,21 @@ function renderCategory(category, parentElement, level = 0, roomId = null, categ
       const currentPos = combinedOrder.findIndex(o => o.type === 'category' && o.index === index);
       canMoveUp = currentPos > 0;
       canMoveDown = currentPos !== -1 && currentPos < combinedOrder.length - 1;
-      log('📂 Orden combinado:', { combinedOrder, currentPos, canMoveUp, canMoveDown });
+      console.log('📂 DEBUG Menú carpeta:', { 
+        categoryName: category.name,
+        categoryPath,
+        parentPath,
+        index,
+        parentCategories: parent.categories?.length || 0,
+        parentPages: parent.pages?.length || 0,
+        parentOrder: parent.order,
+        combinedOrder, 
+        currentPos, 
+        canMoveUp, 
+        canMoveDown 
+      });
     } else {
-      log('⚠️ Parent no encontrado para carpeta:', category.name);
+      console.log('⚠️ Parent no encontrado para carpeta:', category.name, { categoryPath, parentPath });
     }
     
     const menuItems = [
@@ -5292,7 +5304,7 @@ function renderCategory(category, parentElement, level = 0, roomId = null, categ
 
 // Función para inicializar el orden en toda la configuración si no existe
 // Esto asegura que siempre haya un order válido para mover elementos
-function initializeOrderRecursive(node) {
+function initializeOrderRecursive(node, nodeName = 'root') {
   if (!node) return;
   
   // Si no hay order, inicializarlo con el orden por defecto
@@ -5311,19 +5323,30 @@ function initializeOrderRecursive(node) {
     
     if (order.length > 0) {
       node.order = order;
+      console.log('✅ initializeOrderRecursive: Orden inicializado para', nodeName, order);
     }
   }
   
   // Recursivamente inicializar subcarpetas
   if (node.categories && Array.isArray(node.categories)) {
-    node.categories.forEach(cat => initializeOrderRecursive(cat));
+    node.categories.forEach((cat, idx) => initializeOrderRecursive(cat, cat.name || `category-${idx}`));
   }
 }
 
 // Función auxiliar para obtener el orden combinado de elementos en un nivel
 // El orden se guarda en parent.order como array de {type: 'category'|'page', index: number}
 function getCombinedOrder(parent) {
-  if (!parent) return [];
+  if (!parent) {
+    console.log('⚠️ getCombinedOrder: parent es null/undefined');
+    return [];
+  }
+  
+  console.log('🔍 getCombinedOrder llamado con:', {
+    hasOrder: !!parent.order,
+    orderLength: parent.order?.length,
+    categoriesCount: parent.categories?.length || 0,
+    pagesCount: parent.pages?.length || 0
+  });
   
   // Si existe un orden guardado, usarlo
   if (parent.order && Array.isArray(parent.order)) {
