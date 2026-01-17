@@ -3918,7 +3918,8 @@ export class ExtensionController {
   }
 
   /**
-   * Detecta si el GM actual es Co-GM (solo lectura)
+   * Detecta si el GM actual es Co-GM (solo lectura) y establece ownership si corresponde
+   * Esta función combina la detección de coGM con la toma de ownership para evitar race conditions
    * @private
    */
   async _detectCoGM() {
@@ -3927,32 +3928,34 @@ export class ExtensionController {
       
       log('🔍 Verificando vault owner:', owner);
       
-      // Si no hay owner o el owner no tiene datos válidos, no es coGM
-      if (!owner || !owner.id) {
-        log('👑 [Master GM] No hay vault owner válido');
+      // Verificar si el owner está inactivo (más de 15 minutos sin heartbeat)
+      const timeSinceLastActivity = owner ? (Date.now() - (owner.lastHeartbeat || 0)) : Infinity;
+      const isStale = timeSinceLastActivity > OWNER_TIMEOUT;
+      const minutesInactive = Math.round(timeSinceLastActivity / 60000);
+      
+      // Si no hay owner, owner inválido, o el owner está inactivo → SOY MASTER GM
+      if (!owner || !owner.id || isStale) {
+        log('👑 [Master GM] Tomando ownership (owner:', owner?.id ? 'inactivo' : 'no existe', ')');
         this.isCoGM = false;
+        // Establecer ownership inmediatamente
+        await this.storageService.setVaultOwner(this.playerId, this.playerName);
         return;
       }
       
-      // Verificar si soy el owner
+      // Verificar si soy el owner actual
       const isMe = owner.id === this.playerId;
       log('🔍 ¿Soy el owner?', isMe, '| Mi ID:', this.playerId, '| Owner ID:', owner.id);
       
-      // Verificar si el owner está inactivo (más de 15 minutos sin heartbeat)
-      const timeSinceLastActivity = Date.now() - (owner.lastHeartbeat || 0);
-      const isStale = timeSinceLastActivity > OWNER_TIMEOUT;
-      const minutesInactive = Math.round(timeSinceLastActivity / 60000);
-      log('🔍 Owner inactivo?', isStale, '| Minutos inactivo:', minutesInactive);
-      
-      // Es Co-GM si hay owner válido, no soy yo, y no está inactivo
-      this.isCoGM = !isMe && !isStale;
-      
-      if (this.isCoGM) {
-        log('👁️ [Co-GM] Modo solo lectura - Master GM:', owner.name || 'Desconocido');
-      } else if (isMe) {
+      if (isMe) {
+        // Soy el owner actual → Master GM
         log('👑 [Master GM] Soy el vault owner');
-      } else if (isStale) {
-        log('👑 [Master GM] El vault owner anterior está inactivo (', minutesInactive, 'min)');
+        this.isCoGM = false;
+        // Actualizar heartbeat
+        await this.storageService.setVaultOwner(this.playerId, this.playerName);
+      } else {
+        // Hay otro owner activo → Co-GM
+        log('👁️ [Co-GM] Modo solo lectura - Master GM:', owner.name || 'Desconocido');
+        this.isCoGM = true;
       }
     } catch (e) {
       logError('Error detectando Co-GM:', e);
