@@ -999,10 +999,18 @@ export class ExtensionController {
     
     // Obtener opciones de carpetas, excluyendo esta carpeta y sus subcarpetas
     const folderOptions = this._getFolderOptions(categoryPath);
+    
+    // Asegurarse de que el valor coincida exactamente con una opción disponible
+    let folderValue = currentFolderPathStr;
+    const matchingOption = folderOptions.find(opt => opt.value === currentFolderPathStr);
+    if (!matchingOption && folderOptions.length > 0) {
+      // Si no se encuentra, usar la primera opción (root) como fallback
+      folderValue = folderOptions[0].value;
+    }
 
     this._showModalForm('Edit Folder', [
       { name: 'name', label: 'Name', type: 'text', value: category.name, required: true },
-      { name: 'folder', label: 'Parent Folder', type: 'select', value: currentFolderPathStr, options: folderOptions }
+      { name: 'folder', label: 'Parent Folder', type: 'select', value: folderValue, options: folderOptions }
     ], async (data) => {
       const nameChanged = data.name && data.name !== category.name;
       const folderChanged = data.folder !== currentFolderPathStr;
@@ -2088,11 +2096,19 @@ export class ExtensionController {
     // Obtener opciones de carpetas
     const folderOptions = this._getFolderOptions();
     const currentFolderPathStr = this.currentCategoryPath.join('/');
+    
+    // Asegurarse de que el valor coincida exactamente con una opción disponible
+    let folderValue = currentFolderPathStr;
+    const matchingOption = folderOptions.find(opt => opt.value === currentFolderPathStr);
+    if (!matchingOption && folderOptions.length > 0) {
+      // Si no se encuentra, usar la primera opción (root) como fallback
+      folderValue = folderOptions[0].value;
+    }
 
     this._showModalForm('Edit Page', [
       { name: 'name', label: 'Name', type: 'text', value: page.name, required: true },
       { name: 'url', label: 'URL', type: 'url', value: page.url, required: true },
-      { name: 'folder', label: 'Folder', type: 'select', value: currentFolderPathStr, options: folderOptions },
+      { name: 'folder', label: 'Folder', type: 'select', value: folderValue, options: folderOptions },
       { name: 'blockTypes', label: 'Block filter (comma-separated)', type: 'text', value: currentBlockTypes, placeholder: 'e.g., paragraph,heading_1,image' },
       { name: 'visibleToPlayers', label: 'Visible to players', type: 'checkbox', value: page.visibleToPlayers }
     ], async (data) => {
@@ -2137,6 +2153,14 @@ export class ExtensionController {
     // Obtener opciones de carpetas
     const folderOptions = this._getFolderOptions();
     const currentFolderPathStr = categoryPath.join('/');
+    
+    // Asegurarse de que el valor coincida exactamente con una opción disponible
+    let folderValue = currentFolderPathStr;
+    const matchingOption = folderOptions.find(opt => opt.value === currentFolderPathStr);
+    if (!matchingOption && folderOptions.length > 0) {
+      // Si no se encuentra, usar la primera opción (root) como fallback
+      folderValue = folderOptions[0].value;
+    }
 
     const currentBlockTypes = page.blockTypes 
       ? (Array.isArray(page.blockTypes) ? page.blockTypes.join(',') : page.blockTypes) 
@@ -2145,7 +2169,7 @@ export class ExtensionController {
     this._showModalForm('Edit Page', [
       { name: 'name', label: 'Name', type: 'text', value: page.name, required: true },
       { name: 'url', label: 'URL', type: 'url', value: page.url, required: true },
-      { name: 'folder', label: 'Folder', type: 'select', value: currentFolderPathStr, options: folderOptions },
+      { name: 'folder', label: 'Folder', type: 'select', value: folderValue, options: folderOptions },
       { name: 'blockTypes', label: 'Block filter (comma-separated)', type: 'text', value: currentBlockTypes, placeholder: 'e.g., paragraph,heading_1,image' },
       { name: 'visibleToPlayers', label: 'Visible to players', type: 'checkbox', value: page.visibleToPlayers }
     ], async (data) => {

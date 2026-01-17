@@ -4025,6 +4025,18 @@ initDebugMode();
 try {
   OBR.onReady(async () => {
     try {
+      // Configurar el panel para usar 100% de altura responsive
+      // Esto ajusta el panel al tamaño del viewport disponible
+      if (OBR.panel && typeof OBR.panel.setHeight === 'function') {
+        try {
+          // Obtener la altura del viewport y configurar el panel
+          const viewportHeight = window.innerHeight;
+          await OBR.panel.setHeight(viewportHeight);
+        } catch (e) {
+          console.warn('No se pudo ajustar la altura del panel dinámicamente:', e);
+        }
+      }
+      
       // Inicializar analytics y verificar rol EN PARALELO
       const [, isGM] = await Promise.all([
         initMixpanel(),
@@ -5426,17 +5438,18 @@ async function editCategoryFromPageList(category, categoryPath, roomId) {
   // Buscar el valor correcto del parentPath en las opciones disponibles
   let parentPathValue = '';
   if (parentPath.length > 0) {
-    // Buscar en las opciones el path que coincida con el parentPath
-    const matchingOption = categoryOptions.find(opt => {
-      const optPath = JSON.parse(opt.value);
-      return JSON.stringify(optPath) === JSON.stringify(parentPath);
-    });
+    const parentPathStr = JSON.stringify(parentPath);
+    // Buscar la opción que coincida exactamente con el parentPath
+    const matchingOption = categoryOptions.find(opt => opt.value === parentPathStr);
     if (matchingOption) {
       parentPathValue = matchingOption.value;
     } else {
       // Si no se encuentra, usar el parentPath directamente
-      parentPathValue = JSON.stringify(parentPath);
+      parentPathValue = parentPathStr;
     }
+  } else {
+    // Si no hay parentPath, significa que está en root, usar cadena vacía
+    parentPathValue = '';
   }
   
   const fields = [
@@ -5546,7 +5559,22 @@ async function editPageFromPageList(page, pageCategoryPath, roomId) {
   const currentConfig = getPagesJSONFromLocalStorage(roomId) || await getDefaultJSON();
   const categoryOptions = getCategoryOptions(currentConfig);
   
-  const pageCategoryPathValue = pageCategoryPath.length > 0 ? JSON.stringify(pageCategoryPath) : '';
+  // Buscar la opción que coincida exactamente con el path actual de la página
+  let defaultValue = '';
+  if (pageCategoryPath.length > 0) {
+    const pageCategoryPathStr = JSON.stringify(pageCategoryPath);
+    // Buscar la opción que coincida exactamente
+    const matchingOption = categoryOptions.find(opt => opt.value === pageCategoryPathStr);
+    if (matchingOption) {
+      defaultValue = matchingOption.value;
+    } else {
+      // Si no se encuentra, usar el valor stringificado directamente
+      defaultValue = pageCategoryPathStr;
+    }
+  } else if (categoryOptions.length > 0) {
+    // Si no hay path, usar la primera opción (root)
+    defaultValue = categoryOptions[0].value;
+  }
   
   const fields = [
     { name: 'name', label: 'Name', type: 'text', required: true, value: page.name, placeholder: 'Page name' },
@@ -5555,7 +5583,6 @@ async function editPageFromPageList(page, pageCategoryPath, roomId) {
   
   // Agregar selector de carpeta si hay carpetas disponibles
   if (categoryOptions.length > 0) {
-    const defaultValue = pageCategoryPathValue || categoryOptions[0].value;
     fields.push({
       name: 'category',
       label: 'Folder',

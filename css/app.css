@@ -122,8 +122,8 @@
     font-size: var(--font-size-base);
     color: var(--color-text-secondary);
     padding: var(--spacing-lg);
-    min-height: 100vh;
-    height: 100vh;
+    min-height: 100dvh; /* Altura dinámica del viewport para dispositivos móviles */
+    height: 100dvh; /* Altura responsive al 100% del viewport */
     width: 100%;
     max-width: 100%;
     margin: 0;
