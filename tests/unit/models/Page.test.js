@@ -184,12 +184,17 @@ describe('Page Model', () => {
       const page = new Page('Test', 'https://example.com');
       const json = page.toJSON();
       
-      expect(json).toEqual({
-        name: 'Test',
-        url: 'https://example.com'
-      });
+      // Debe incluir id, name y url
+      expect(json.id).toBeDefined();
+      expect(json.name).toBe('Test');
+      expect(json.url).toBe('https://example.com');
+      
+      // Propiedades opcionales no deben estar presentes si están vacías
       expect(json.visibleToPlayers).toBeUndefined();
       expect(json.blockTypes).toBeUndefined();
+      expect(json.icon).toBeUndefined();
+      expect(json.linkedTokenId).toBeUndefined();
+      expect(json.htmlContent).toBeUndefined();
     });
   });
 });
