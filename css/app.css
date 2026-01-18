@@ -1,6 +1,11 @@
 /* ==========================================================================
   Variables CSS
   ========================================================================== */
+  @import url('https://fonts.cdnfonts.com/css/flow-circular');
+
+  /* ==========================================================================
+  Variables CSS
+  ========================================================================== */
   :root {
     /* Colores de fondo */
     --color-bg-primary: rgba(0, 0, 0, 0.24);
@@ -52,6 +57,7 @@
     /* Tipografía */
     --font-family-base: Roboto, Helvetica, Arial, sans-serif;
     --font-family-mono: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', monospace;
+    --font-family-comms: 'Flow Circular', sans-serif;
     --font-size-xs: 12px;
     --font-size-sm: 14px;
     --font-size-base: 16px;
@@ -143,6 +149,11 @@
     display: none !important;
   }
   
+
+  .comms-font { 
+    font-family: var(--font-family-comms) !important;
+  }
+
   /* ==========================================================================
       Componentes Base - Botones
       ========================================================================== */
