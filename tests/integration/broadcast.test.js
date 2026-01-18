@@ -656,6 +656,162 @@ describe('Escenarios de error y edge cases', () => {
 });
 
 // ============================================
+// TESTS: Refresh manual con forceRefresh
+// ============================================
+
+describe('Refresh manual con forceRefresh', () => {
+  let gmBroadcast;
+  let playerBroadcast;
+  let gmOBR;
+  let playerOBR;
+  let mockCacheService;
+
+  beforeEach(() => {
+    gmOBR = createMockOBR('GM');
+    playerOBR = createMockOBR('PLAYER');
+    
+    mockCacheService = {
+      getHtmlFromLocalCache: jest.fn((pageId) => {
+        if (pageId === 'cached-page') {
+          return '<div>Cached content</div>';
+        }
+        return null;
+      }),
+      saveHtmlToLocalCache: jest.fn(),
+      clearPageCache: jest.fn(),
+    };
+    
+    gmBroadcast = new BroadcastService();
+    gmBroadcast.setDependencies({ OBR: gmOBR, cacheService: mockCacheService });
+    
+    playerBroadcast = new BroadcastService();
+    playerBroadcast.setDependencies({ OBR: playerOBR });
+  });
+
+  it('Player debe poder solicitar contenido con forceRefresh=true', async () => {
+    const pageId = 'test-page';
+    
+    // Player solicita contenido CON forceRefresh
+    const requestPromise = playerBroadcast.requestContentFromGM(pageId, true);
+    
+    // Simular respuesta del GM
+    setTimeout(() => {
+      playerOBR.broadcast._simulateIncomingMessage(BROADCAST_CHANNEL_RESPONSE, {
+        pageId,
+        html: '<div>Fresh content</div>',
+        timestamp: Date.now()
+      });
+    }, 10);
+    
+    const result = await requestPromise;
+    
+    // Verificar que la solicitud incluyó forceRefresh
+    expect(playerOBR.broadcast.sendMessage).toHaveBeenCalledWith(
+      BROADCAST_CHANNEL_REQUEST,
+      expect.objectContaining({
+        pageId,
+        forceRefresh: true,
+        requestId: expect.any(Number)
+      })
+    );
+    expect(result).toBe('<div>Fresh content</div>');
+  });
+
+  it('Solicitud con forceRefresh debe tener timeout mayor (10s)', async () => {
+    const pageId = 'test-page';
+    const startTime = Date.now();
+    
+    // Player solicita con forceRefresh (no habrá respuesta, esperamos timeout)
+    const result = await playerBroadcast.requestContentFromGM(pageId, true);
+    
+    const elapsed = Date.now() - startTime;
+    
+    // Debe haber esperado ~10 segundos (con algo de margen)
+    expect(elapsed).toBeGreaterThanOrEqual(9500);
+    expect(result).toBeNull();
+  }, 15000);
+
+  it('Solicitud SIN forceRefresh debe tener timeout menor (5s)', async () => {
+    const pageId = 'test-page';
+    const startTime = Date.now();
+    
+    // Player solicita SIN forceRefresh (no habrá respuesta, esperamos timeout)
+    const result = await playerBroadcast.requestContentFromGM(pageId, false);
+    
+    const elapsed = Date.now() - startTime;
+    
+    // Debe haber esperado ~5 segundos (con algo de margen)
+    expect(elapsed).toBeLessThan(7000);
+    expect(result).toBeNull();
+  }, 10000);
+
+  it('GM debe procesar forceRefresh y limpiar caché antes de responder', async () => {
+    const pageId = 'cached-page';
+    let generateCalled = false;
+    let generateForceRefresh = null;
+    
+    // Configurar GM para responder (con callback que rastrea forceRefresh)
+    gmBroadcast.setupGMContentResponder(async (requestedPageId, forceRefresh) => {
+      generateCalled = true;
+      generateForceRefresh = forceRefresh;
+      return '<div>Generated content</div>';
+    });
+    
+    // Simular solicitud de player CON forceRefresh
+    gmOBR.broadcast._simulateIncomingMessage(BROADCAST_CHANNEL_REQUEST, {
+      pageId,
+      forceRefresh: true,
+      requestId: Date.now()
+    });
+    
+    // Esperar procesamiento
+    await new Promise(resolve => setTimeout(resolve, 50));
+    
+    // Verificar que se llamó al generador con forceRefresh=true
+    expect(generateCalled).toBe(true);
+    expect(generateForceRefresh).toBe(true);
+    
+    // Verificar que se limpió el caché antes de generar
+    expect(mockCacheService.clearPageCache).toHaveBeenCalledWith(pageId);
+  });
+
+  it('GM debe usar caché cuando NO hay forceRefresh', async () => {
+    const pageId = 'cached-page';
+    let generateCalled = false;
+    
+    // Configurar GM para responder
+    gmBroadcast.setupGMContentResponder(async () => {
+      generateCalled = true;
+      return '<div>Generated content</div>';
+    });
+    
+    // Simular solicitud de player SIN forceRefresh
+    gmOBR.broadcast._simulateIncomingMessage(BROADCAST_CHANNEL_REQUEST, {
+      pageId,
+      forceRefresh: false,
+      requestId: Date.now()
+    });
+    
+    // Esperar procesamiento
+    await new Promise(resolve => setTimeout(resolve, 50));
+    
+    // Verificar que se usó el caché (NO se llamó al generador)
+    expect(generateCalled).toBe(false);
+    expect(mockCacheService.getHtmlFromLocalCache).toHaveBeenCalledWith(pageId);
+    expect(mockCacheService.clearPageCache).not.toHaveBeenCalled();
+    
+    // Verificar que se envió el contenido cacheado
+    expect(gmOBR.broadcast.sendMessage).toHaveBeenCalledWith(
+      BROADCAST_CHANNEL_RESPONSE,
+      expect.objectContaining({
+        pageId,
+        html: '<div>Cached content</div>'
+      })
+    );
+  });
+});
+
+// ============================================
 // TESTS: Actualización de visibilidad en tiempo real
 // ============================================
 

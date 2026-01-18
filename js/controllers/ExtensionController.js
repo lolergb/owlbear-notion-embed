@@ -2111,7 +2111,9 @@ export class ExtensionController {
       });
     }
 
-    // Agregar Refresh solo para páginas de Notion (disponible para GM y Co-GM)
+    // Agregar Refresh para páginas de Notion (disponible para TODOS los roles)
+    // - Master GM: hace refresh directo desde la API de Notion
+    // - Co-GM y Players: solicitan refresh al GM con forceRefresh=true
     if (page.isNotionPage()) {
       menuItems.push({
         icon: 'img/icon-reload.svg',
@@ -4149,30 +4151,41 @@ export class ExtensionController {
    * @private
    */
   _setupGMBroadcast() {
-    // Responder a solicitudes de contenido
-    this.broadcastService.setupGMContentResponder(async (pageId) => {
-      // Primero intentar obtener del caché local
-      let html = this.cacheService.getHtmlFromLocalCache(pageId);
+    // Responder a solicitudes de contenido (acepta forceRefresh de Players/Co-GMs)
+    this.broadcastService.setupGMContentResponder(async (pageId, forceRefresh = false) => {
+      let html = null;
       
-      // Si no está en caché, intentar generarlo bajo demanda CON header (cover, título, icono)
-      if (!html) {
-        log('📡 Contenido no en caché, generando bajo demanda para:', pageId);
-        try {
-          // Usar función centralizada que incluye header completo
-          const result = await this._generateNotionHtmlWithHeader(pageId, {
-            includeShareButtons: false, // Players/coGM no deben ver botones de share
-            useCache: true
-          });
-          
-          if (result?.html) {
-            html = result.html;
-            // Cachear para futuras solicitudes (header + bloques)
-            this.cacheService.saveHtmlToLocalCache(pageId, html);
-            log('✅ Contenido con header generado y cacheado para:', pageId);
-          }
-        } catch (e) {
-          log('⚠️ Error generando contenido bajo demanda:', e.message);
+      // Si NO es forceRefresh, intentar obtener del caché local
+      if (!forceRefresh) {
+        html = this.cacheService.getHtmlFromLocalCache(pageId);
+        if (html) {
+          log('📦 Contenido del caché local para:', pageId);
+          return html;
         }
+      } else {
+        // Si es forceRefresh, limpiar caché para forzar regeneración
+        log('🔄 forceRefresh solicitado - limpiando caché para:', pageId);
+        this.cacheService.clearPageCache(pageId);
+      }
+      
+      // Generar contenido bajo demanda CON header (cover, título, icono)
+      log(`📡 Generando contenido bajo demanda para: ${pageId}${forceRefresh ? ' (forceRefresh)' : ''}`);
+      try {
+        // Usar función centralizada que incluye header completo
+        // useCache: false si es forceRefresh para obtener datos frescos de Notion
+        const result = await this._generateNotionHtmlWithHeader(pageId, {
+          includeShareButtons: false, // Players/coGM no deben ver botones de share
+          useCache: !forceRefresh
+        });
+        
+        if (result?.html) {
+          html = result.html;
+          // Cachear para futuras solicitudes (header + bloques)
+          this.cacheService.saveHtmlToLocalCache(pageId, html);
+          log('✅ Contenido con header generado y cacheado para:', pageId);
+        }
+      } catch (e) {
+        log('⚠️ Error generando contenido bajo demanda:', e.message);
       }
       
       return html;
@@ -4865,12 +4878,12 @@ export class ExtensionController {
    * Solicita contenido de Notion al GM (para players sin token)
    * @private
    */
-  async _requestNotionContentFromGM(page, pageId, notionContent) {
+  async _requestNotionContentFromGM(page, pageId, notionContent, forceRefresh = false) {
     // Mostrar loading
     notionContent.innerHTML = `
       <div class="empty-state">
         <div class="loading-spinner"></div>
-        <p class="empty-state-text">Loading content...</p>
+        <p class="empty-state-text">${forceRefresh ? 'Refreshing content...' : 'Loading content...'}</p>
         <p class="empty-state-hint">Requesting from GM...</p>
       </div>
     `;
@@ -4893,18 +4906,24 @@ export class ExtensionController {
       return;
     }
 
-    // Intentar obtener del caché local primero
-    const cachedHtml = this.cacheService.getHtmlFromLocalCache(pageId);
-    if (cachedHtml) {
-      log('📦 Usando HTML del caché local');
-      notionContent.innerHTML = cachedHtml;
-      this._attachImageHandlers(notionContent);
-      return;
+    // Si NO es forceRefresh, intentar obtener del caché local primero
+    if (!forceRefresh) {
+      const cachedHtml = this.cacheService.getHtmlFromLocalCache(pageId);
+      if (cachedHtml) {
+        log('📦 Usando HTML del caché local');
+        notionContent.innerHTML = cachedHtml;
+        this._attachImageHandlers(notionContent);
+        return;
+      }
+    } else {
+      // Si es forceRefresh, limpiar caché local para esta página
+      log('🔄 Refresh solicitado - limpiando caché local');
+      this.cacheService.clearPageCache(pageId);
     }
 
-    // Solicitar contenido al GM vía broadcast
-    log('📡 Solicitando contenido Notion al GM...');
-    const html = await this.broadcastService.requestContentFromGM(pageId);
+    // Solicitar contenido al GM vía broadcast (con flag de forceRefresh)
+    log(`📡 Solicitando contenido Notion al GM...${forceRefresh ? ' (forceRefresh)' : ''}`);
+    const html = await this.broadcastService.requestContentFromGM(pageId, forceRefresh);
     
     if (html) {
       log('✅ Contenido recibido del GM');

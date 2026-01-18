@@ -103,5 +103,83 @@ describe('CacheService', () => {
       expect(Object.keys(cacheService.localHtmlCache).length).toBe(0);
     });
   });
+
+  describe('clearPageCache', () => {
+    it('debe limpiar todos los cachés de una página', async () => {
+      const pageId = 'test-page';
+      const blocks = [{ id: '1', type: 'paragraph' }];
+      const pageInfo = { lastEditedTime: '2024-01-01', icon: null };
+      const html = '<div>Test content</div>';
+      
+      // Guardar en todos los cachés
+      await cacheService.setCachedBlocks(pageId, blocks, false);
+      cacheService.setCachedPageInfo(pageId, pageInfo);
+      cacheService.saveHtmlToLocalCache(pageId, html);
+      
+      // Verificar que están guardados
+      expect(cacheService.getCachedBlocks(pageId)).toEqual(blocks);
+      expect(cacheService.getCachedPageInfo(pageId)).not.toBeNull();
+      expect(cacheService.getHtmlFromLocalCache(pageId)).toBe(html);
+      
+      // Limpiar caché de la página
+      cacheService.clearPageCache(pageId);
+      
+      // Verificar que todos fueron eliminados
+      expect(cacheService.getCachedBlocks(pageId)).toBeNull();
+      expect(cacheService.getCachedPageInfo(pageId)).toBeNull();
+      expect(cacheService.getHtmlFromLocalCache(pageId)).toBeNull();
+    });
+
+    it('debe no afectar otras páginas al limpiar', async () => {
+      const pageId1 = 'page-1';
+      const pageId2 = 'page-2';
+      const blocks1 = [{ id: '1' }];
+      const blocks2 = [{ id: '2' }];
+      
+      await cacheService.setCachedBlocks(pageId1, blocks1, false);
+      await cacheService.setCachedBlocks(pageId2, blocks2, false);
+      
+      cacheService.clearPageCache(pageId1);
+      
+      // page-1 debe estar limpia
+      expect(cacheService.getCachedBlocks(pageId1)).toBeNull();
+      // page-2 debe mantenerse
+      expect(cacheService.getCachedBlocks(pageId2)).toEqual(blocks2);
+    });
+  });
+
+  describe('lastEditedTime tracking', () => {
+    it('debe guardar lastEditedTime en pageInfo', () => {
+      const pageInfo = {
+        lastEditedTime: '2024-01-15T10:30:00.000Z',
+        icon: { type: 'emoji', emoji: '📝' },
+        cover: null
+      };
+      
+      cacheService.setCachedPageInfo('test-page', pageInfo);
+      const cached = cacheService.getCachedPageInfo('test-page');
+      
+      expect(cached.lastEditedTime).toBe('2024-01-15T10:30:00.000Z');
+    });
+
+    it('debe permitir comparar lastEditedTime para invalidación', () => {
+      const pageId = 'test-page';
+      const oldTime = '2024-01-15T10:30:00.000Z';
+      const newTime = '2024-01-15T12:00:00.000Z';
+      
+      // Guardar con tiempo antiguo
+      cacheService.setCachedPageInfo(pageId, { lastEditedTime: oldTime });
+      
+      const cached = cacheService.getCachedPageInfo(pageId);
+      
+      // Simular verificación de invalidación
+      const needsInvalidation = cached.lastEditedTime !== newTime;
+      expect(needsInvalidation).toBe(true);
+      
+      // Si el tiempo es igual, no necesita invalidación
+      const sameTime = cached.lastEditedTime !== oldTime;
+      expect(sameTime).toBe(false);
+    });
+  });
 });
 

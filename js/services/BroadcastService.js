@@ -153,22 +153,24 @@ export class BroadcastService {
   // ============================================
 
   /**
-   * Solicita HTML/contenido al GM (para players)
+   * Solicita HTML/contenido al GM (para players y Co-GMs)
    * @param {string} pageId - ID de la página
+   * @param {boolean} forceRefresh - Si true, el GM debe refrescar el contenido desde Notion
    * @returns {Promise<string|null>}
    */
-  async requestContentFromGM(pageId) {
+  async requestContentFromGM(pageId, forceRefresh = false) {
     if (!this.OBR) return null;
 
     return new Promise((resolve) => {
-      log('📡 Solicitando contenido al GM para:', pageId);
+      log(`📡 Solicitando contenido al GM para: ${pageId}${forceRefresh ? ' (forceRefresh)' : ''}`);
       
-      // Timeout de 5 segundos
+      // Timeout de 5 segundos (10 si es forceRefresh porque puede tardar más)
+      const timeoutMs = forceRefresh ? 10000 : 5000;
       const timeout = setTimeout(() => {
         log('⏰ Timeout esperando respuesta del GM');
         unsubscribe();
         resolve(null);
-      }, 5000);
+      }, timeoutMs);
       
       // Escuchar respuesta del GM
       const unsubscribe = this.OBR.broadcast.onMessage(BROADCAST_CHANNEL_RESPONSE, (event) => {
@@ -188,9 +190,10 @@ export class BroadcastService {
         }
       });
       
-      // Enviar solicitud
+      // Enviar solicitud con flag de forceRefresh
       this.OBR.broadcast.sendMessage(BROADCAST_CHANNEL_REQUEST, { 
         pageId,
+        forceRefresh,
         requestId: Date.now() 
       });
     });
@@ -198,7 +201,7 @@ export class BroadcastService {
 
   /**
    * Configura el GM para responder a solicitudes de contenido
-   * @param {Function} getHtmlForPage - Función que retorna HTML para un pageId
+   * @param {Function} getHtmlForPage - Función que retorna HTML para un pageId (acepta pageId y forceRefresh)
    */
   setupGMContentResponder(getHtmlForPage) {
     if (!this.OBR) return;
@@ -210,18 +213,27 @@ export class BroadcastService {
       const data = event.data;
       if (!data || !data.pageId) return;
 
-      log('📡 Solicitud de contenido recibida para:', data.pageId);
+      const forceRefresh = data.forceRefresh || false;
+      log(`📡 Solicitud de contenido recibida para: ${data.pageId}${forceRefresh ? ' (forceRefresh)' : ''}`);
 
       try {
-        // Obtener HTML del caché o generarlo
         let html = null;
         
-        if (this.cacheService) {
+        // Si es forceRefresh, NO usar caché local
+        if (!forceRefresh && this.cacheService) {
           html = this.cacheService.getHtmlFromLocalCache(data.pageId);
+          if (html) {
+            log('📦 Usando HTML del caché local del GM');
+          }
+        } else if (forceRefresh && this.cacheService) {
+          // Limpiar caché local del GM para forzar regeneración
+          log('🔄 Limpiando caché del GM para forceRefresh');
+          this.cacheService.clearPageCache(data.pageId);
         }
 
+        // Si no hay en caché o es forceRefresh, generar nuevo contenido
         if (!html && getHtmlForPage) {
-          html = await getHtmlForPage(data.pageId);
+          html = await getHtmlForPage(data.pageId, forceRefresh);
         }
 
         if (html) {
