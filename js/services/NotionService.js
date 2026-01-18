@@ -294,36 +294,9 @@ export class NotionService {
     // Intentar obtener del caché local primero
     if (useCache && this.cacheService) {
       const cachedBlocks = this.cacheService.getCachedBlocks(pageId);
-      const cachedPageInfo = this.cacheService.getCachedPageInfo(pageId);
-      
       if (cachedBlocks && cachedBlocks.length > 0) {
-        // Verificar si la página fue editada en Notion (invalidación automática)
-        if (cachedPageInfo?.lastEditedTime) {
-          try {
-            // Obtener solo metadata de la página (llamada ligera)
-            const currentPageInfo = await this.fetchPageInfo(pageId, false);
-            
-            if (currentPageInfo?.lastEditedTime && 
-                currentPageInfo.lastEditedTime !== cachedPageInfo.lastEditedTime) {
-              log('🔄 Caché invalidado: página editada en Notion');
-              log(`   Caché: ${cachedPageInfo.lastEditedTime}`);
-              log(`   Notion: ${currentPageInfo.lastEditedTime}`);
-              this.cacheService.clearPageCache(pageId);
-              // Continuar para obtener bloques frescos de la API
-            } else {
-              log('✅ Usando caché persistente para:', pageId, '-', cachedBlocks.length, 'bloques');
-              return cachedBlocks;
-            }
-          } catch (e) {
-            // Si falla la verificación, usar caché como fallback
-            log('⚠️ No se pudo verificar last_edited_time, usando caché:', e.message);
-            return cachedBlocks;
-          }
-        } else {
-          // No hay lastEditedTime en caché, usar caché directamente
-          log('✅ Usando caché persistente para:', pageId, '-', cachedBlocks.length, 'bloques');
-          return cachedBlocks;
-        }
+        log('✅ Usando caché persistente para:', pageId, '-', cachedBlocks.length, 'bloques');
+        return cachedBlocks;
       }
       log('⚠️ No hay caché para:', pageId, '- se pedirá a la API');
     } else if (!useCache) {
