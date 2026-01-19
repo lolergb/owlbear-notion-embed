@@ -1176,19 +1176,24 @@ export class NotionService {
         // 
         // Lógica de asignación:
         // 1. Si una página de DB tiene un label que coincide con una categoría existente → se añade a esa categoría
-        // 2. Si no hay coincidencia por label → se crea una carpeta nueva con el nombre de la base de datos (databaseTitle)
+        // 2. Si el nombre de la DB coincide con el título de la página que la contiene → se añaden directamente (sin carpeta)
+        // 3. Si no hay coincidencia por label ni por nombre → se crea una carpeta nueva con el nombre de la base de datos (databaseTitle)
         // 
         // Ejemplo:
-        //   - Base de datos "NPCs" con items: "Indithir", "Thava", "Gareth"
+        //   - Página "NPCs" contiene una base de datos "NPCs" con items: "Indithir", "Thava", "Gareth"
+        //   - Resultado: Los items se añaden directamente a la página "NPCs" (sin crear carpeta "NPCs")
+        // 
+        //   - Página "Personajes" contiene una base de datos "NPCs" con items: "Indithir", "Thava", "Gareth"
         //   - Resultado: Carpeta "NPCs" con páginas "Indithir", "Thava", "Gareth"
         // 
         // NOTA: Si en el futuro se quiere cambiar este comportamiento (ej: añadir items directamente sin carpeta),
-        // modificar la lógica en las líneas 1208-1228 y 1231-1241
+        // modificar la lógica en las líneas 1208-1240 y 1243-1253
         //
         const existingCategoryNames = Array.from(categoryMap.keys());
         const databaseFolders = new Map(); // databaseTitle -> pages[]
         let dbAssignedToCategory = 0;
         let dbInFolders = 0;
+        let dbAddedDirectly = 0; // Items añadidos directamente porque DB tiene mismo nombre que página
         
         for (const child of dbPagesForLater) {
           const pageData = {
@@ -1198,6 +1203,7 @@ export class NotionService {
           };
           
           let assignedToCategory = false;
+          let addedDirectly = false;
           
           // Buscar si algún label coincide con una categoría existente
           if (child.labels && child.labels.length > 0) {
@@ -1218,14 +1224,24 @@ export class NotionService {
             }
           }
           
-          // Si no se asignó por label, intentar crear carpeta con el título de la DB
-          // ESTO ES LO QUE CREA LA CARPETA CON EL NOMBRE DE LA TABLA
+          // Si no se asignó por label, verificar si la DB tiene el mismo nombre que la página actual
           if (!assignedToCategory) {
             const dbTitle = child.databaseTitle || '';
             const invalidTitles = ['Untitled', 'Database', ''];
             
-            // Solo crear carpeta si el título de la DB es válido
-            if (dbTitle && !invalidTitles.includes(dbTitle)) {
+            // Comparar nombre de DB con título de página (case-insensitive)
+            const dbTitleNormalized = dbTitle.trim().toLowerCase();
+            const pageTitleNormalized = title.trim().toLowerCase();
+            
+            if (dbTitleNormalized === pageTitleNormalized && dbTitle && !invalidTitles.includes(dbTitle)) {
+              // La DB tiene el mismo nombre que la página → añadir directamente sin carpeta
+              items.push(pageData);
+              addedDirectly = true;
+              dbAddedDirectly++;
+              stats.pagesImported++;
+              log(`  📄 "${child.title}" añadido directamente (DB "${dbTitle}" coincide con página "${title}")`);
+            } else if (dbTitle && !invalidTitles.includes(dbTitle)) {
+              // Crear carpeta con el título de la DB
               if (!databaseFolders.has(dbTitle)) {
                 databaseFolders.set(dbTitle, []);
               }
@@ -1242,7 +1258,7 @@ export class NotionService {
           }
         }
         
-        // Crear carpetas para páginas de DB que no coincidieron con categorías
+        // Crear carpetas para páginas de DB que no coincidieron con categorías ni con el nombre de la página
         // AQUÍ SE CREAN LAS CARPETAS CON EL NOMBRE DE LA TABLA (databaseTitle)
         for (const [folderName, pages] of databaseFolders) {
           if (pages.length > 0) {
@@ -1258,7 +1274,12 @@ export class NotionService {
         // Log resumen de procesamiento de DB
         if (dbPagesForLater.length > 0) {
           const dbFiltered = stats.dbPagesFiltered;
-          log(`📊 DB: ${dbAssignedToCategory} asignados por label, ${dbInFolders} en carpetas de DB${dbFiltered > 0 ? `, ${dbFiltered} omitidos (DB sin nombre válido)` : ''}`);
+          const parts = [];
+          if (dbAssignedToCategory > 0) parts.push(`${dbAssignedToCategory} asignados por label`);
+          if (dbAddedDirectly > 0) parts.push(`${dbAddedDirectly} añadidos directamente (mismo nombre)`);
+          if (dbInFolders > 0) parts.push(`${dbInFolders} en carpetas de DB`);
+          if (dbFiltered > 0) parts.push(`${dbFiltered} omitidos (DB sin nombre válido)`);
+          log(`📊 DB: ${parts.join(', ')}`);
         }
 
         // ============================================

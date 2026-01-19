@@ -3269,27 +3269,38 @@ export class ExtensionController {
             
             // Mostrar resultado
             const { pagesImported, pagesSkipped, emptyPages, dbPagesFiltered } = totalStats;
-            const modeText = importMode === 'append' ? 'added' : importMode === 'merge' ? 'merged' : 'replaced';
+            const modeText = importMode === 'append' ? 'added' : importMode === 'merge' ? 'merged' : 'updated';
             
             // Solo mostrar warning si hay páginas saltadas por profundidad (no por filtrado intencional de DB)
             const realSkipped = pagesSkipped - emptyPages; // Solo las saltadas por profundidad
             
             if (realSkipped > 0 || emptyPages > 0 || dbPagesFiltered > 0) {
+              // Construir mensaje más claro y descriptivo
               const skippedInfo = [];
-              if (emptyPages > 0) skippedInfo.push(`${emptyPages} empty`);
-              if (realSkipped > 0) skippedInfo.push(`${realSkipped} over depth`);
-              if (dbPagesFiltered > 0) skippedInfo.push(`${dbPagesFiltered} from unnamed DBs`);
+              if (emptyPages > 0) {
+                skippedInfo.push(`${emptyPages} empty page${emptyPages > 1 ? 's' : ''}`);
+              }
+              if (realSkipped > 0) {
+                skippedInfo.push(`${realSkipped} page${realSkipped > 1 ? 's' : ''} beyond depth limit`);
+              }
+              if (dbPagesFiltered > 0) {
+                skippedInfo.push(`${dbPagesFiltered} page${dbPagesFiltered > 1 ? 's' : ''} from databases without names`);
+              }
+              
+              const skippedText = skippedInfo.length > 0 
+                ? ` ${skippedInfo.length === 1 ? skippedInfo[0] : skippedInfo.join(', ')} ${skippedInfo.length === 1 ? 'was' : 'were'} skipped.`
+                : '';
               
               this.uiRenderer.showWarningToast(
-                'Import completed',
-                `${pagesImported} pages ${modeText}. Skipped: ${skippedInfo.join(', ')}.`,
+                'Vault updated',
+                `${pagesImported} page${pagesImported !== 1 ? 's' : ''} ${modeText} in your vault.${skippedText}`,
                 8000
               );
             } else {
               const pageText = pagesToImport.length === 1 ? pagesToImport[0].title : `${pagesToImport.length} sources`;
               this.uiRenderer.showSuccessToast(
-                'Import successful!',
-                `${pagesImported} pages ${modeText} from ${pageText}.`
+                'Vault updated',
+                `${pagesImported} page${pagesImported !== 1 ? 's' : ''} ${modeText} from ${pageText}.`
               );
             }
 
