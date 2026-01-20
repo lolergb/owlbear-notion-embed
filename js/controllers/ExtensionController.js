@@ -2161,8 +2161,21 @@ export class ExtensionController {
    * @private
    */
   async _openPageInModal(page) {
-    // Validar que page tenga url
-    if (!page || !page.url) {
+    // Validar que page exista
+    if (!page) {
+      logError('Error: página no definida para abrir modal');
+      return;
+    }
+    
+    // Las páginas con htmlContent (local-first, ej: Obsidian) no necesitan modal
+    // El contenido ya se muestra embebido en la vista de página
+    if (!page.url && page.htmlContent) {
+      log('Página con htmlContent embebido, no requiere modal externo');
+      return;
+    }
+    
+    // Validar que tenga URL para abrir en modal
+    if (!page.url) {
       logError('Error: página sin URL para abrir modal');
       return;
     }
@@ -3466,6 +3479,8 @@ export class ExtensionController {
       let finalCategories;
       let finalPages;
 
+      log(`Import mode selected: "${importMode}"`);
+      
       switch (importMode) {
         case 'append':
           // Añadir al final
