@@ -5906,103 +5906,111 @@ export class ExtensionController {
     });
     
     try {
-      // Cargar contenido de la página
-      const notionPageId = page.getNotionPageId();
-      
-      if (!notionPageId) {
-        content.innerHTML = `
-          <div class="empty-state">
-            <div class="empty-state-icon">⚠️</div>
-            <p class="empty-state-text">Cannot load page</p>
-            <p class="empty-state-hint">Invalid page ID</p>
-          </div>
-        `;
-        return;
-      }
-      
       // Configurar renderer para modo modal (mentions no clickeables)
       this.notionRenderer.setRenderingOptions({ isInModal: true });
       
       let htmlContent = null;
       
-      // Master GM: usar API de Notion directamente
-      // CoGM y Players: solicitar contenido vía broadcast
-      if (this.isGM && !this.isCoGM) {
-        // Master GM: generar contenido con header completo
-        const result = await this._generateNotionHtmlWithHeader(notionPageId, {
-          includeShareButtons: true,
-          fallbackTitle: displayName,
-          useCache: true
-        });
-        htmlContent = result?.html;
-      } else {
-        // CoGM y Players: solicitar contenido al GM
-        log('👤 Co-GM/Player: solicitando contenido de mention al GM...');
+      // Caso 1: Página con HTML embebido (local-first, Obsidian)
+      if (page.hasEmbeddedHtml()) {
+        log('📄 Mention: página con HTML embebido (local-first)');
+        // Usar el HTML embebido directamente
+        htmlContent = page.htmlContent;
+      }
+      // Caso 2: Página de Notion (necesita API o broadcast)
+      else {
+        const notionPageId = page.getNotionPageId();
         
-        // Verificar si el GM está activo
-        const gmAvailable = await this._checkGMAvailability();
-        
-        if (!gmAvailable.isActive) {
+        if (!notionPageId) {
           content.innerHTML = `
             <div class="empty-state">
-              <div class="empty-state-icon">👋</div>
-              <p class="empty-state-text">The GM is not active</p>
-              <p class="empty-state-hint">Wait for the GM to join the session to view this page</p>
-              <button class="btn btn--sm btn--secondary mention-modal__retry-btn">
-                🔄 Retry
-              </button>
+              <div class="empty-state-icon">⚠️</div>
+              <p class="empty-state-text">Cannot load page</p>
+              <p class="empty-state-hint">Invalid page ID</p>
             </div>
           `;
-          // Añadir handler para retry
-          const retryBtn = content.querySelector('.mention-modal__retry-btn');
-          if (retryBtn) {
-            retryBtn.addEventListener('click', () => {
-              closeModal();
-              this._openMentionedPage(notionPageId, displayName, null, null);
-            });
-          }
           return;
         }
         
-        // Intentar obtener del caché local primero
-        const cachedHtml = this.cacheService.getHtmlFromLocalCache(notionPageId);
-        if (cachedHtml) {
-          log('📦 Mention: usando HTML del caché local');
-          htmlContent = cachedHtml;
+        // Master GM: usar API de Notion directamente
+        // CoGM y Players: solicitar contenido vía broadcast
+        if (this.isGM && !this.isCoGM) {
+          // Master GM: generar contenido con header completo
+          const result = await this._generateNotionHtmlWithHeader(notionPageId, {
+            includeShareButtons: true,
+            fallbackTitle: displayName,
+            useCache: true
+          });
+          htmlContent = result?.html;
         } else {
-          // Solicitar contenido al GM vía broadcast
-          log('📡 Mention: solicitando contenido al GM...');
-          htmlContent = await this.broadcastService.requestContentFromGM(notionPageId);
+          // CoGM y Players: solicitar contenido al GM
+          log('👤 Co-GM/Player: solicitando contenido de mention al GM...');
           
-          if (htmlContent) {
-            log('✅ Mention: contenido recibido del GM');
-            // Guardar en caché local para próximas visitas
-            this.cacheService.saveHtmlToLocalCache(notionPageId, htmlContent);
+          // Verificar si el GM está activo
+          const gmAvailable = await this._checkGMAvailability();
+          
+          if (!gmAvailable.isActive) {
+            content.innerHTML = `
+              <div class="empty-state">
+                <div class="empty-state-icon">👋</div>
+                <p class="empty-state-text">The GM is not active</p>
+                <p class="empty-state-hint">Wait for the GM to join the session to view this page</p>
+                <button class="btn btn--sm btn--secondary mention-modal__retry-btn">
+                  🔄 Retry
+                </button>
+              </div>
+            `;
+            // Añadir handler para retry
+            const retryBtn = content.querySelector('.mention-modal__retry-btn');
+            if (retryBtn) {
+              retryBtn.addEventListener('click', () => {
+                closeModal();
+                this._openMentionedPage(notionPageId, displayName, null, null);
+              });
+            }
+            return;
           }
-        }
-        
-        // Si no hay contenido disponible
-        if (!htmlContent) {
-          content.innerHTML = `
-            <div class="empty-state">
-              <div class="empty-state-icon">⏳</div>
-              <p class="empty-state-text">Content not available</p>
-              <p class="empty-state-hint">The GM needs to open this page first to cache it.</p>
-              <p class="empty-state-subhint">Ask your GM to view this page so you can access it.</p>
-              <button class="btn btn--sm btn--secondary mention-modal__retry-btn">
-                🔄 Retry
-              </button>
-            </div>
-          `;
-          // Añadir handler para retry
-          const retryBtn = content.querySelector('.mention-modal__retry-btn');
-          if (retryBtn) {
-            retryBtn.addEventListener('click', () => {
-              closeModal();
-              this._openMentionedPage(notionPageId, displayName, null, null);
-            });
+          
+          // Intentar obtener del caché local primero
+          const cachedHtml = this.cacheService.getHtmlFromLocalCache(notionPageId);
+          if (cachedHtml) {
+            log('📦 Mention: usando HTML del caché local');
+            htmlContent = cachedHtml;
+          } else {
+            // Solicitar contenido al GM vía broadcast
+            log('📡 Mention: solicitando contenido al GM...');
+            htmlContent = await this.broadcastService.requestContentFromGM(notionPageId);
+            
+            if (htmlContent) {
+              log('✅ Mention: contenido recibido del GM');
+              // Guardar en caché local para próximas visitas
+              this.cacheService.saveHtmlToLocalCache(notionPageId, htmlContent);
+            }
           }
-          return;
+          
+          // Si no hay contenido disponible
+          if (!htmlContent) {
+            content.innerHTML = `
+              <div class="empty-state">
+                <div class="empty-state-icon">⏳</div>
+                <p class="empty-state-text">Content not available</p>
+                <p class="empty-state-hint">The GM needs to open this page first to cache it.</p>
+                <p class="empty-state-subhint">Ask your GM to view this page so you can access it.</p>
+                <button class="btn btn--sm btn--secondary mention-modal__retry-btn">
+                  🔄 Retry
+                </button>
+              </div>
+            `;
+            // Añadir handler para retry
+            const retryBtn = content.querySelector('.mention-modal__retry-btn');
+            if (retryBtn) {
+              retryBtn.addEventListener('click', () => {
+                closeModal();
+                this._openMentionedPage(notionPageId, displayName, null, null);
+              });
+            }
+            return;
+          }
         }
       }
       
