@@ -6797,6 +6797,7 @@ export class ExtensionController {
               delete item.metadata[`${METADATA_KEY}/pageUrl`];
               delete item.metadata[`${METADATA_KEY}/pageName`];
               delete item.metadata[`${METADATA_KEY}/pageIcon`];
+              delete item.metadata[`${METADATA_KEY}/pageId`];
             });
           });
           
@@ -6843,6 +6844,7 @@ export class ExtensionController {
         } else if (item.type === 'page' && category.pages && category.pages[item.index]) {
           const page = category.pages[item.index];
           allPages.push({
+            id: page.id,
             name: page.name,
             url: page.url,
             icon: page.icon,
@@ -6909,6 +6911,9 @@ export class ExtensionController {
             item.metadata[`${METADATA_KEY}/pageUrl`] = selectedPage.url;
             item.metadata[`${METADATA_KEY}/pageName`] = selectedPage.name;
             item.metadata[`${METADATA_KEY}/pageIcon`] = selectedPage.icon;
+            if (selectedPage.id) {
+              item.metadata[`${METADATA_KEY}/pageId`] = selectedPage.id;
+            }
           });
         });
         
