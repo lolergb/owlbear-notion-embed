@@ -6780,6 +6780,60 @@ export class ExtensionController {
         }
       });
       
+      // Menú: Copiar link de página (todos, si tiene página con URL)
+      await this.OBR.contextMenu.create({
+        id: `${METADATA_KEY}/copy-link`,
+        icons: [
+          {
+            icon: `${baseUrl}/img/icon-link.svg`,
+            label: 'Copy link',
+            filter: {
+              every: [
+                { key: 'layer', value: 'CHARACTER' },
+                { key: ['metadata', `${METADATA_KEY}/pageUrl`], value: undefined, operator: '!=' }
+              ]
+            }
+          }
+        ],
+        onClick: async (context) => {
+          const item = context.items[0];
+          if (!item) return;
+          
+          const pageUrl = item.metadata[`${METADATA_KEY}/pageUrl`];
+          const pageName = item.metadata[`${METADATA_KEY}/pageName`] || 'Linked page';
+          
+          // Solo copiar si hay URL (páginas de Obsidian pueden no tener URL)
+          if (pageUrl) {
+            try {
+              // Copiar al portapapeles usando la API del navegador
+              await navigator.clipboard.writeText(pageUrl);
+              log(`📋 Link copiado: ${pageUrl}`);
+              this._showFeedback(`✅ Link copied: ${pageName}`);
+            } catch (error) {
+              logError('Error al copiar link:', error);
+              // Fallback para navegadores que no soportan clipboard API
+              try {
+                const textArea = document.createElement('textarea');
+                textArea.value = pageUrl;
+                textArea.style.position = 'fixed';
+                textArea.style.opacity = '0';
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+                log(`📋 Link copiado (fallback): ${pageUrl}`);
+                this._showFeedback(`✅ Link copied: ${pageName}`);
+              } catch (fallbackError) {
+                logError('Error en fallback de copia:', fallbackError);
+                this._showFeedback('❌ Error copying link');
+              }
+            }
+          } else {
+            this._showFeedback('⚠️ No URL available to copy');
+          }
+        }
+      });
+      
       // Menú: Desvincular página (solo GM)
       await this.OBR.contextMenu.create({
         id: `${METADATA_KEY}/unlink-page`,
