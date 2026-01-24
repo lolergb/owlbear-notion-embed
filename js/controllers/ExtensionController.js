@@ -1931,6 +1931,43 @@ export class ExtensionController {
    * @param {Page|Object} page - La página a compartir
    * @private
    */
+  /**
+   * Copia el link de una página al portapapeles
+   * @param {Object} page - Página a copiar
+   * @private
+   */
+  async _copyPageLink(page) {
+    if (!page || !page.url) {
+      this._showFeedback('⚠️ No URL available to copy');
+      return;
+    }
+
+    try {
+      // Copiar al portapapeles usando la API del navegador
+      await navigator.clipboard.writeText(page.url);
+      log(`📋 Link copiado: ${page.url}`);
+      this._showFeedback(`✅ Link copied: ${page.name}`);
+    } catch (error) {
+      logError('Error al copiar link:', error);
+      // Fallback para navegadores que no soportan clipboard API
+      try {
+        const textArea = document.createElement('textarea');
+        textArea.value = page.url;
+        textArea.style.position = 'fixed';
+        textArea.style.opacity = '0';
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+        log(`📋 Link copiado (fallback): ${page.url}`);
+        this._showFeedback(`✅ Link copied: ${page.name}`);
+      } catch (fallbackError) {
+        logError('Error en fallback de copia:', fallbackError);
+        this._showFeedback('❌ Error copying link');
+      }
+    }
+  }
+
   async _shareCurrentPageToPlayers(pageData) {
     if (!pageData) return;
 
@@ -4216,6 +4253,9 @@ export class ExtensionController {
       },
       onPageShare: (page, categoryPath, pageIndex) => {
         this._shareCurrentPageToPlayers(page);
+      },
+      onPageCopyLink: (page) => {
+        this._copyPageLink(page);
       },
       onPageEdit: (page, categoryPath, pageIndex, newData) => {
         this._handlePageEdit(page, categoryPath, pageIndex, newData);
@@ -6776,60 +6816,6 @@ export class ExtensionController {
             // Trackear y abrir la página
             this.analyticsService.trackPageViewedFromToken(pageName);
             await this._openLinkedPage(pageUrl, pageName, pageId);
-          }
-        }
-      });
-      
-      // Menú: Copiar link de página (todos, si tiene página con URL)
-      await this.OBR.contextMenu.create({
-        id: `${METADATA_KEY}/copy-link`,
-        icons: [
-          {
-            icon: `${baseUrl}/img/icon-link.svg`,
-            label: 'Copy link',
-            filter: {
-              every: [
-                { key: 'layer', value: 'CHARACTER' },
-                { key: ['metadata', `${METADATA_KEY}/pageUrl`], value: undefined, operator: '!=' }
-              ]
-            }
-          }
-        ],
-        onClick: async (context) => {
-          const item = context.items[0];
-          if (!item) return;
-          
-          const pageUrl = item.metadata[`${METADATA_KEY}/pageUrl`];
-          const pageName = item.metadata[`${METADATA_KEY}/pageName`] || 'Linked page';
-          
-          // Solo copiar si hay URL (páginas de Obsidian pueden no tener URL)
-          if (pageUrl) {
-            try {
-              // Copiar al portapapeles usando la API del navegador
-              await navigator.clipboard.writeText(pageUrl);
-              log(`📋 Link copiado: ${pageUrl}`);
-              this._showFeedback(`✅ Link copied: ${pageName}`);
-            } catch (error) {
-              logError('Error al copiar link:', error);
-              // Fallback para navegadores que no soportan clipboard API
-              try {
-                const textArea = document.createElement('textarea');
-                textArea.value = pageUrl;
-                textArea.style.position = 'fixed';
-                textArea.style.opacity = '0';
-                document.body.appendChild(textArea);
-                textArea.select();
-                document.execCommand('copy');
-                document.body.removeChild(textArea);
-                log(`📋 Link copiado (fallback): ${pageUrl}`);
-                this._showFeedback(`✅ Link copied: ${pageName}`);
-              } catch (fallbackError) {
-                logError('Error en fallback de copia:', fallbackError);
-                this._showFeedback('❌ Error copying link');
-              }
-            }
-          } else {
-            this._showFeedback('⚠️ No URL available to copy');
           }
         }
       });
