@@ -146,10 +146,10 @@ export class AnalyticsService {
       return;
     }
 
-    // Si es beta, no inicializar Mixpanel pero el consent ya está guardado
+    // Si el usuario aceptó, inicializar Mixpanel incluso en beta
+    // Esto permite detectar problemas temprano y obtener insights de uso
     if (isBeta) {
-      log('📊 Mixpanel deshabilitado (entorno beta)');
-      return;
+      log('📊 Entorno beta detectado - Mixpanel habilitado con consentimiento del usuario');
     }
 
     try {
