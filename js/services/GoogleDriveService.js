@@ -47,6 +47,28 @@ export class GoogleDriveService {
   }
 
   /**
+   * Obtiene las credenciales de Google desde el servidor
+   * @returns {Promise<Object>} - {apiKey, clientId} o null si no están configuradas
+   */
+  async getCredentialsFromServer() {
+    try {
+      const response = await fetch('/.netlify/functions/get-google-drive-credentials');
+      if (response.ok) {
+        const data = await response.json();
+        if (data.apiKey && data.clientId) {
+          this.setCredentials(data.apiKey, data.clientId);
+          log('✅ Credenciales de Google Drive obtenidas del servidor');
+          return { apiKey: data.apiKey, clientId: data.clientId };
+        }
+      }
+      return null;
+    } catch (error) {
+      logError('Error obteniendo credenciales de Google Drive:', error);
+      return null;
+    }
+  }
+
+  /**
    * Carga las APIs de Google necesarias
    * @returns {Promise<void>}
    */

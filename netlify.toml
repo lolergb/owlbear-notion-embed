@@ -85,4 +85,12 @@
 #   - Valor: "false" o "0" para desactivar logs
 #   - Si OWNER_TOKEN está configurado, DEBUG_MODE solo funciona para tu token
 #   - Si OWNER_TOKEN NO está configurado, DEBUG_MODE funciona para todos (menos seguro)
+# GM_VAULT_DEFAULT_CONFIG: Token de Notion para default-config
+#   - Se usa para cargar páginas de Notion en la configuración por defecto
+# GM_VAULT_GOOGLE_API_KEY: API Key de Google para Google Drive
+#   - Se usa para la funcionalidad de importación desde Google Drive
+#   - Solo disponible cuando hay OWNER_TOKEN
+# GM_VAULT_GOOGLE_CLIENT_ID: Client ID de OAuth de Google
+#   - Se usa para la funcionalidad de importación desde Google Drive
+#   - Solo disponible cuando hay OWNER_TOKEN
 
