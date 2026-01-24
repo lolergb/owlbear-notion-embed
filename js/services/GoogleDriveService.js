@@ -98,10 +98,15 @@ export class GoogleDriveService {
   }
 
   /**
-   * Inicia sesión con Google usando Google Identity Services
-   * Usa OAuth 2.0 directamente sin necesidad de Client ID del servidor
-   * @param {string} clientId - Client ID de Google OAuth (opcional, se puede obtener del usuario)
-   * @returns {Promise<string>} - Token de acceso
+   * Inicia sesión con Google usando OAuth 2.0 Token Model
+   * Implementa el flujo de OAuth 2.0 para aplicaciones JavaScript del lado del cliente
+   * según la documentación oficial: https://developers.google.com/identity/protocols/oauth2
+   * 
+   * Usa Google Identity Services con initTokenClient() que es el método recomendado
+   * para aplicaciones JavaScript. No requiere client secret, solo Client ID.
+   * 
+   * @param {string} clientId - Client ID de Google OAuth (obtenido del usuario)
+   * @returns {Promise<string>} - Token de acceso OAuth 2.0
    */
   async signInWithGoogle(clientId = null) {
     try {
@@ -111,36 +116,36 @@ export class GoogleDriveService {
         throw new Error('Google Identity Services no está disponible');
       }
 
-      // Si no se proporciona Client ID, usar uno por defecto o pedirlo al usuario
+      // Obtener Client ID de localStorage si no se proporciona
       if (!clientId) {
-        // Intentar obtener de localStorage
         clientId = localStorage.getItem('google_drive_client_id');
         
-        // Si no hay, usar un Client ID público de Google (para desarrollo)
-        // En producción, el usuario debería configurar su propio Client ID
         if (!clientId) {
-          // Client ID público de Google para OAuth 2.0 (puede no funcionar en producción)
-          // El usuario debería configurar su propio Client ID
           throw new Error('Client ID no configurado. Por favor, configura tu Client ID de Google OAuth.');
         }
       }
 
+      // Usar Google Identity Services Token Model (recomendado por Google)
+      // Documentación: https://developers.google.com/identity/oauth2/web/guides/use-token-model
       return new Promise((resolve, reject) => {
         this.tokenClient = window.google.accounts.oauth2.initTokenClient({
           client_id: clientId,
           scope: 'https://www.googleapis.com/auth/drive.readonly',
           callback: (response) => {
             if (response.error) {
-              logError('Error en autenticación:', response.error);
+              logError('Error en autenticación OAuth 2.0:', response.error);
               reject(new Error(response.error));
               return;
             }
+            // El access token se obtiene directamente del callback
+            // No se necesita client secret para aplicaciones JavaScript
             this.accessToken = response.access_token;
-            log('✅ Autenticado con Google Drive');
+            log('✅ Autenticado con Google Drive usando OAuth 2.0');
             resolve(this.accessToken);
           }
         });
         
+        // Solicitar token de acceso (abre ventana de autenticación de Google)
         this.tokenClient.requestAccessToken();
       });
     } catch (error) {
@@ -151,6 +156,8 @@ export class GoogleDriveService {
 
   /**
    * Lista todas las carpetas del usuario en Google Drive
+   * Usa el access token OAuth 2.0 para autenticar las peticiones a la API
+   * 
    * @returns {Promise<Array>} - Array de carpetas {id, name}
    */
   async listFolders() {
@@ -159,9 +166,11 @@ export class GoogleDriveService {
         throw new Error('No estás autenticado. Inicia sesión primero.');
       }
 
-      // Configurar el token en el cliente
+      // Configurar el token OAuth 2.0 en el cliente de Google API
+      // El token se envía automáticamente en el header Authorization
       window.gapi.client.setToken({ access_token: this.accessToken });
 
+      // Llamar a Google Drive API usando el token OAuth 2.0
       const response = await window.gapi.client.drive.files.list({
         q: "mimeType='application/vnd.google-apps.folder' and trashed=false",
         fields: 'files(id, name)',
