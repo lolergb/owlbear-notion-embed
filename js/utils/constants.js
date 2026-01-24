@@ -94,9 +94,9 @@ export const NOTION_BLOCK_TYPES = [
 // ============================================
 // FEATURE FLAGS
 // ============================================
-// Flag para habilitar funcionalidad de Google Drive
-// Solo disponible cuando hay OWNER_TOKEN (token del servidor)
-export const ENABLE_GOOGLE_DRIVE = true; // Cambiar a false para deshabilitar
+// Google Drive functionality - deshabilitada temporalmente
+// export const ENABLE_GOOGLE_DRIVE = true;
+// export const GOOGLE_DRIVE_CLIENT_ID = null;
 
 // ============================================
 // EXPORT AGRUPADO

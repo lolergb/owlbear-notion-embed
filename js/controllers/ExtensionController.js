@@ -6,7 +6,7 @@
 
 import { log, logError, logWarn, setOBRReference, setGetTokenFunction, initDebugMode, getUserRole, isDebugMode } from '../utils/logger.js';
 import { filterVisiblePages } from '../utils/helpers.js';
-import { BROADCAST_CHANNEL_REQUEST_FULL_VAULT, BROADCAST_CHANNEL_RESPONSE_FULL_VAULT, OWNER_TIMEOUT, METADATA_KEY, ENABLE_GOOGLE_DRIVE } from '../utils/constants.js';
+import { BROADCAST_CHANNEL_REQUEST_FULL_VAULT, BROADCAST_CHANNEL_RESPONSE_FULL_VAULT, OWNER_TIMEOUT, METADATA_KEY } from '../utils/constants.js';
 
 // Models
 import { Page } from '../models/Page.js';
@@ -19,7 +19,6 @@ import { NotionService } from '../services/NotionService.js';
 import { BroadcastService } from '../services/BroadcastService.js';
 import { AnalyticsService } from '../services/AnalyticsService.js';
 import { getImageCacheService } from '../services/ImageCacheService.js';
-import { GoogleDriveService } from '../services/GoogleDriveService.js';
 
 // Renderers
 import { NotionRenderer } from '../renderers/NotionRenderer.js';
@@ -58,7 +57,6 @@ export class ExtensionController {
     this.broadcastService = new BroadcastService();
     this.analyticsService = new AnalyticsService();
     this.imageCacheService = getImageCacheService();
-    this.googleDriveService = new GoogleDriveService();
 
     // Renderers
     this.notionRenderer = new NotionRenderer();
@@ -1672,10 +1670,6 @@ export class ExtensionController {
       notionService: this.notionService
     });
 
-    // Google Drive Service
-    this.googleDriveService.setOBR(this.OBR);
-    // Las credenciales se obtienen del servidor automáticamente
-    // No se guardan en localStorage - siempre se obtienen del servidor
 
     // Image Cache Service - inicializar en background
     this.imageCacheService.init().then(() => {
@@ -2709,7 +2703,6 @@ export class ExtensionController {
       
       // Mostrar botón Import from Notion solo si hay token guardado
       const importNotionBtn = document.getElementById('import-notion-btn');
-      const importDriveBtn = document.getElementById('import-drive-btn');
       const saveTokenBtn = document.getElementById('save-token');
       if (importNotionBtn) {
         const hasToken = !!this.storageService.getUserToken();
@@ -2726,28 +2719,6 @@ export class ExtensionController {
             saveTokenBtn.classList.add('btn--primary');
           }
         }
-      }
-
-      // Controlar visibilidad del botón de Google Drive (solo si hay OWNER_TOKEN)
-      // Ocultar por defecto hasta verificar
-      if (importDriveBtn) {
-        importDriveBtn.style.display = 'none';
-      }
-      
-      if (importDriveBtn && ENABLE_GOOGLE_DRIVE) {
-        // Verificar OWNER_TOKEN de forma asíncrona
-        this.notionService._getDefaultToken().then(token => {
-          // Convertir token a booleano: si existe y no está vacío, es true
-          const hasOwnerToken = !!(token && typeof token === 'string' && token.trim().length > 0);
-          importDriveBtn.style.display = hasOwnerToken ? '' : 'none';
-          log('⚙️ Import Google Drive button:', hasOwnerToken ? 'visible (OWNER_TOKEN found)' : 'hidden (no OWNER_TOKEN)');
-        }).catch(() => {
-          importDriveBtn.style.display = 'none';
-          log('⚙️ Import Google Drive button: hidden (error checking OWNER_TOKEN)');
-        });
-      } else if (importDriveBtn) {
-        // Si la flag está deshabilitada, asegurar que esté oculto
-        importDriveBtn.style.display = 'none';
       }
     }
 
@@ -3123,234 +3094,8 @@ export class ExtensionController {
       });
     }
 
-    // Botón de importar desde Google Drive
-    const importDriveBtn = document.getElementById('import-drive-btn');
-    if (importDriveBtn && !importDriveBtn.dataset.listenerAdded) {
-      importDriveBtn.dataset.listenerAdded = 'true';
-      importDriveBtn.addEventListener('click', async () => {
-        // Verificar OWNER_TOKEN antes de ejecutar (doble verificación de seguridad)
-        try {
-          const token = await this.notionService._getDefaultToken();
-          const hasOwnerToken = !!(token && typeof token === 'string' && token.trim().length > 0);
-          if (!hasOwnerToken) {
-            this._showFeedback('❌ Esta funcionalidad solo está disponible para el GM (OWNER_TOKEN requerido)');
-            log('⚠️ Intento de acceso a Google Drive sin OWNER_TOKEN');
-            return;
-          }
-          this._importFromGoogleDrive();
-        } catch (error) {
-          logError('Error verificando OWNER_TOKEN:', error);
-          this._showFeedback('❌ Error verificando permisos. Esta funcionalidad solo está disponible para el GM.');
-        }
-      });
-    }
   }
 
-  /**
-   * Importa el vault desde Google Drive
-   * @private
-   */
-  async _importFromGoogleDrive() {
-    try {
-      // Verificar OWNER_TOKEN antes de continuar (doble verificación de seguridad)
-      const token = await this.notionService._getDefaultToken();
-      const hasOwnerToken = !!(token && typeof token === 'string' && token.trim().length > 0);
-      if (!hasOwnerToken) {
-        logError('⚠️ Intento de acceso a Google Drive sin OWNER_TOKEN');
-        this._showFeedback('❌ Esta funcionalidad solo está disponible para el GM (OWNER_TOKEN requerido)');
-        return;
-      }
-
-      // Cargar APIs de Google
-      this._showFeedback('🔄 Cargando Google Drive...');
-      await this.googleDriveService.loadGoogleAPIs();
-
-      // Iniciar sesión con Google (el Client ID se obtiene automáticamente desde el servidor)
-      this._showFeedback('🔐 Iniciando sesión con Google...');
-      try {
-        await this.googleDriveService.signInWithGoogle();
-        this._showFeedback('✅ Sesión iniciada correctamente');
-      } catch (authError) {
-        if (authError.message.includes('cancelada') || authError.message.includes('popup_closed')) {
-          this._showFeedback('❌ Inicio de sesión cancelado');
-          return;
-        } else if (authError.message.includes('Client ID') || authError.message.includes('invalid_client')) {
-          logError('⚠️ Error de autenticación:', authError);
-          this._showFeedback('❌ Error de autenticación. Por favor, contacta al administrador.');
-          return;
-        }
-        throw authError;
-      }
-
-      // Listar carpetas de nivel superior
-      this._showFeedback('📁 Obteniendo lista de carpetas de nivel superior...');
-      const folders = await this.googleDriveService.listTopLevelFolders();
-      
-      if (!folders || folders.length === 0) {
-        this._showFeedback('❌ No se encontraron carpetas en tu Google Drive');
-        alert('No se encontraron carpetas en tu Google Drive.\n\nAsegúrate de tener al menos una carpeta en tu Drive.');
-        return;
-      }
-
-      // Mostrar modal para seleccionar carpeta o usar todas
-      const folderId = await this._showFolderSelectorModal(folders);
-      if (!folderId) {
-        this._showFeedback('❌ Selección de carpeta cancelada');
-        return;
-      }
-
-      // Generar vault desde la carpeta seleccionada
-      this._showFeedback('🔄 Analizando estructura de carpetas y archivos...');
-      let driveConfig;
-      
-      if (folderId === 'all') {
-        // Generar vault desde todas las carpetas de nivel superior
-        driveConfig = await this.googleDriveService.generateVaultFromAllFolders();
-      } else {
-        // Generar vault desde una carpeta específica
-        driveConfig = await this.googleDriveService.generateVaultFromFolder(folderId);
-      }
-      
-      this._showFeedback('✅ Vault generado correctamente');
-
-      // El formato de driveConfig ya es compatible con el formato legacy del vault
-      // { categories: [...], pages: [...] }
-      const importedConfig = {
-        categories: driveConfig.categories || [],
-        pages: driveConfig.pages || []
-      };
-
-      // Contar páginas
-      const currentConfig = this.config || { categories: [] };
-      const configForCount = currentConfig.toJSON ? currentConfig.toJSON() : currentConfig;
-      const currentPagesCount = this._countPagesInConfig(configForCount);
-      const importedPagesCount = this._countPagesInConfig(importedConfig);
-
-      log(`Import from Drive: currentPages=${currentPagesCount}, importedPages=${importedPagesCount}`);
-
-      // Mostrar modal de opciones de importación (igual que JSON)
-      await this._showLoadJsonOptionsModal(importedConfig, currentPagesCount, importedPagesCount, 'Google Drive');
-
-    } catch (error) {
-      logError('Error importando desde Google Drive:', error);
-      
-      let userMessage = '❌ Error desconocido';
-      
-      if (error.message === 'Selección cancelada') {
-        userMessage = '❌ Importación cancelada';
-      } else if (error.message.includes('Credenciales')) {
-        userMessage = '❌ Error en las credenciales. Verifica que el API Key y Client ID sean correctos.';
-      } else if (error.message.includes('no está disponible')) {
-        userMessage = '❌ Google Drive no está disponible. Verifica tu conexión a internet.';
-      } else if (error.message.includes('autenticación') || error.message.includes('Auth')) {
-        userMessage = '❌ Error de autenticación. Intenta cerrar sesión y volver a iniciar.';
-      } else if (error.message.includes('inicializado')) {
-        userMessage = '❌ Error al conectar con Google. Verifica tus credenciales en la configuración.';
-      } else {
-        userMessage = `❌ Error: ${error.message}`;
-      }
-      
-      this._showFeedback(userMessage);
-      
-      // Mostrar alerta solo para errores críticos
-      if (!error.message.includes('cancelada')) {
-        setTimeout(() => {
-          alert(`${userMessage}\n\nSi el problema persiste, contacta al administrador.`);
-        }, 500);
-      }
-    }
-  }
-
-  /**
-   * Muestra modal para seleccionar una carpeta de Google Drive
-   * @param {Array} folders - Array de carpetas {id, name}
-   * @returns {Promise<string|null>} - ID de la carpeta seleccionada, 'all' para todas, o null si se cancela
-   * @private
-   */
-  async _showFolderSelectorModal(folders) {
-    return new Promise((resolve) => {
-      const foldersList = folders.map(folder => {
-        const folderName = folder.name.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-        return `<button type="button" class="folder-item" data-folder-id="${folder.id}">
-          <span class="folder-icon">📁</span>
-          <span class="folder-name">${folderName}</span>
-        </button>`;
-      }).join('');
-
-      const modalContent = `
-        <div class="form">
-          <p class="settings__description" style="margin-bottom: 16px;">
-            Selecciona una carpeta específica o todas las carpetas de nivel superior:
-          </p>
-          <div class="folder-selector" style="max-height: 400px; overflow-y: auto; border: 1px solid #ddd; border-radius: 8px; padding: 8px;">
-            <button type="button" class="folder-item folder-item--all" data-folder-id="all" style="background: #e3f2fd; border-color: #2196f3;">
-              <span class="folder-icon">📚</span>
-              <span class="folder-name"><strong>Todas las carpetas de nivel superior</strong></span>
-            </button>
-            ${foldersList || '<p style="text-align: center; color: #999; padding: 20px;">No hay carpetas disponibles</p>'}
-          </div>
-          <div class="form__actions" style="margin-top: 16px;">
-            <button type="button" id="folder-selector-cancel" class="btn btn--ghost btn--flex">Cancelar</button>
-          </div>
-        </div>
-        <style>
-          .folder-item {
-            width: 100%;
-            padding: 12px;
-            margin: 4px 0;
-            border: 1px solid #ddd;
-            border-radius: 6px;
-            background: #fff;
-            cursor: pointer;
-            text-align: left;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            transition: all 0.2s;
-          }
-          .folder-item:hover {
-            background: #f5f5f5;
-            border-color: #2196f3;
-          }
-          .folder-item:active {
-            background: #e3f2fd;
-          }
-          .folder-item--all:hover {
-            background: #bbdefb;
-          }
-          .folder-icon {
-            font-size: 20px;
-          }
-          .folder-name {
-            flex: 1;
-            font-weight: 500;
-            color: #333;
-          }
-        </style>
-      `;
-
-      const modal = this.modalManager.showCustom({
-        title: '📁 Seleccionar carpeta(s) de Google Drive',
-        content: modalContent
-      });
-
-      const cancelBtn = modal.querySelector('#folder-selector-cancel');
-      const folderItems = modal.querySelectorAll('.folder-item');
-
-      cancelBtn.addEventListener('click', () => {
-        this.modalManager.close();
-        resolve(null);
-      });
-
-      folderItems.forEach(item => {
-        item.addEventListener('click', () => {
-          const folderId = item.dataset.folderId;
-          this.modalManager.close();
-          resolve(folderId);
-        });
-      });
-    });
-  }
 
 
   /**

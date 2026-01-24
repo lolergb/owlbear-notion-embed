@@ -6,6 +6,7 @@
  */
 
 import { log, logError, logWarn } from '../utils/logger.js';
+import { GOOGLE_DRIVE_CLIENT_ID } from '../utils/constants.js';
 
 /**
  * Servicio para interactuar con Google Drive
@@ -36,30 +37,6 @@ export class GoogleDriveService {
     this.OBR = obr;
   }
 
-  /**
-   * Obtiene el Client ID de Google OAuth desde la configuración del servidor
-   * @returns {Promise<string>} - Client ID
-   * @private
-   */
-  async _getClientId() {
-    try {
-      // Intentar obtener desde la función de Netlify
-      const response = await fetch('/.netlify/functions/get-google-drive-credentials');
-      if (response.ok) {
-        const data = await response.json();
-        if (data.clientId) {
-          log('✅ Client ID obtenido desde configuración del servidor');
-          return data.clientId;
-        }
-      }
-      
-      // Si no está disponible en el servidor, lanzar error
-      throw new Error('Google OAuth Client ID no está configurado en el servidor');
-    } catch (error) {
-      logError('Error obteniendo Client ID:', error);
-      throw new Error('No se pudo obtener el Client ID de Google OAuth. Por favor, contacta al administrador.');
-    }
-  }
 
   /**
    * Carga Google Identity Services y Google API Client
@@ -132,10 +109,12 @@ export class GoogleDriveService {
    * Usa Google Identity Services con initTokenClient() que es el método recomendado
    * para aplicaciones JavaScript. No requiere client secret, solo Client ID.
    * 
-   * @param {string} clientId - Client ID de Google OAuth (obtenido del usuario)
+   * El Client ID se obtiene desde GOOGLE_DRIVE_CLIENT_ID en constants.js
+   * Si no está configurado, solo se loguea un error para desarrolladores (no bloquea al usuario)
+   * 
    * @returns {Promise<string>} - Token de acceso OAuth 2.0
    */
-  async signInWithGoogle(clientId = null) {
+  async signInWithGoogle() {
     try {
       await this.loadGoogleAPIs();
 
@@ -143,16 +122,20 @@ export class GoogleDriveService {
         throw new Error('Google Identity Services no está disponible');
       }
 
-      // Obtener Client ID desde configuración del servidor si no se proporciona
-      if (!clientId) {
-        clientId = await this._getClientId();
+      // Obtener Client ID desde constante (no desde servidor)
+      const clientId = GOOGLE_DRIVE_CLIENT_ID;
+      
+      if (!clientId || typeof clientId !== 'string' || clientId.trim().length === 0) {
+        // Solo loguear error para desarrolladores, no bloquear al usuario
+        logError('⚠️ [DEV] Google OAuth Client ID no configurado. Configura GOOGLE_DRIVE_CLIENT_ID en js/utils/constants.js');
+        throw new Error('Google OAuth Client ID no está configurado');
       }
 
       // Usar Google Identity Services Token Model (recomendado por Google)
       // Documentación: https://developers.google.com/identity/oauth2/web/guides/use-token-model
       return new Promise((resolve, reject) => {
         this.tokenClient = window.google.accounts.oauth2.initTokenClient({
-          client_id: clientId,
+          client_id: clientId.trim(),
           scope: 'https://www.googleapis.com/auth/drive.readonly',
           callback: (response) => {
             if (response.error) {
@@ -161,31 +144,22 @@ export class GoogleDriveService {
               return;
             }
             // El access token se obtiene directamente del callback
-            // No se necesita client secret para aplicaciones JavaScript
             // IMPORTANTE: El token se almacena solo en memoria (this.accessToken)
-            // NO se guarda en localStorage por seguridad (requisito del proyecto)
+            // NO se guarda en localStorage por seguridad
             this.accessToken = response.access_token;
             
-            // Guardar información del token si está disponible (para refresh si es necesario)
-            // Los tokens OAuth 2.0 típicamente expiran en 1 hora
+            // Guardar información del token si está disponible
             if (response.expires_in) {
               this.tokenExpiresAt = Date.now() + (response.expires_in * 1000);
               log(`⏰ Token expira en ${Math.round(response.expires_in / 60)} minutos`);
             }
             
-            // Si hay refresh token, guardarlo (aunque en el flujo implícito puede no estar disponible)
-            // Nota: El flujo implícito de OAuth 2.0 para JavaScript no siempre proporciona refresh tokens
-            // Si el token expira, el usuario necesitará autenticarse de nuevo
-            
-            // Configurar el token en el cliente de Google API una vez
-            // Esto hará que todas las peticiones futuras incluyan el token automáticamente
-            // en el header Authorization: Bearer <token>
+            // Configurar el token en el cliente de Google API
             if (window.gapi && window.gapi.client) {
               window.gapi.client.setToken({ access_token: this.accessToken });
             }
             
             log('✅ Autenticado con Google Drive usando OAuth 2.0');
-            log(`✅ Token de acceso obtenido (expira en ${response.expires_in || 'desconocido'} segundos)`);
             resolve(this.accessToken);
           }
         });
