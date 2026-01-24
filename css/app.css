@@ -749,8 +749,7 @@
   /* Estilos base para botones de acción */
   .page-share-button,
   .page-visibility-button,
-  .page-context-menu-button,
-  .page-copy-link-button {
+  .page-context-menu-button {
     width: 32px; /* 24px icono + 8px padding * 2 */
     height: 32px;
     background: transparent;
@@ -767,15 +766,13 @@
   
   .page-share-button:hover,
   .page-visibility-button:hover,
-  .page-context-menu-button:hover,
-  .page-copy-link-button:hover {
+  .page-context-menu-button:hover {
     background: var(--color-bg-hover);
   }
   
   .page-share-button img,
   .page-visibility-button img,
-  .page-context-menu-button img,
-  .page-copy-link-button img {
+  .page-context-menu-button img {
     width: var(--icon-size-md); /* 20px */
     height: var(--icon-size-md); /* 20px */
   }

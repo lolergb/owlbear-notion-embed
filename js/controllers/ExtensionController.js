@@ -1931,43 +1931,6 @@ export class ExtensionController {
    * @param {Page|Object} page - La página a compartir
    * @private
    */
-  /**
-   * Copia el link de una página al portapapeles
-   * @param {Object} page - Página a copiar
-   * @private
-   */
-  async _copyPageLink(page) {
-    if (!page || !page.url) {
-      this._showFeedback('⚠️ No URL available to copy');
-      return;
-    }
-
-    try {
-      // Copiar al portapapeles usando la API del navegador
-      await navigator.clipboard.writeText(page.url);
-      log(`📋 Link copiado: ${page.url}`);
-      this._showFeedback(`✅ Link copied: ${page.name}`);
-    } catch (error) {
-      logError('Error al copiar link:', error);
-      // Fallback para navegadores que no soportan clipboard API
-      try {
-        const textArea = document.createElement('textarea');
-        textArea.value = page.url;
-        textArea.style.position = 'fixed';
-        textArea.style.opacity = '0';
-        document.body.appendChild(textArea);
-        textArea.select();
-        document.execCommand('copy');
-        document.body.removeChild(textArea);
-        log(`📋 Link copiado (fallback): ${page.url}`);
-        this._showFeedback(`✅ Link copied: ${page.name}`);
-      } catch (fallbackError) {
-        logError('Error en fallback de copia:', fallbackError);
-        this._showFeedback('❌ Error copying link');
-      }
-    }
-  }
-
   async _shareCurrentPageToPlayers(pageData) {
     if (!pageData) return;
 
@@ -4253,9 +4216,6 @@ export class ExtensionController {
       },
       onPageShare: (page, categoryPath, pageIndex) => {
         this._shareCurrentPageToPlayers(page);
-      },
-      onPageCopyLink: (page) => {
-        this._copyPageLink(page);
       },
       onPageEdit: (page, categoryPath, pageIndex, newData) => {
         this._handlePageEdit(page, categoryPath, pageIndex, newData);

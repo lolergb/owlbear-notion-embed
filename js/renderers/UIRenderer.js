@@ -62,8 +62,7 @@ export class UIRenderer {
     const keys = [
       'onPageClick', 'onVisibilityChange', 'onPageShare', 'onPageEdit', 'onPageDelete', 
       'onPageMove', 'onPageDuplicate', 'onCategoryEdit', 'onCategoryDelete',
-      'onCategoryMove', 'onCategoryDuplicate', 'onAddPage', 'onAddCategory', 'onShowModal',
-      'onPageCopyLink'
+      'onCategoryMove', 'onCategoryDuplicate', 'onAddPage', 'onAddCategory', 'onShowModal'
     ];
     keys.forEach(key => {
       if (callbacks[key]) this[key] = callbacks[key];
@@ -481,48 +480,6 @@ export class UIRenderer {
 
         actionsContainer.appendChild(visibilityButton);
         actionsContainer.appendChild(contextMenuButton);
-        
-        // Botón de copiar link (solo GM, si la página tiene URL)
-        if (page && page.url) {
-          const copyLinkButton = document.createElement('button');
-          copyLinkButton.className = 'page-copy-link-button';
-          copyLinkButton.innerHTML = '<img src="img/icon-link.svg" alt="Copy link">';
-          copyLinkButton.title = 'Copy link';
-          
-          copyLinkButton.addEventListener('click', async (e) => {
-            e.stopPropagation();
-            try {
-              // Copiar al portapapeles usando la API del navegador
-              await navigator.clipboard.writeText(page.url);
-              console.log(`📋 Link copiado: ${page.url}`);
-              // Mostrar feedback (usar el callback si está disponible)
-              if (this.onPageCopyLink) {
-                this.onPageCopyLink(page);
-              }
-            } catch (error) {
-              console.error('Error al copiar link:', error);
-              // Fallback para navegadores que no soportan clipboard API
-              try {
-                const textArea = document.createElement('textarea');
-                textArea.value = page.url;
-                textArea.style.position = 'fixed';
-                textArea.style.opacity = '0';
-                document.body.appendChild(textArea);
-                textArea.select();
-                document.execCommand('copy');
-                document.body.removeChild(textArea);
-                console.log(`📋 Link copiado (fallback): ${page.url}`);
-                if (this.onPageCopyLink) {
-                  this.onPageCopyLink(page);
-                }
-              } catch (fallbackError) {
-                console.error('Error en fallback de copia:', fallbackError);
-              }
-            }
-          });
-
-          actionsContainer.appendChild(copyLinkButton);
-        }
     }
     
     button.appendChild(actionsContainer);
