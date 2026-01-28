@@ -196,9 +196,9 @@
         const role = await OBR.player.getRole();
         const isGM = role === 'GM';
         
-        // Mostrar botón de compartir si es GM/Co-GM/Player Y el parámetro share es true
+        // Mostrar botón de compartir solo si es GM Y el parámetro share no es false
         // (showShareButton es false cuando la imagen fue recibida por broadcast)
-        if (showShareButton) {
+        if (isGM && showShareButton) {
           document.querySelector('.gm-only').style.display = 'flex';
           
           // Configurar botón de compartir
@@ -214,12 +214,15 @@
               // Mostrar feedback
               const feedback = document.getElementById('feedback');
               feedback.classList.add('visible');
-              setTimeout(() => {
-                feedback.classList.remove('visible');
-              }, 2000);
               
               // Cambiar el botón a estado compartido
               shareButton.classList.add('shared');
+              
+              // Quitar el estado compartido cuando desaparezca el feedback
+              setTimeout(() => {
+                feedback.classList.remove('visible');
+                shareButton.classList.remove('shared');
+              }, 2000);
               
             } catch (error) {
               console.error('Error al compartir imagen:', error);
