@@ -4323,6 +4323,43 @@ export class ExtensionController {
       onPageMove: (page, categoryPath, pageIndex, direction) => {
         this._handlePageMove(page, categoryPath, pageIndex, direction);
       },
+    });
+
+    // Escuchar mensajes postMessage de páginas cargadas en iframes (páginas de Obsidian)
+    window.addEventListener('message', async (event) => {
+      // Validar origen (opcional, pero recomendado para seguridad)
+      // Por ahora aceptamos cualquier origen ya que las URLs pueden variar
+      
+      if (event.data && event.data.type === 'openMentionModal') {
+        const { pageId, pageName, pageUrl } = event.data;
+        
+        log('📨 Mensaje recibido para abrir modal:', { pageId, pageName, pageUrl });
+        
+        try {
+          // Buscar la página en el vault
+          let page = null;
+          
+          // Buscar por URL primero (más confiable para páginas de Obsidian)
+          if (pageUrl && this.config) {
+            page = this.config.findPageByUrl(pageUrl);
+          }
+          
+          // Si no se encuentra por URL, intentar por ID
+          if (!page && pageId && this.config) {
+            page = this.config.findPageByNotionId(pageId) || this.config.findPageById(pageId);
+          }
+          
+          if (page) {
+            log('✅ Página encontrada, abriendo modal:', page);
+            await this._showMentionPageModal(page, pageName || page.name);
+          } else {
+            logWarn('⚠️ Página no encontrada en vault para mention:', { pageId, pageUrl });
+          }
+        } catch (error) {
+          logError('❌ Error al abrir modal desde postMessage:', error);
+        }
+      }
+    });
       onPageDuplicate: (page, categoryPath, pageIndex) => {
         this._handlePageDuplicate(page, categoryPath, pageIndex);
       },
